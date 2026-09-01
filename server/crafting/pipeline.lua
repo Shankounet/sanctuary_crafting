@@ -612,7 +612,7 @@ local BP_TIER_LABEL = {
     industrial = 'PLAN INDUSTRIEL',
     medical = 'PLAN MÉDICAL',
     experimental = 'PLAN EXPÉRIMENTAL',
-    expérimental = 'PLAN EXPÉRIMENTAL',
+    ['expérimental'] = 'PLAN EXPÉRIMENTAL',
 }
 
 local function blueprintMetaOf(r)
@@ -731,7 +731,7 @@ local function findDismantleSources(src, item)
             -- reverse map: recipes that list this item as a yield/byproduct
             local hit = false
             for i = 1, #list do
-                if list[i].item == item then hit = true break end
+                if list[i].item == item then hit = true; break end
             end
             if not hit and rr.result and rr.result.item == item then hit = true end
             if hit then
