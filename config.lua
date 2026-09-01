@@ -202,7 +202,7 @@ Config.WorldBenches = {}
 Config.Recipes = {}
 
 --------------------------------------------------------------------------------
--- Lookup (rempli par recipes/registry.lua)
+-- Lookup (rempli par server/recipes/registry.lua)
 --------------------------------------------------------------------------------
 Config.RecipeById = {}
 
