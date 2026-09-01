@@ -335,9 +335,10 @@
         <button type="button" class="card-fav${favOn ? ' on' : ''}" data-fav="${escapeHtml(r.id)}" title="Favori" aria-label="Favori">
           <i class="fa-${favOn ? 'solid' : 'regular'} fa-star" aria-hidden="true"></i>
         </button>
-        <div class="card-img-zone" aria-hidden="true">
-          <span class="ph"><i class="fa-solid fa-cube"></i></span>
+        <div class="card-img-zone">
+          <span class="ph" aria-hidden="true"><i class="fa-solid fa-cube"></i></span>
           <img alt="" />
+          <span class="card-state-badge ${status.cls}" title="${escapeHtml(status.text)}">${status.text}</span>
         </div>
         <div class="card-body">
           <div class="card-identity">
@@ -346,9 +347,6 @@
               <span class="card-cat">${escapeHtml(categoryLabel(r.category))}</span>
               <span class="card-code">${escapeHtml(code)}</span>
             </div>
-          </div>
-          <div class="card-status-row">
-            <span class="status-plate status-pill ${status.cls}">${status.text}</span>
           </div>
         </div>
       `;
