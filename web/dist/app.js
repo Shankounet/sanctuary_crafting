@@ -780,8 +780,9 @@
     const catLabel = categoryLabel(data.category);
     const stencil = $('#station-stencil');
     if (stencil) {
-      const code = String(data.benchKey || data.category || '03').replace(/[^a-zA-Z0-9]/g, '').slice(-2).toUpperCase() || '03';
-      stencil.textContent = `STATION ${code} · ${catLabel}`;
+      const raw = String(data.benchKey || data.category || 'NG');
+      const code = raw.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'NG';
+      stencil.textContent = `STATION ${code} · ${catLabel.toUpperCase()}`;
     }
     const metaBits = [];
     if (data.category) metaBits.push(catLabel);
