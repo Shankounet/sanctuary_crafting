@@ -655,8 +655,79 @@ local function buildRecipeEntry(src, r)
         playerSkillLevel = lockArgs[2]
     end
 
+    -- Missing / almost-craftable enrichment for NUI badges
+    local missingCount = 0
+    local primaryMissing = nil
+    for i = 1, #ingsOut do
+        local ing = ingsOut[i]
+        local need = ing.count or 1
+        local owned = ing.owned or 0
+        if owned < need then
+            missingCount = missingCount + 1
+            if not primaryMissing then
+                primaryMissing = { item = ing.item, owned = owned, count = need }
+            end
+        end
+    end
+
+    local toolDurability = nil
+    if Config.Tools and Config.Tools.Enabled and r.requireTool then
+        local toolItem = type(r.requireTool) == 'string' and r.requireTool or r.requireTool.item
+        if toolItem and GetResourceState('ox_inventory') == 'started' then
+            local slots = exports.ox_inventory:Search(src, 'slots', toolItem) or {}
+            local key = (Config.Tools.DurabilityKey) or 'durability'
+            for _, it in pairs(slots) do
+                if it then
+                    local meta = it.metadata or {}
+                    toolDurability = meta[key]
+                    if toolDurability == nil then
+                        toolDurability = Config.Tools.DefaultDurability or 100
+                    end
+                    break
+                end
+            end
+        end
+    end
+
+    local levelGap = nil
+    if lockReason == 'craft_level_required' then
+        local need = (lockArgs and lockArgs[1]) or r.requireLevel
+        local cur = (lockArgs and lockArgs[2]) or playerSkillLevel
+        if need ~= nil and cur ~= nil then
+            levelGap = math.max(0, (tonumber(need) or 0) - (tonumber(cur) or 0))
+        end
+    elseif lockReason == 'craft_station_level' and r.stationLevel then
+        -- bench level filled at menu level; gap computed client-side if needed
+        levelGap = nil
+    end
+
+    local almostCraftable = false
+    if not (canCraft and hasItems) then
+        if canCraft and not hasItems and missingCount == 1 then
+            almostCraftable = true
+        elseif levelGap ~= nil and levelGap > 0 and levelGap <= 2 and hasItems then
+            almostCraftable = true
+        elseif toolDurability ~= nil and toolDurability > 0 and toolDurability <= 15 and hasItems and canCraft == false then
+            -- tool nearly broken while other gates may vary — hint only when tools matter
+            almostCraftable = true
+        elseif not canCraft and hasItems and lockReason == 'craft_tool_required' and toolDurability ~= nil and toolDurability <= 15 then
+            almostCraftable = true
+        end
+    end
+
+    local tags = r.tags or {}
+    local isNew = r.isNew == true
+    local newlyUnlocked = r.newlyUnlocked == true
+    if type(tags) == 'table' then
+        for _, t in ipairs(tags) do
+            local tl = type(t) == 'string' and string.lower(t) or ''
+            if tl == 'new' or tl == 'nouveau' then isNew = true end
+            if tl == 'newlyunlocked' or tl == 'newly_unlocked' then newlyUnlocked = true end
+        end
+    end
+
     return {
-        id = r.id, label = r.label, category = r.category, tags = r.tags or {},
+        id = r.id, label = r.label, category = r.category, tags = tags,
         description = r.description,
         ingredients = ingsOut,
         result = r.result, duration = r.duration,
@@ -673,6 +744,15 @@ local function buildRecipeEntry(src, r)
         skillCategory = skillCategory,
         playerSkillLevel = playerSkillLevel,
         hasSpecialization = hasSpecialization,
+        missingCount = missingCount,
+        primaryMissing = primaryMissing,
+        toolDurability = toolDurability,
+        levelGap = levelGap,
+        almostCraftable = almostCraftable,
+        isNew = isNew,
+        newlyUnlocked = newlyUnlocked,
+        compareWith = r.compareWith,
+        relatedRecipeId = r.relatedRecipeId,
     }
 end
 
@@ -694,19 +774,59 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
     local favorites = {}
     if Favorites then favorites = Favorites.Get(src) end
 
+    local pinned = {}
+    if SurvivalBook and SurvivalBook.ListPins then
+        local pins = SurvivalBook.ListPins(src) or {}
+        for i = 1, #pins do
+            local rid = pins[i].recipeId or pins[i]
+            if type(rid) == 'string' then pinned[#pinned + 1] = rid end
+        end
+    end
+
+    -- station-level almost gap fill for stationLevel locks
+    local benchLevel = bench.stationLevel or 1
+    for i = 1, #out do
+        local e = out[i]
+        if e.lockReason == 'craft_station_level' and e.stationLevel then
+            local gap = math.max(0, (tonumber(e.stationLevel) or 0) - benchLevel)
+            e.levelGap = gap
+            if not e.canCraft and e.missingItems == false and gap > 0 and gap <= 2 then
+                e.almostCraftable = true
+            end
+        end
+    end
+
+    local ux = (Config.UI and Config.UI.Ux) or {}
+    local compareCfg = Config.Compare or {}
+
     return {
         ok = true, benchKey = benchKey, category = bench.category,
         label = bench.label or _(Config.BenchLabels[bench.category] or 'bench_scrap'),
-        stationLevel = bench.stationLevel or 1, modules = bench.modules or {},
+        stationLevel = benchLevel, modules = bench.modules or {},
         powered = (CraftingPower and CraftingPower.HasPower and CraftingPower.HasPower(bench)) or false,
-        recipes = out, favorites = favorites,
-        ui = Config.UI, flags = {
+        recipes = out, favorites = favorites, pinned = pinned,
+        ui = Config.UI, ux = ux,
+        compare = {
+            enabled = compareCfg.Enabled == true,
+            map = compareCfg.Map or {},
+        },
+        queueMax = (Config.Queue and Config.Queue.MaxQueuePerPlayer) or 5,
+        flags = {
             quality = Config.Quality and Config.Quality.Enabled,
             blueprints = Config.Blueprints and Config.Blueprints.Enabled,
             queue = Config.Queue and Config.Queue.Enabled,
             batch = Config.Batch and Config.Batch.Enabled,
             mastery = Config.Mastery and Config.Mastery.Enabled,
             shopping = Config.ShoppingList and Config.ShoppingList.Enabled,
+            almostCraftable = ux.AlmostCraftable ~= false,
+            badgeTooltips = ux.BadgeTooltips ~= false,
+            nouveauIndicator = ux.NouveauIndicator ~= false,
+            selectionTransition = ux.SelectionTransition ~= false,
+            masteryDots = ux.MasteryDots ~= false,
+            pinFollow = ux.PinFollow ~= false,
+            fabReadyConsole = ux.FabReadyConsole ~= false,
+            microToasts = ux.MicroToasts ~= false,
+            compare = compareCfg.Enabled == true,
         },
     }
 end)

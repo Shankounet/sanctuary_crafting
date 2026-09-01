@@ -9,6 +9,7 @@
     benchKey: null,
     recipes: [],
     favorites: [],
+    pinned: [],
     selected: null,
     filter: 'all',
     category: 'all',
@@ -19,11 +20,159 @@
     queue: [],
     shop: {},
     flags: {},
+    ux: {},
+    compare: { enabled: false, map: {} },
+    queueMax: 5,
+    lastCraft: null,
     menuMeta: {},
     sounds: { Enabled: true, Volume: 0.35, Files: {} },
     audioCtx: null,
     sideTab: 'queue',
   };
+
+  const SEEN_KEY = 'sanctuary_crafting:seenRecipes';
+  const LAST_CRAFT_KEY = 'sanctuary_crafting:lastCraft';
+
+  function loadSeenRecipes() {
+    try {
+      const raw = localStorage.getItem(SEEN_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch (_) {
+      return new Set();
+    }
+  }
+
+  function saveSeenRecipes(set) {
+    try {
+      localStorage.setItem(SEEN_KEY, JSON.stringify(Array.from(set)));
+    } catch (_) { /* ignore */ }
+  }
+
+  let seenRecipes = loadSeenRecipes();
+
+  function uxOn(key, fallback = true) {
+    if (state.flags && state.flags[key] != null) return !!state.flags[key];
+    if (state.ux && state.ux[key] != null) return !!state.ux[key];
+    /* PascalCase mirror from Config.UI.Ux */
+    const pascal = key.charAt(0).toUpperCase() + key.slice(1);
+    if (state.ux && state.ux[pascal] != null) return !!state.ux[pascal];
+    return fallback;
+  }
+
+  function isPinned(id) {
+    return (state.pinned || []).includes(id);
+  }
+
+  function showToast(message, kind) {
+    if (!uxOn('microToasts', true) && !uxOn('MicroToasts', true)) return;
+    if (state.flags && state.flags.microToasts === false) return;
+    const host = $('#craft-toasts');
+    if (!host || !message) return;
+    const el = document.createElement('div');
+    el.className = `craft-toast ${kind || ''}`.trim();
+    el.textContent = message;
+    host.appendChild(el);
+    setTimeout(() => {
+      el.classList.add('out');
+      setTimeout(() => el.remove(), 180);
+    }, 2200);
+  }
+
+  function markRecipeSeen(id) {
+    if (!id) return;
+    if (seenRecipes.has(id)) return;
+    seenRecipes.add(id);
+    saveSeenRecipes(seenRecipes);
+  }
+
+  function recipeMarkedNew(r) {
+    if (!r) return false;
+    if (r.isNew || r.newlyUnlocked) return true;
+    const tags = r.tags || [];
+    return tags.includes('new') || tags.includes('nouveau') || tags.includes('newlyUnlocked') || tags.includes('newly_unlocked');
+  }
+
+  function compareTargetFor(r) {
+    if (!r) return null;
+    const enabled = !!(state.compare && state.compare.enabled) || uxOn('compare', false);
+    if (!enabled) return null;
+    if (r.compareWith) return r.compareWith;
+    if (r.relatedRecipeId) return r.relatedRecipeId;
+    const map = (state.compare && state.compare.map) || {};
+    if (map[r.id]) return map[r.id];
+    return null;
+  }
+
+  function masteryDots(value) {
+    const v = Math.max(0, Math.min(100, Number(value) || 0));
+    if (v <= 0) return 0;
+    if (v < 34) return 1;
+    if (v < 67) return 2;
+    return 3;
+  }
+
+  function primaryBadgeReason(r) {
+    if (!r) return '';
+    if (r.canCraft) return 'Conditions remplies';
+    if (r.primaryMissing && r.primaryMissing.item) {
+      const pm = r.primaryMissing;
+      return `${humanize(pm.item)} ${pm.owned || 0}/${pm.count || 1}`;
+    }
+    const ings = r.ingredients || [];
+    const miss = ings.find((ing) => {
+      if (typeof ing.owned !== 'number') return false;
+      return ing.owned < (ing.count || 1);
+    });
+    if (miss) return `${humanize(miss.item)} ${miss.owned}/${miss.count || 1}`;
+    if (r.lockReason === 'craft_blueprint_required') {
+      const bp = (r.lockArgs && r.lockArgs[0]) || r.requireBlueprint;
+      return bp ? `Plan requis : ${humanize(bp)}` : 'Plan requis';
+    }
+    if (r.lockReason === 'craft_level_required') {
+      const need = (r.lockArgs && r.lockArgs[0]) || r.requireLevel;
+      const cur = (r.lockArgs && r.lockArgs[1]) != null ? r.lockArgs[1] : r.playerSkillLevel;
+      if (need != null && cur != null) return `Niveau ${need} requis (actuel : ${cur})`;
+      if (need != null) return `Niveau ${need} requis`;
+      return 'Niveau requis';
+    }
+    if (r.lockReason === 'craft_station_level') {
+      const need = r.stationLevel;
+      const cur = state.menuMeta && state.menuMeta.stationLevel;
+      if (need != null && cur != null) return `Atelier niveau ${need} (actuel : ${cur})`;
+      return need ? `Atelier niveau ${need} requis` : 'Niveau d\'atelier insuffisant';
+    }
+    if (r.toolDurability != null && r.toolDurability <= 15) {
+      return `Outil usé (${r.toolDurability}%)`;
+    }
+    const lt = lockText(r);
+    return lt.text || 'Non faisable';
+  }
+
+  function computeAlmost(r) {
+    if (!r || r.canCraft) return false;
+    if (r.almostCraftable === true) return true;
+    let missing = typeof r.missingCount === 'number' ? r.missingCount : null;
+    if (missing == null && Array.isArray(r.ingredients)) {
+      missing = r.ingredients.filter((ing) => typeof ing.owned === 'number' && ing.owned < (ing.count || 1)).length;
+    }
+    if (!r.locked && missing === 1) return true;
+    if (typeof r.levelGap === 'number' && r.levelGap > 0 && r.levelGap <= 2) return true;
+    if (r.lockReason === 'craft_level_required') {
+      const need = (r.lockArgs && r.lockArgs[0]) || r.requireLevel;
+      const cur = (r.lockArgs && r.lockArgs[1]) != null ? r.lockArgs[1] : r.playerSkillLevel;
+      if (need != null && cur != null) {
+        const gap = need - cur;
+        if (gap > 0 && gap <= 2) return true;
+      }
+    }
+    if (r.lockReason === 'craft_station_level' && r.stationLevel != null && state.menuMeta && state.menuMeta.stationLevel != null) {
+      const gap = r.stationLevel - state.menuMeta.stationLevel;
+      if (gap > 0 && gap <= 2) return true;
+    }
+    if (r.toolDurability != null && r.toolDurability > 0 && r.toolDurability <= 15) return true;
+    return false;
+  }
 
   function post(name, data = {}) {
     return fetch(`https://${res}/${name}`, {
@@ -149,9 +298,8 @@
   }
 
   function isNewRecipe(r) {
-    if (state.flags.mastery) return !r.mastery || r.mastery <= 0;
-    const tags = r.tags || [];
-    return tags.includes('new') || tags.includes('nouveau') || r.rarity === 'new';
+    /* Do not mark all mastery-0 recipes as new on first visit */
+    return recipeMarkedNew(r) && !seenRecipes.has(r.id);
   }
 
   function matchesFilter(r) {
@@ -209,9 +357,12 @@
   }
 
   function cardStatus(r) {
-    /* Catalogue cards: binary glanceable state only. Details stay in right panel. */
-    if (r.canCraft) return { text: 'FAISABLE', cls: 'ok' };
-    return { text: 'NON FAISABLE', cls: 'bad' };
+    if (r.canCraft) return { text: 'FAISABLE', cls: 'ok', tip: 'Conditions remplies' };
+    const almostEnabled = uxOn('almostCraftable', true);
+    if (almostEnabled && computeAlmost(r)) {
+      return { text: 'PRESQUE', cls: 'almost', tip: primaryBadgeReason(r) };
+    }
+    return { text: 'NON FAISABLE', cls: 'bad', tip: primaryBadgeReason(r) };
   }
 
   function disableReasons(r) {
@@ -359,6 +510,16 @@
       }
       const resultItem = (r.result && r.result.item) || r.id;
       const code = recipeCode(r);
+      const showNouveau = uxOn('nouveauIndicator', true) && recipeMarkedNew(r) && !seenRecipes.has(r.id);
+      const tip = uxOn('badgeTooltips', true) ? (status.tip || status.text) : status.text;
+      const showMastery = uxOn('masteryDots', true) && state.flags.mastery && (r.mastery != null);
+      const filled = showMastery ? masteryDots(r.mastery) : 0;
+      const masteryHtml = showMastery
+        ? `<div class="card-mastery" title="Maîtrise ${escapeHtml(r.mastery || 0)}%" aria-hidden="true">${[0,1,2].map((i) => `<span class="${i < filled ? 'on' : ''}"></span>`).join('')}</div>`
+        : '';
+      const nouveauHtml = showNouveau
+        ? '<span class="card-nouveau">NOUVEAU</span>'
+        : '';
 
       card.innerHTML = `
         <button type="button" class="card-fav${favOn ? ' on' : ''}" data-fav="${escapeHtml(r.id)}" title="Favori" aria-label="Favori">
@@ -367,7 +528,8 @@
         <div class="card-img-zone">
           <span class="ph" aria-hidden="true"><i class="fa-solid fa-cube"></i></span>
           <img alt="" />
-          <span class="card-state-badge ${status.cls}" title="${escapeHtml(status.text)}">${status.text}</span>
+          ${nouveauHtml}
+          <span class="card-state-badge ${status.cls}" title="${escapeHtml(tip)}">${status.text}</span>
         </div>
         <div class="card-body">
           <div class="card-identity">
@@ -376,6 +538,7 @@
               <span class="card-cat">${escapeHtml(categoryLabel(r.category))}</span>
               <span class="card-code">${escapeHtml(code)}</span>
             </div>
+            ${masteryHtml}
           </div>
         </div>
       `;
@@ -392,7 +555,9 @@
       if (favBtn) {
         favBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
+          const was = isFavorite(r.id);
           await post('favorite', { recipeId: r.id });
+          showToast(was ? 'Retiré des favoris' : 'Ajouté aux favoris', 'ok');
           await refresh();
         });
       }
@@ -423,6 +588,11 @@
   function selectRecipe(r) {
     state.selected = r;
     playTick();
+    if (uxOn('nouveauIndicator', true) && recipeMarkedNew(r)) {
+      const first = !seenRecipes.has(r.id);
+      markRecipeSeen(r.id);
+      if (first && (r.newlyUnlocked || r.isNew)) showToast('Nouveau plan déverrouillé', 'warn');
+    }
     $('#detail-empty').classList.add('hidden');
     $('#detail').classList.remove('hidden');
 
@@ -666,7 +836,36 @@
     favBtn.classList.toggle('on', on);
     favBtn.innerHTML = `<i class="fa-${on ? 'solid' : 'regular'} fa-star" aria-hidden="true"></i>`;
 
+    syncPinButton(r);
+    syncCompareButton(r);
+
     renderList();
+  }
+
+  function syncPinButton(r) {
+    const btnPin = $('#btn-pin');
+    if (!btnPin) return;
+    const follow = uxOn('pinFollow', true);
+    const pinned = !!(r && isPinned(r.id));
+    btnPin.title = follow ? 'Suivre dans le Carnet' : 'Épingler au carnet';
+    btnPin.setAttribute('aria-label', btnPin.title);
+    btnPin.classList.toggle('on', pinned);
+    btnPin.classList.toggle('is-pinned', pinned);
+    const label = btnPin.querySelector('.tool-label');
+    if (label) label.textContent = pinned ? 'Suivi' : 'Suivre';
+  }
+
+  function syncCompareButton(r) {
+    const btn = $('#btn-compare');
+    if (!btn) return;
+    const target = compareTargetFor(r);
+    btn.classList.toggle('hidden', !target);
+    if (target) {
+      btn.dataset.compareTarget = target;
+      btn.title = `Comparer avec ${humanize(target)}`;
+    } else {
+      delete btn.dataset.compareTarget;
+    }
   }
 
   let fabDoneTimer = null;
@@ -807,6 +1006,27 @@
       const cur = mod && mod.getAttribute('data-fab-state');
       if (cur !== 'done') setFabState('ready');
     }
+
+    updateFabIdleConsole();
+  }
+
+  function updateFabIdleConsole() {
+    const cons = $('#fab-idle-console');
+    if (!cons) return;
+    const show = uxOn('fabReadyConsole', true);
+    cons.classList.toggle('hidden', !show);
+    if (!show) return;
+    const qEl = $('#fab-idle-queue');
+    const maxQ = state.queueMax || 5;
+    const n = (state.queue && state.queue.length) || 0;
+    if (qEl) qEl.textContent = `${n}/${maxQ}`;
+    const lastEl = $('#fab-idle-last');
+    if (lastEl) {
+      const last = state.lastCraft || (function () {
+        try { return localStorage.getItem(LAST_CRAFT_KEY); } catch (_) { return null; }
+      })();
+      lastEl.textContent = last || '—';
+    }
   }
 
   function syncFabQueueMini() {
@@ -862,6 +1082,7 @@
     const data = await post('craft', { recipeId: state.selected.id, benchKey: state.benchKey, batch });
     if (!data.ok) {
       beep('error');
+      showToast('Craft impossible', 'err');
       await post('notify', { type: 'error', reason: data.reason });
       return;
     }
@@ -897,11 +1118,15 @@
       beep('success');
       if (data.chainNext) beep('blueprint');
       const doneLabel = $('#fab-done-label');
-      if (doneLabel) {
-        doneLabel.textContent = data.label
+      const craftName = data.label
           || (state.selected && state.selected.label)
           || 'Objet fabriqué';
+      if (doneLabel) {
+        doneLabel.textContent = craftName;
       }
+      state.lastCraft = craftName;
+      try { localStorage.setItem(LAST_CRAFT_KEY, craftName); } catch (_) { /* ignore */ }
+      updateFabIdleConsole();
       setFabState('done');
     } else {
       beep('error');
@@ -1060,11 +1285,19 @@
     state.benchKey = data.benchKey;
     state.recipes = data.recipes || [];
     state.favorites = data.favorites || [];
+    state.pinned = data.pinned || [];
     state.flags = data.flags || {};
+    state.ux = (data.ui && data.ui.Ux) || data.ux || state.ux || {};
+    state.compare = data.compare || { enabled: !!(state.flags && state.flags.compare), map: {} };
+    if (data.queueMax != null) state.queueMax = data.queueMax;
     if (data.ui && data.ui.Sounds) state.sounds = data.ui.Sounds;
+    if (app) {
+      app.dataset.uxSel = uxOn('selectionTransition', true) ? '1' : '0';
+    }
     updateStationHeader(data);
     renderCategories();
     renderList();
+    updateFabIdleConsole();
     if (state.selected) {
       const again = state.recipes.find((r) => r.id === state.selected.id);
       if (again) selectRecipe(again);
@@ -1142,7 +1375,7 @@
       if (pin) {
         pin.addEventListener('click', () => {
           if (state.selected) {
-            post('bookPinRecipe', { recipeId: state.selected }).then((r) => {
+            post('bookPinRecipe', { recipeId: state.selected.id }).then((r) => {
               post('notify', { type: r && r.ok ? 'success' : 'error', reason: r && r.ok ? 'book_pinned' : (r && r.reason) || 'craft_failed' });
               beep(r && r.ok ? 'click' : 'error');
             });
@@ -1242,15 +1475,20 @@
   }
   bindUi('#btn-fav', 'click', async () => {
     if (!state.selected) return;
+    const was = isFavorite(state.selected.id);
     await post('favorite', { recipeId: state.selected.id });
+    showToast(was ? 'Retiré des favoris' : 'Ajouté aux favoris', 'ok');
     await refresh();
   });
   bindUi('#btn-queue', 'click', async () => {
     if (!state.selected) return;
     const batchEl = $('#batch');
     const batch = parseInt(batchEl && batchEl.value, 10) || 1;
-    await post('queue', { recipeId: state.selected.id, benchKey: state.benchKey, batch });
+    const r = await post('queue', { recipeId: state.selected.id, benchKey: state.benchKey, batch });
+    if (r && r.ok === false) showToast('Impossible d\'ajouter à la file', 'err');
+    else showToast('Ajouté à la file', 'ok');
     await loadQueue();
+    updateFabIdleConsole();
     openTab('queue');
   });
   bindUi('#btn-shop', 'click', async () => {
@@ -1277,15 +1515,44 @@
   const btnPin = $('#btn-pin');
   if (btnPin) btnPin.addEventListener('click', () => {
     if (!state.selected) return;
-    post('bookPinRecipe', { recipeId: state.selected }).then((r) => {
-      post('notify', { type: r && r.ok ? 'success' : 'error', reason: r && r.ok ? 'book_pinned' : (r && r.reason) || 'craft_failed' });
-      beep(r && r.ok ? 'click' : 'error');
+    const id = state.selected.id;
+    const was = isPinned(id);
+    /* optimistic visual toggle */
+    if (was) state.pinned = (state.pinned || []).filter((x) => x !== id);
+    else state.pinned = [...(state.pinned || []), id];
+    syncPinButton(state.selected);
+    const cbName = was ? 'bookUnpinRecipe' : 'bookPinRecipe';
+    post(cbName, { recipeId: id }).then((r) => {
+      if (r && r.pins) {
+        state.pinned = (r.pins || []).map((p) => p.recipeId || p).filter(Boolean);
+      } else if (!(r && r.ok)) {
+        /* revert optimistic */
+        if (was) state.pinned = [...(state.pinned || []), id];
+        else state.pinned = (state.pinned || []).filter((x) => x !== id);
+      }
+      syncPinButton(state.selected);
+      showToast(was ? 'Suivi retiré' : 'Suivi dans le Carnet', r && r.ok !== false ? 'ok' : 'err');
+      post('notify', { type: r && r.ok !== false ? 'success' : 'error', reason: was ? (r && r.ok !== false ? 'book_pinned' : (r && r.reason) || 'craft_failed') : (r && r.ok ? 'book_pinned' : (r && r.reason) || 'craft_failed') });
+      beep(r && r.ok !== false ? 'click' : 'error');
     });
+  });
+
+  bindUi('#btn-compare', 'click', () => {
+    if (!state.selected) return;
+    const target = compareTargetFor(state.selected);
+    if (!target) return;
+    const found = state.recipes.find((r) => r.id === target);
+    if (found) {
+      selectRecipe(found);
+      playTick();
+    } else {
+      showToast('Recette liée introuvable', 'warn');
+    }
   });
   const btnObj = $('#btn-obj');
   if (btnObj) btnObj.addEventListener('click', () => {
     if (!state.selected) return;
-    post('bookObjectiveRecipe', { recipeId: state.selected }).then((r) => {
+    post('bookObjectiveRecipe', { recipeId: state.selected.id }).then((r) => {
       post('notify', { type: r && r.ok ? 'success' : 'error', reason: r && r.ok ? 'book_objective_added' : (r && r.reason) || 'craft_failed' });
       beep(r && r.ok ? 'click' : 'error');
     });
@@ -1299,8 +1566,9 @@
     const msg = event.data || {};
     if (msg.action === 'open') {
       app.classList.remove('hidden');
+      try { state.lastCraft = localStorage.getItem(LAST_CRAFT_KEY); } catch (_) { /* ignore */ }
       applyMenu(msg.data || {});
-      loadQueue();
+      loadQueue().then(() => updateFabIdleConsole());
       openTab(state.sideTab || 'queue');
       if (msg.data && msg.data.ui && msg.data.ui.Accent) {
         document.documentElement.style.setProperty('--accent', msg.data.ui.Accent);
