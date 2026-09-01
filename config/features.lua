@@ -111,3 +111,5 @@ Config.Power = Config.Power or { Enabled = false }
 if Config.Power.FallbackModules == nil then
     Config.Power.FallbackModules = { 'power_cell', 'generator' }
 end
+
+-- Survival Book : voir config/book.lua (Config.Book.*)

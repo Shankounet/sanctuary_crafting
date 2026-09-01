@@ -1,0 +1,98 @@
+:root {
+  --book-accent: #9a8866;
+}
+#book-app {
+  position: absolute;
+  inset: 5% 7%;
+  display: flex;
+  flex-direction: column;
+  background:
+    linear-gradient(145deg, rgba(154,136,102,.06), transparent 40%),
+    linear-gradient(160deg, #14161c 0%, #0e0f11 60%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 24px 70px rgba(0,0,0,.6), inset 0 1px 0 rgba(154,136,102,.14);
+  overflow: hidden;
+  font-family: var(--font);
+  color: var(--text);
+}
+#book-app .book-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  background: #16181c;
+}
+#book-app .book-brand { display: flex; gap: 12px; align-items: center; }
+#book-app .book-mark {
+  width: 28px; height: 36px; border-radius: 3px 8px 8px 3px;
+  background: linear-gradient(180deg, #b09a72, var(--book-accent));
+  box-shadow: 0 0 14px rgba(154,136,102,.35);
+}
+#book-app h1 { font-size: 17px; font-weight: 600; letter-spacing: .04em; }
+#book-app .book-sub { color: var(--muted); font-size: 11px; margin-top: 2px; text-transform: uppercase; letter-spacing: .12em; }
+#book-app .book-actions { display: flex; gap: 8px; align-items: center; }
+#book-app #book-search {
+  width: 200px; padding: 7px 11px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); outline: none;
+}
+#book-app #book-search:focus { border-color: var(--book-accent); }
+#book-app .book-body { flex: 1; display: grid; grid-template-columns: 200px 1fr; min-height: 0; }
+#book-app .book-nav {
+  border-right: 1px solid var(--border); background: #12141a;
+  overflow: auto; padding: 8px;
+}
+#book-app .book-nav button {
+  width: 100%; text-align: left; margin-bottom: 3px;
+  border: 1px solid transparent; background: transparent; color: var(--muted);
+  border-radius: 8px; padding: 9px 10px; cursor: pointer; font-size: 13px;
+}
+#book-app .book-nav button:hover { background: #1c1f24; color: var(--text); }
+#book-app .book-nav button.active {
+  border-color: var(--book-accent); color: var(--book-accent);
+  background: rgba(154,136,102,.1);
+}
+#book-app .book-main { overflow: auto; padding: 14px 16px; min-height: 0; }
+#book-app .cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px; margin-bottom: 14px;
+}
+#book-app .card {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px;
+}
+#book-app .card .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+#book-app .card .v { font-size: 22px; color: var(--book-accent); margin-top: 4px; font-weight: 600; }
+#book-app .section { margin-bottom: 16px; }
+#book-app .section h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted); margin-bottom: 8px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+#book-app .list { list-style: none; }
+#book-app .list li {
+  display: flex; justify-content: space-between; gap: 10px; align-items: center;
+  padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+#book-app .list li:hover { background: rgba(255,255,255,.02); }
+#book-app .badge {
+  font-size: 11px; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--muted);
+}
+#book-app .badge.ok { color: var(--ok); border-color: #3d5a44; }
+#book-app .badge.warn { color: var(--warn); border-color: #5a4a2a; }
+#book-app .unknown { color: var(--muted); font-style: italic; letter-spacing: .2em; }
+#book-app .row-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+#book-app textarea, #book-app input[type="text"], #book-app input[type="number"] {
+  width: 100%; background: var(--bg-elev); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 8px 10px; margin-top: 6px;
+}
+#book-app textarea { min-height: 90px; resize: vertical; }
+#book-app .empty { color: var(--muted); font-size: 13px; padding: 20px 0; }
+#book-app .tree-pre {
+  font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted);
+  white-space: pre-wrap; line-height: 1.45;
+}
+#book-app .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 1100px) {
+  #book-app .book-body { grid-template-columns: 160px 1fr; }
+  #book-app .split { grid-template-columns: 1fr; }
+}
