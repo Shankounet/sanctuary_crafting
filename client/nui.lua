@@ -83,6 +83,11 @@ RegisterNUICallback('tree', function(data, cb)
     cb(r or { ok = false })
 end)
 
+RegisterNUICallback('pathHints', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:pathHints', false, data and data.recipeId)
+    cb(r or { ok = false })
+end)
+
 
 RegisterNUICallback('bookUnpinRecipe', function(data, cb)
     local r = lib.callback.await('sanctuary_crafting:book:action', false, 'unpin', { recipeId = data.recipeId })

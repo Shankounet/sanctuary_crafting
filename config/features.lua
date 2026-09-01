@@ -77,6 +77,13 @@ Config.Mastery = {
     Enabled = true, -- maîtrise locale par recette — PAS d'XP global parallèle à ml_skills
     XpPerCraft = 1,
     MaxMastery = 100,
+    MasteredThreshold = 100, -- mastery >= threshold → état « maîtrisé »
+}
+
+-- Connaissance recette (états UI) — serveur autoritaire ; client n'invente rien
+Config.Knowledge = {
+    Enabled = true,
+    States = true, -- unknown / partial / blueprint / learned / mastered
 }
 
 Config.Tags = {
@@ -114,6 +121,11 @@ Config.UI = {
         PinFollow = true,         -- titre « Suivre dans le Carnet » + état pin
         FabReadyConsole = true,   -- lignes idle STATION READY / File / Dernier craft
         MicroToasts = true,       -- toasts discrets dans le shell craft
+        SmartSearch = true,       -- index client multi-champs (ingrédients, résultat, station…)
+        MasteredBadge = true,     -- pastille MAÎTRISÉ compacte
+        KnowledgeMarks = true,    -- marques knowledge (silhouette / voile / plan / maîtrise)
+        PathHints = true,         -- module CHEMIN RECOMMANDÉ (fiche droite)
+        ArtisanHints = true,      -- module ARTISANS CONNUS (fiche droite)
     },
 }
 

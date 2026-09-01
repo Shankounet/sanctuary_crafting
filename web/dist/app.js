@@ -28,6 +28,7 @@
     sounds: { Enabled: true, Volume: 0.35, Files: {} },
     audioCtx: null,
     sideTab: 'queue',
+    searchIndex: {},
   };
 
   const SEEN_KEY = 'sanctuary_crafting:seenRecipes';
@@ -338,6 +339,34 @@
     return recipeMarkedNew(r) && !seenRecipes.has(r.id);
   }
 
+  function buildRecipeHaystack(r) {
+    const parts = [
+      r.label, r.id, r.category, r.description, r.desc,
+      r.station, r.skillCategory,
+      (r.tags || []).join(' '),
+    ];
+    (r.ingredients || []).forEach((ing) => {
+      parts.push(ing.item, ing.label);
+    });
+    if (r.result) {
+      parts.push(r.result.item, r.result.label);
+    }
+    if (r.blueprintId || r.requireBlueprint) {
+      parts.push(r.blueprintId || r.requireBlueprint);
+    }
+    if (r.knowledge) parts.push(r.knowledge);
+    return parts.filter(Boolean).join(' ').toLowerCase();
+  }
+
+  function rebuildSearchIndex(recipes) {
+    const idx = {};
+    (recipes || []).forEach((r) => {
+      if (!r || !r.id) return;
+      idx[r.id] = buildRecipeHaystack(r);
+    });
+    state.searchIndex = idx;
+  }
+
   function matchesFilter(r) {
     if (state.category && state.category !== 'all' && r.category !== state.category) return false;
     if (state.filter === 'craftable' && !r.canCraft) return false;
@@ -346,10 +375,17 @@
     if (state.filter === 'new' && !isNewRecipe(r)) return false;
     if (state.filter === 'plans' && !hasKnownPlan(r)) return false;
     if (state.search) {
-      const q = state.search.toLowerCase();
-      const tags = (r.tags || []).join(' ');
-      const hay = `${r.label} ${r.id} ${tags} ${r.category || ''} ${r.result && r.result.item || ''}`.toLowerCase();
-      if (!hay.includes(q)) return false;
+      const q = state.search.toLowerCase().trim();
+      if (q) {
+        if (uxOn('smartSearch', true)) {
+          const hay = (state.searchIndex && state.searchIndex[r.id]) || buildRecipeHaystack(r);
+          if (!hay.includes(q)) return false;
+        } else {
+          const tags = (r.tags || []).join(' ');
+          const hay = `${r.label} ${r.id} ${tags} ${r.category || ''} ${r.result && r.result.item || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+      }
     }
     return true;
   }
@@ -390,6 +426,20 @@
     else if (r.lockReason === 'craft_level_required' || r.lockReason === 'craft_station_level') tag = 'NIVEAU REQUIS';
     else if (r.lockReason === 'craft_skill_required') tag = 'VERROUILLÉ';
     return { text, cls: 'warn', tag };
+  }
+
+
+  function knowledgeMarkHtml(kn) {
+    if (!kn || kn === 'learned') return '';
+    const map = {
+      unknown: { ico: 'fa-question', title: 'Inconnu' },
+      partial: { ico: 'fa-eye-low-vision', title: 'Connaissance partielle' },
+      blueprint: { ico: 'fa-drafting-compass', title: 'Plan technique' },
+      mastered: { ico: 'fa-certificate', title: 'Maîtrisé' },
+    };
+    const m = map[kn];
+    if (!m) return '';
+    return `<span class="card-knowledge-mark kn-${kn}" title="${m.title}" aria-hidden="true"><i class="fa-solid ${m.ico}"></i></span>`;
   }
 
   function cardStatus(r) {
@@ -559,21 +609,35 @@
       const nouveauHtml = showNouveau
         ? '<span class="card-nouveau">NOUVEAU</span>'
         : '';
+      const kn = (uxOn('knowledgeMarks', true) && (state.flags.knowledge !== false)) ? (r.knowledge || null) : null;
+      if (kn) {
+        card.classList.add(`knowledge-${kn}`);
+        card.dataset.knowledge = kn;
+      }
+      const masteredOn = uxOn('masteredBadge', true) && (r.mastered === true || kn === 'mastered');
+      const masteredHtml = masteredOn
+        ? '<span class="card-mastered-badge" title="Maîtrisé">MAÎTRISÉ</span>'
+        : '';
+      const knMark = kn ? knowledgeMarkHtml(kn) : '';
+      const titleText = kn === 'unknown' ? '???' : r.label;
+      const veilImg = (kn === 'unknown' || kn === 'partial');
 
       card.innerHTML = `
         <button type="button" class="card-fav${favOn ? ' on' : ''}" data-fav="${escapeHtml(r.id)}" title="Favori" aria-label="Favori">
           <i class="fa-${favOn ? 'solid' : 'regular'} fa-star" aria-hidden="true"></i>
         </button>
-        <div class="card-img-zone">
-          <span class="ph" aria-hidden="true"><i class="fa-solid fa-cube"></i></span>
+        <div class="card-img-zone${veilImg ? ' is-veiled' : ''}${kn === 'unknown' ? ' is-unknown' : ''}">
+          <span class="ph" aria-hidden="true"><i class="fa-solid ${kn === 'unknown' ? 'fa-question' : 'fa-cube'}"></i></span>
           <img alt="" />
           ${nouveauHtml}
+          ${masteredHtml}
+          ${knMark}
           ${r.rarity ? `<span class="card-rarity-mark rarity-${rarityKey(r.rarity)}" title="${escapeHtml(rarityLabel(r.rarity))}"><i class="fa-solid ${RARITY_ICON[rarityKey(r.rarity)] || 'fa-circle'}" aria-hidden="true"></i></span>` : ''}
           <span class="card-state-badge ${status.cls}" title="${escapeHtml(tip)}">${status.text}</span>
         </div>
         <div class="card-body">
           <div class="card-identity">
-            <div class="card-title">${escapeHtml(r.label)}</div>
+            <div class="card-title">${escapeHtml(titleText)}</div>
             <div class="card-meta-line">
               <span class="card-cat">${escapeHtml(categoryLabel(r.category))}</span>
               <span class="card-code">${escapeHtml(code)}</span>
@@ -585,7 +649,12 @@
 
       const img = card.querySelector('.card-img-zone img');
       const ph = card.querySelector('.card-img-zone .ph');
-      bindItemImg(img, resultItem, ph);
+      if (kn === 'unknown') {
+        if (img) { img.hidden = true; img.classList.add('is-fallback'); }
+        if (ph) ph.style.display = '';
+      } else {
+        bindItemImg(img, resultItem, ph);
+      }
 
       card.addEventListener('click', (e) => {
         if (e.target.closest('[data-fav]')) return;
@@ -802,7 +871,7 @@
       li.innerHTML = `
         <img class="ing-thumb" alt="" />
         <span class="mark ${info.cls}">${info.mark}</span>
-        <span class="iname">${escapeHtml(humanize(ing.item))}</span>
+        <span class="iname">${escapeHtml(ing.label || humanize(ing.item))}</span>
         <span class="icount ${info.cls}">${escapeHtml(info.text)}</span>
       `;
       bindItemImg(li.querySelector('img'), ing.item, null);
@@ -890,6 +959,13 @@
       }
     }
 
+    // —— Knowledge source / blueprint identity ——
+    renderKnowledgeSource(r);
+
+    // —— Recommended path + artisans (server fields only) ——
+    renderPathHints(r);
+    renderArtisanHints(r);
+
     // —— FABRIQUER / module fabrication ——
     updateActionBar(r);
 
@@ -902,6 +978,155 @@
     syncCompareButton(r);
 
     renderList();
+  }
+
+  function blueprintTierLabel(meta) {
+    if (!meta) return null;
+    if (meta.label) return meta.label;
+    const t = (meta.tier || meta.type || '').toLowerCase();
+    const map = {
+      military: 'PLAN MILITAIRE',
+      industrial: 'PLAN INDUSTRIEL',
+      industriel: 'PLAN INDUSTRIEL',
+      medical: 'PLAN MÉDICAL',
+      experimental: 'PLAN EXPÉRIMENTAL',
+    };
+    return map[t] || null;
+  }
+
+  function renderKnowledgeSource(r) {
+    const block = $('#block-knowledge-source');
+    const fiche = $('#detail');
+    const hero = fiche && fiche.querySelector('.fiche-hero');
+    if (fiche) {
+      fiche.classList.remove('from-blueprint', 'has-blueprint-cue');
+      delete fiche.dataset.knowledgeSource;
+    }
+    if (hero) hero.classList.remove('from-blueprint');
+    if (!block) return;
+    const src = r.knowledgeSource;
+    const kn = r.knowledge;
+    const show = !!(src === 'blueprint' || kn === 'blueprint' || (r.blueprintId && hasKnownPlan(r) && src === 'blueprint'));
+    if (!show) {
+      block.classList.add('hidden');
+      return;
+    }
+    block.classList.remove('hidden');
+    if (fiche) {
+      fiche.classList.add('from-blueprint', 'has-blueprint-cue');
+      fiche.dataset.knowledgeSource = 'blueprint';
+    }
+    if (hero) hero.classList.add('from-blueprint');
+    const txt = $('#d-knowledge-source');
+    if (txt) {
+      txt.textContent = 'SOURCE DE CONNAISSANCE · Plan technique';
+    }
+    const tierEl = $('#d-blueprint-tier');
+    const tier = blueprintTierLabel(r.blueprintMeta);
+    if (tierEl) {
+      if (tier) {
+        tierEl.textContent = tier;
+        tierEl.classList.remove('hidden');
+      } else {
+        tierEl.textContent = '';
+        tierEl.classList.add('hidden');
+      }
+    }
+  }
+
+  function renderPathHints(r) {
+    const block = $('#block-path');
+    const list = $('#d-path-hints');
+    const countEl = $('#path-count');
+    const moreBtn = $('#btn-path-more');
+    if (!block || !list) return;
+    const enabled = uxOn('pathHints', true) && state.flags.pathHints !== false;
+    const hints = (enabled && Array.isArray(r.pathHints)) ? r.pathHints.slice(0, 3) : [];
+    if (!enabled || !hints.length) {
+      block.classList.add('hidden');
+      list.innerHTML = '';
+      return;
+    }
+    block.classList.remove('hidden');
+    if (countEl) countEl.textContent = String(hints.length);
+    list.innerHTML = '';
+    hints.forEach((h) => {
+      const li = document.createElement('li');
+      li.className = `path-hint kind-${escapeHtml(h.kind || 'info')}`;
+      const canLink = h.recipeId && state.recipes.some((x) => x.id === h.recipeId);
+      li.innerHTML = `
+        <div class="path-hint-head">
+          <span class="path-kind">${escapeHtml(h.title || '')}</span>
+          ${canLink ? `<button type="button" class="ghost compact path-goto" data-recipe="${escapeHtml(h.recipeId)}">Voir la recette</button>` : ''}
+        </div>
+        <p class="path-detail">${escapeHtml(h.detail || '')}</p>
+      `;
+      list.appendChild(li);
+    });
+    list.querySelectorAll('.path-goto').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = btn.getAttribute('data-recipe');
+        const found = state.recipes.find((x) => x.id === id);
+        if (found) selectRecipe(found);
+      });
+    });
+    if (moreBtn) {
+      const more = r.pathHintsMore === true;
+      moreBtn.classList.toggle('hidden', !more);
+      moreBtn.onclick = () => {
+        if (!r.id) return;
+        post('pathHints', { recipeId: r.id }).then((data) => {
+          if (!(data && data.ok)) return;
+          // display only server-provided hints — never invent
+          const merged = Object.assign({}, r, {
+            pathHints: data.pathHints || r.pathHints,
+            pathHintsMore: data.moreAvailable,
+            artisanHints: data.artisanHints || r.artisanHints,
+          });
+          const idx = state.recipes.findIndex((x) => x.id === r.id);
+          if (idx >= 0) state.recipes[idx] = merged;
+          state.selected = merged;
+          renderPathHints(merged);
+          renderArtisanHints(merged);
+        });
+      };
+    }
+  }
+
+  function renderArtisanHints(r) {
+    const block = $('#block-artisans');
+    const host = $('#d-artisans');
+    const countEl = $('#artisan-count');
+    if (!block || !host) return;
+    const enabled = uxOn('artisanHints', true) && state.flags.artisanHints !== false;
+    const hints = (r && r.artisanHints) || { potential: [], confirmed: [] };
+    const pot = enabled ? (hints.potential || []) : [];
+    const conf = enabled ? (hints.confirmed || []) : [];
+    if (!enabled || (!pot.length && !conf.length)) {
+      block.classList.add('hidden');
+      host.innerHTML = '';
+      return;
+    }
+    block.classList.remove('hidden');
+    if (countEl) countEl.textContent = String(pot.length + conf.length);
+    let html = '';
+    conf.forEach((a) => {
+      html += `<div class="artisan-row confirmed">
+        <span class="artisan-tag">SERVICE CONFIRMÉ</span>
+        <span class="artisan-name">${escapeHtml(a.name || a.id || '')}</span>
+        <span class="artisan-spec muted">${escapeHtml(a.specialty || a.serviceLabel || '')}</span>
+      </div>`;
+    });
+    pot.forEach((a) => {
+      html += `<div class="artisan-row potential">
+        <span class="artisan-tag">CONTACT POTENTIEL</span>
+        <span class="artisan-name">${escapeHtml(a.name || a.id || '')}</span>
+        <span class="artisan-spec muted">${escapeHtml(a.specialty || '')}</span>
+      </div>`;
+    });
+    host.innerHTML = html;
   }
 
   function syncPinButton(r) {
@@ -1356,6 +1581,7 @@
     if (app) {
       app.dataset.uxSel = uxOn('selectionTransition', true) ? '1' : '0';
     }
+    rebuildSearchIndex(state.recipes);
     updateStationHeader(data);
     renderCategories();
     renderList();
@@ -1617,11 +1843,34 @@
     post('bookObjectiveRecipe', { recipeId: state.selected.id }).then((r) => {
       post('notify', { type: r && r.ok ? 'success' : 'error', reason: r && r.ok ? 'book_objective_added' : (r && r.reason) || 'craft_failed' });
       beep(r && r.ok ? 'click' : 'error');
+      if (r && r.ok) showToast('Objectif ajouté au Carnet', 'ok');
     });
   });
   const btnBook = $('#btn-book');
   if (btnBook) btnBook.addEventListener('click', () => {
     post('bookOpenFromCraft', { page: 'dashboard' });
+  });
+  bindUi('#btn-path-objective', 'click', () => {
+    if (!state.selected) return;
+    post('bookObjectiveRecipe', { recipeId: state.selected.id, withMissing: true }).then((r) => {
+      post('notify', { type: r && r.ok ? 'success' : 'error', reason: r && r.ok ? 'book_objective_added' : (r && r.reason) || 'craft_failed' });
+      beep(r && r.ok ? 'click' : 'error');
+      if (r && r.ok) showToast('Objectifs (recette + manquants) ajoutés', 'ok');
+    });
+  });
+  bindUi('#btn-path-follow', 'click', () => {
+    if (!state.selected) return;
+    const id = state.selected.id;
+    post('bookPinRecipe', { recipeId: id }).then((r) => {
+      if (r && r.pins) {
+        state.pinned = (r.pins || []).map((p) => p.recipeId || p).filter(Boolean);
+        syncPinButton(state.selected);
+      }
+      post('bookOpenFromCraft', { page: 'objectives' });
+    });
+  });
+  bindUi('#btn-artisans-book', 'click', () => {
+    post('bookOpenFromCraft', { page: 'artisans' });
   });
 
   window.addEventListener('message', (event) => {

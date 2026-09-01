@@ -84,7 +84,9 @@ lib.callback.register('sanctuary_crafting:book:action', function(src, action, pa
         if not obj then return { ok = false, reason = err } end
         return { ok = true, data = obj }
     elseif action == 'addObjectiveRecipe' then
-        local obj, err = SurvivalBook.AddObjectiveFromRecipe(src, payload.recipeId)
+        local obj, err = SurvivalBook.AddObjectiveFromRecipe(src, payload.recipeId, {
+            withMissing = payload.withMissing ~= false,
+        })
         if not obj then return { ok = false, reason = err } end
         return { ok = true, data = obj }
     elseif action == 'completeObjective' then
