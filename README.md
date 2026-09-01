@@ -1,15 +1,25 @@
-# sanctuary_crafting v2.1.2
+# sanctuary_crafting v2.1.3
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
 **ml_skills** (Micio Mods) est la **seule** source de compétences / XP / niveaux. Aucun XP craft parallèle.
 
-UI NUI **premium** (v2.1.2) : post-apo industriel moderne (pas Fallout / pas cyberpunk), accent `#9a8866`. **Craft** = atelier / banc de production (chrome industriel net, grille 3 colonnes). **Carnet** = journal technique / dossier de terrain (chrome dossier plus doux, sidebar app + pages widgets). Micro-interactions 100–180 ms. Callbacks NUI inchangés.
+UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton terni `#9a8866`, pas Fallout / pas cyberpunk). **Craft** = banc de production 3 colonnes (polish densité PC). **Carnet** = journal / dossier de terrain (identité séparée). Micro-interactions 100–180 ms. **Callbacks NUI inchangés.**
 
 ---
 
 
 ## Notes de version
+
+### v2.1.3 — Craft UI polish
+Polish UX / art direction de l’**atelier craft** (`web/dist/style.css`, `app.js`, `index.html`) sans redesign architecture (3 colonnes, cartes, détail droit, File/Arbre/Courses).
+
+- Colonne gauche un peu plus étroite, catégories compactes, File/Arbre/Courses mieux présentés (file industrielle / plan technique / checklist récup).
+- Cartes recettes : image un peu plus grande, hiérarchie nom, tags techniques (OPÉRATIONNEL / MANQUANT / VERROUILLÉ), favori discret, hover premium.
+- Panneau droit : identité (image, nom, catégorie, rareté, description) puis blocs techniques ; lignes « — » masquées ; spécialisation ✓/✕ ; skill ml_skills (nom, niveau actuel/requis, barre) ; matériaux image + owned/required.
+- FABRIQUER désactivé mais lisible + une raison primaire ; tooltips obligatoires sur icônes latérales.
+- Direction artistique atelier survivant (grain métal, rivets, stencils STATION/RECIPE INDEX, codes recette) — **Book inchangé** (reste dossier / journal via `book.css` / `book.js`).
+- Enrichissement NUI additif dans `buildRecipeEntry` (`owned`, `playerSkillLevel`, `hasSpecialization`, `description`) — **aucun rename** de callbacks (`close`, `refresh`, `craft`, `complete`, `cancel`, `favorite`, `queue`, `queueList`, `queueCollect`, `shopping`, `shoppingClear`, `tree`, `notify`, book*).
 
 ### v2.1.2 — Identité visuelle Carnet (Book ≠ Craft)
 Refonte UI/UX du **Carnet de survie** (`web/dist/book.js` + `book.css` + mount HTML) : journal technique / dossier personnel, pas un clone du banc craft.
