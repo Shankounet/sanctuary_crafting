@@ -31,9 +31,13 @@ ensure sanctuary_crafting
 
 ```
 sanctuary_crafting/
-├── config.lua                 # base + distances + anti-exploit + recettes vides
+├── config.lua                 # base + distances + anti-exploit + Skills pack
 ├── config/features.lua        # flags de tous les systèmes (implémentés)
-├── config/examples.lua        # 9 recettes d’exemple
+├── config/categories.lua      # Config.RecipeCategories (IDs propres FR)
+├── config/recipes_import.lua  # pack recettes Alex (DevHub → sanctuary)
+├── config/world_benches.lua   # bancs monde (Shared.Craftings)
+├── config/community_projects.lua
+├── config/examples.lua        # 9 recettes d’exemple (OFF si import)
 ├── shared/                    # utils, UUID craftId, types de bancs
 ├── integrations/
 │   ├── ml_skills.lua          # CraftingSkills.* → API ml_skills
@@ -158,7 +162,8 @@ Tous les modules sont **implémentés**. Les flags activent/désactivent le comp
 {
   id = 'ex_metal_plate',
   label = 'Plaque de métal',
-  category = 'scrap', -- scrap|medical|weapons|survival|mechanic
+  category = 'weapons', -- UI RecipeCategories (ammo|weapons|…)
+  station = 'armurier', -- banc / Shared.Crafts key (requis pour le pack import)
   tags = { 'metal' },
   ingredients = {
     { item = 'scrap_metal', count = 5, substitutes = { 'metal_ore' } },
@@ -189,7 +194,56 @@ Tous les modules sont **implémentés**. Les flags activent/désactivent le comp
 }
 ```
 
-9 exemples : `config/examples.lua` (`Config.LoadExampleRecipes`). `ex_cut_pipe` démo `steps[]`.
+9 exemples : `config/examples.lua` (`Config.LoadExampleRecipes = true` pour forcer). `ex_cut_pipe` démo `steps[]`.
+
+---
+
+## Import recettes (pack Alex / DevHub)
+
+Conversion **non 1:1** depuis `Shared.Categories` / `Shared.Crafts` / `Shared.Craftings` / `Shared.CommunityProjects`.
+
+### Fichiers
+
+| Fichier | Contenu |
+|---------|---------|
+| `config/categories.lua` | `Config.RecipeCategories` — IDs propres (`ammo`, `weapons`, …), labels FR |
+| `config/recipes_import.lua` | **379** recettes → `Config.Recipes` + `Config.RecipesByStation` |
+| `config/world_benches.lua` | **19** bancs monde (coords serveur conservées) |
+| `config/community_projects.lua` | 2 projets communautaires |
+
+`Config.LoadImportedRecipes` vaut `true` par défaut. Les exemples démo sont **désactivés** (`LoadExampleRecipes` seulement si forcé à `true`).
+
+### Mapping catégories UI
+
+`category_1775…` → ids propres : `ammo`, `weapons`, `repair_kits`, `weapon_body`, `weapon_barrel`, `powders`, `weapon_repair`, `bandages`, `painkillers`, `remedies`, `med_kits`, `tickets`, `electricity`, `lamps`, `gadgets`, `radio`, `appliances`, `vehicle_customs`, `batteries`, `paint`, `tires`, `melee`, `tools`, `smelting`, `armor`, `sprouts`, `farm_equipment`, `consumables`, `meats`, `fish`, `shellfish`, `bags`, `artisan_prod` (+ extras pack : `decoration`, `cooker`, `techno`, `survie`).
+
+### Stations (18)
+
+`ingenieur`, `tailleur`, `boucherie`, `medical`, `forgeron`, `manche_forgeron`, `agriculture`, `mecano`, `schema`, `accessoires`, `fonderie_forgeron`, `decoration`, `munition`, `cuisine`, `reparation_forgeron`, `construction`, `survie`, `armurier`.
+
+Une recette a `category` (filtre UI) **et** `station` (banc). Le pipeline matche `recipe.station` (ou `category` pour les exemples) avec `bench.category`.
+
+### Skills ml_skills (catégories exactes du pack)
+
+`ingenieur`, `survie`, `agriculture`, `medecin`, `forgeron`, `mechanic`, `armurier`.
+
+Listées dans `Config.Skills.categories`. XP = `requiredLevelCategory` + `craftXP`. Skill = premier `skillTreeRequirements`.
+
+### BypassRequirements (rappel)
+
+> **NE JAMAIS activer `Config.Skills.BypassRequirements` sur un serveur public / production.**
+
+Réservé aux labs / tests de recettes. Voir section « Mode test sans skills ».
+
+### Ce qui n’est PAS importé
+
+- `customRequirements.handler` (remplacé par `tools` / `requireTool` pour `WEAPON_WRENCHKNIFE`)
+- `cameraOffset` / `PropDefaults` / tables `camera` (commentées éventuellement)
+- Invented ml_skills exports — uniquement les wrappers `CraftingSkills.*` existants
+
+### Bancs `type = "coords"`
+
+Pas de spawn prop : zone `ox_target` au point. Les autres bancs spawnent `model`/`prop` (string → `joaat` client).
 
 ---
 

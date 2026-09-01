@@ -32,7 +32,9 @@ function Benches.GetAllForClient()
     for id, b in pairs(worldEntities) do
         list[#list + 1] = {
             key = b.key, kind = 'world', id = id, category = b.category,
+            label = b.label, station = b.station or b.category,
             coords = b.coords, heading = b.heading, model = b.model,
+            type = b.type, spawnProp = b.spawnProp, queueSize = b.queueSize, blip = b.blip,
             stationLevel = b.stationLevel or 1, modules = b.modules or {},
             powered = CraftingPower.HasPower(b),
         }
@@ -53,10 +55,29 @@ local function loadWorld()
     for i = 1, #(Config.WorldBenches or {}) do
         local w = Config.WorldBenches[i]
         local id = w.id or ('world_' .. i)
+        local benchType = w.type
+        local spawnProp = w.spawnProp
+        if spawnProp == nil then
+            spawnProp = (benchType ~= 'coords') and (w.model ~= nil or w.prop ~= nil)
+        end
+        local model = w.model or w.prop
+        if spawnProp and not model then
+            model = GetBenchModel(w.category)
+        end
+        if not spawnProp then
+            model = nil
+        end
         worldEntities[id] = {
             key = benchKey('world', id), kind = 'world', id = id,
-            category = w.category, coords = w.coords, heading = w.heading or 0.0,
-            model = w.model or GetBenchModel(w.category),
+            label = w.label,
+            station = w.station or w.category,
+            category = w.category or w.station,
+            coords = w.coords, heading = w.heading or 0.0,
+            model = model,
+            type = benchType,
+            spawnProp = spawnProp,
+            queueSize = w.queueSize,
+            blip = w.blip,
             stationLevel = w.stationLevel or (Config.Stations and Config.Stations.DefaultLevel) or 1,
             modules = w.modules or {},
         }

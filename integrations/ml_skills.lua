@@ -164,6 +164,9 @@ end
 ---@param recipe table
 ---@return string
 function CraftingSkills.LevelCategoryForRecipe(recipe)
+    if recipe.requireSkillCategory then
+        return recipe.requireSkillCategory
+    end
     if recipe.xp and recipe.xp.category then
         return recipe.xp.category
     end

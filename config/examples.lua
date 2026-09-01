@@ -11,7 +11,9 @@
       -- OU chain = { 'ex_reinforced_plate' }  -- après complete, serveur renvoie chainNext (même craftUID)
 ]]
 
-Config.LoadExampleRecipes = Config.LoadExampleRecipes ~= false -- default true for examples pack
+-- Désactivé par défaut quand le pack import est présent (évite conflits scrap/medical démo).
+-- Forcer true pour recharger les 9 recettes d'exemple.
+Config.LoadExampleRecipes = Config.LoadExampleRecipes == true
 
 local Examples = {
     -- 1. Simple scrap

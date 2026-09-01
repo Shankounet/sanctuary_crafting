@@ -187,10 +187,31 @@ local function rollQuality(src, recipe)
 end
 
 local function applyToolCost(src, recipe)
+    -- Nouveau schéma tools[] (import) : consume=false → présence seule
+    if recipe.tools and type(recipe.tools) == 'table' then
+        for i = 1, #recipe.tools do
+            local t = recipe.tools[i]
+            if t and t.item then
+                if not Tools or not Tools.Has or not Tools.Has(src, t.item) then
+                    return false
+                end
+                if t.consume and Config.Tools and Config.Tools.Enabled and Tools.Consume then
+                    if not Tools.Consume(src, { item = t.item, durabilityCost = t.durabilityCost or 1 }) then
+                        return false
+                    end
+                end
+            end
+        end
+        return true
+    end
     if not Config.Tools or not Config.Tools.Enabled or not recipe.requireTool then
         return true
     end
     if not Tools or not Tools.Consume then return true end
+    -- durabilityCost 0 → présence seule
+    if (recipe.requireTool.durabilityCost or 0) <= 0 then
+        return Tools.Has and Tools.Has(src, recipe.requireTool.item) or false
+    end
     return Tools.Consume(src, recipe.requireTool)
 end
 
@@ -245,7 +266,8 @@ local function validateStart(src, recipeId, benchKey, batch)
 
     local bench = Benches.Resolve(benchKey)
     if not bench then return nil, 'craft_invalid' end
-    if recipe.category ~= bench.category then return nil, 'craft_wrong_bench' end
+    local recipeStation = recipe.station or recipe.category
+    if recipeStation ~= bench.category then return nil, 'craft_wrong_bench' end
     if not Validation.IsNearBench(src, bench.coords, Config.InteractDistance) then
         return nil, 'craft_too_far'
     end
@@ -605,7 +627,8 @@ local function buildRecipeEntry(src, r)
         result = r.result, duration = r.duration,
         xp = r.xp, requireLevel = r.requireLevel, requireSkill = r.requireSkill,
         requireBlueprint = r.requireBlueprint or r.blueprintId,
-        requireTool = r.requireTool, quality = r.quality, byproducts = r.byproducts,
+        requireTool = r.requireTool, tools = r.tools, station = r.station, rarity = r.rarity,
+        hideIfSkillLocked = r.hideIfSkillLocked, quality = r.quality, byproducts = r.byproducts,
         queueable = r.queueable, batchMax = r.batchMax, dismantle = r.dismantle,
         stationLevel = r.stationLevel, powerCost = r.powerCost, noiseLevel = r.noiseLevel,
         steps = stepsOut, chain = r.chain,
@@ -635,7 +658,7 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
 
     return {
         ok = true, benchKey = benchKey, category = bench.category,
-        label = _(Config.BenchLabels[bench.category] or 'bench_scrap'),
+        label = bench.label or _(Config.BenchLabels[bench.category] or 'bench_scrap'),
         stationLevel = bench.stationLevel or 1, modules = bench.modules or {},
         powered = (CraftingPower and CraftingPower.HasPower and CraftingPower.HasPower(bench)) or false,
         recipes = out, favorites = favorites,

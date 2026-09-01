@@ -17,8 +17,18 @@ function RecipeRegistry.Validate(r)
     if type(r) ~= 'table' then return fail('?', 'pas une table') end
     if type(r.id) ~= 'string' or r.id == '' then return fail(r.id, 'id manquant') end
     if type(r.label) ~= 'string' then return fail(r.id, 'label manquant') end
-    if type(r.category) ~= 'string' or not IsValidBenchCategory(r.category) then
-        return fail(r.id, 'category invalide: ' .. tostring(r.category))
+    -- category = catégorie UI (RecipeCategories) ; station = banc (BenchTypes)
+    if type(r.category) ~= 'string' or r.category == '' then
+        return fail(r.id, 'category manquante')
+    end
+    if IsValidRecipeCategory and not IsValidRecipeCategory(r.category) then
+        -- soft: log but allow unknown recipe categories from packs
+        print(('[^3sanctuary_crafting^0] category UI inconnue [%s]: %s'):format(tostring(r.id), tostring(r.category)))
+    end
+    if r.station ~= nil and type(r.station) == 'string' and r.station ~= '' then
+        if not IsValidBenchCategory(r.station) then
+            print(('[^3sanctuary_crafting^0] station inconnue [%s]: %s'):format(tostring(r.id), tostring(r.station)))
+        end
     end
     local hasSteps = type(r.steps) == 'table' and #r.steps > 0
     if hasSteps then
@@ -90,15 +100,23 @@ end
 
 ---@param category string
 ---@return table[]
+--- Recettes pour un banc : match recipe.station (import) OU recipe.category (exemples legacy)
 function GetRecipesForCategory(category)
     local list = {}
     for i = 1, #(Config.Recipes or {}) do
         local r = Config.Recipes[i]
-        if r.category == category and Config.RecipeById[r.id] then
-            list[#list + 1] = r
+        if Config.RecipeById[r.id] then
+            local station = r.station or r.category
+            if station == category or r.category == category then
+                list[#list + 1] = r
+            end
         end
     end
     return list
+end
+
+function GetRecipesForStation(station)
+    return GetRecipesForCategory(station)
 end
 
 ---@param id string

@@ -23,7 +23,11 @@ shared_scripts {
     '@es_extended/imports.lua',
     'config.lua',
     'config/features.lua',
-    'config/examples.lua',
+    'config/categories.lua',
+    'config/world_benches.lua',
+    'config/community_projects.lua',
+    'config/recipes_import.lua',
+    'config/examples.lua', -- demos ; Config.LoadExampleRecipes = false par défaut si import actif
     'config/book.lua',
     'shared/*.lua',
     'locales/*.lua',
