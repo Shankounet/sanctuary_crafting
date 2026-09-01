@@ -1,5 +1,5 @@
 /* sanctuary_crafting — Craft atelier design system (#app only). Book uses book.css. */
-/* v2.2.16 — recipe card footer breathing + readable category */
+/* v2.2.18 — craft cards: fixed media + guaranteed unclipped footer */
 
 :root {
   /* —— Color tokens (canonical) — neutral charcoal hierarchy —— */
@@ -3155,4 +3155,140 @@ button, input { font: inherit; color: inherit; }
   right: 8px !important;
   bottom: 8px !important;
   max-width: calc(100% - 20px);
+}
+
+
+/* ============================================================
+   v2.2.18 — Recipe cards: MEDIA + FOOTER fixed, no clipped text
+   ============================================================ */
+#app .recipe-card {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: visible !important;
+  /* softer corner cut so footer text is never eaten */
+  clip-path: polygon(0 2px, 2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px)) !important;
+  min-height: 186px !important;
+  height: auto !important;
+}
+
+/* 1) MEDIA — fixed height, overflow only here */
+#app .card-img-zone,
+#app .recipe-card.selected .card-img-zone,
+#app .recipe-card[class*="cat-"] .card-img-zone {
+  height: 96px !important;
+  min-height: 96px !important;
+  max-height: 96px !important;
+  flex: 0 0 96px !important;
+  overflow: hidden !important;
+  position: relative !important;
+  background: #232323 !important;
+}
+#app .card-img-zone img {
+  width: calc(100% - 16px) !important;
+  height: calc(100% - 14px) !important;
+  max-width: 92% !important;
+  max-height: 88% !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  margin: 0 auto !important;
+}
+#app .card-state-badge {
+  right: 8px !important;
+  bottom: 8px !important;
+  z-index: 5 !important;
+  /* keep badge inside media only */
+  max-width: calc(100% - 16px);
+}
+
+/* 2) FOOTER — guaranteed height, never clipped */
+#app .card-body,
+#app .recipe-card.selected .card-body {
+  flex: 0 0 auto !important;
+  flex-grow: 0 !important;
+  flex-shrink: 0 !important;
+  min-height: 68px !important;
+  height: auto !important;
+  overflow: visible !important;
+  padding: 10px 12px 14px !important;
+  gap: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  box-sizing: border-box !important;
+  background: #1e1e1e !important;
+}
+#app .card-identity {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+#app .card-title {
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: unset !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 0.86rem !important;
+  font-weight: 780 !important;
+  line-height: 1.25 !important;
+  max-width: 100%;
+  margin: 0 !important;
+}
+#app .card-meta-line {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  padding: 0 0 1px !important;
+  min-height: 1.15em !important;
+  overflow: visible !important;
+}
+#app .card-cat {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 0.56rem !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  color: rgba(190,190,190,0.78) !important;
+  opacity: 1 !important;
+  font-weight: 650 !important;
+  line-height: 1.35 !important;
+}
+#app .card-code,
+#app .recipe-card.selected .card-code {
+  flex: 0 0 auto !important;
+  font-size: 0.48rem !important;
+  letter-spacing: 0.08em !important;
+  color: rgba(154,154,154,0.4) !important;
+  opacity: 1 !important;
+  padding-right: 2px !important;
+  line-height: 1.35 !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 1440px) {
+  #app .card-img-zone,
+  #app .recipe-card.selected .card-img-zone,
+  #app .recipe-card[class*="cat-"] .card-img-zone {
+    height: 88px !important;
+    min-height: 88px !important;
+    max-height: 88px !important;
+    flex-basis: 88px !important;
+  }
+  #app .recipe-card {
+    min-height: 172px !important;
+  }
+  #app .card-body,
+  #app .recipe-card.selected .card-body {
+    min-height: 64px !important;
+    padding: 9px 11px 13px !important;
+  }
 }
