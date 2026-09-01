@@ -27,6 +27,36 @@ local function scaleIngredients(ingredients, batch)
     return list
 end
 
+
+local function recipeHasSteps(recipe)
+    return recipe and type(recipe.steps) == 'table' and #recipe.steps > 0
+end
+
+---@return table|nil step, number index, number total
+local function currentStepInfo(recipe, stepIndex)
+    if not recipeHasSteps(recipe) then return nil, 1, 1 end
+    local idx = stepIndex or 1
+    return recipe.steps[idx], idx, #recipe.steps
+end
+
+local function stepIngredients(recipe, stepIndex, batch)
+    batch = batch or 1
+    local step = recipeHasSteps(recipe) and recipe.steps[stepIndex or 1] or nil
+    local src = (step and step.ingredients) or recipe.ingredients or {}
+    return scaleIngredients(src, batch)
+end
+
+local function stepDuration(recipe, stepIndex)
+    local step = recipeHasSteps(recipe) and recipe.steps[stepIndex or 1] or nil
+    if step and type(step.duration) == 'number' then return step.duration end
+    if recipeHasSteps(recipe) then
+        -- split total duration across steps if step has no own duration
+        local n = #recipe.steps
+        return math.max(500, math.floor((recipe.duration or 5000) / n))
+    end
+    return recipe.duration or 5000
+end
+
 function CraftingPipeline.HasActive(src)
     local set = activeBySrc[src]
     if not set then return false end
@@ -52,15 +82,21 @@ local function clearActive(craftId, refund)
     if activeBySrc[craft.src] then
         activeBySrc[craft.src][craftId] = nil
     end
-    Validation.DecCraftCount(craft.src)
-    if refund and craft.removed and craft.ingredients then
-        for i = 1, #craft.ingredients do
-            local ing = craft.ingredients[i]
-            exports.ox_inventory:AddItem(craft.src, ing.item, ing.count)
-        end
-        -- restore tool durability if consumed
-        if craft.toolRestore then
-            -- best-effort; tools module may re-add
+    if Validation and Validation.DecCraftCount then Validation.DecCraftCount(craft.src) end
+    if refund and craft.removed then
+        -- multi-step: rembourser tout l'historique d'ingrédients retirés
+        local hist = craft.removedHistory
+        if type(hist) == 'table' and #hist > 0 then
+            for _, list in ipairs(hist) do
+                for i = 1, #list do
+                    exports.ox_inventory:AddItem(craft.src, list[i].item, list[i].count)
+                end
+            end
+        elseif craft.ingredients then
+            for i = 1, #craft.ingredients do
+                local ing = craft.ingredients[i]
+                exports.ox_inventory:AddItem(craft.src, ing.item, ing.count)
+            end
         end
     end
     return craft
@@ -154,6 +190,7 @@ local function applyToolCost(src, recipe)
     if not Config.Tools or not Config.Tools.Enabled or not recipe.requireTool then
         return true
     end
+    if not Tools or not Tools.Consume then return true end
     return Tools.Consume(src, recipe.requireTool)
 end
 
@@ -213,13 +250,19 @@ local function validateStart(src, recipeId, benchKey, batch)
         return nil, 'craft_too_far'
     end
 
-    local okPerm, permReason = CraftingPermissions.CanUseStation(src, bench)
+    local okPerm, permReason = true, nil
+    if CraftingPermissions and CraftingPermissions.CanUseStation then
+        okPerm, permReason = CraftingPermissions.CanUseStation(src, bench)
+    end
     if not okPerm then return nil, permReason or 'craft_denied' end
 
-    if not CraftingPower.CanRunRecipe(bench, recipe) then return nil, 'craft_no_power' end
+    if CraftingPower and CraftingPower.CanRunRecipe and not CraftingPower.CanRunRecipe(bench, recipe) then return nil, 'craft_no_power' end
     if not Benches.MeetsStationLevel(bench, recipe) then return nil, 'craft_station_level' end
 
-    local okSkill, skillReason, skillArgs = CraftingSkills.CheckRecipeGates(src, recipe)
+    local okSkill, skillReason, skillArgs = true, nil, nil
+    if CraftingSkills and CraftingSkills.CheckRecipeGates then
+        okSkill, skillReason, skillArgs = CraftingSkills.CheckRecipeGates(src, recipe)
+    end
     if not okSkill then return nil, skillReason, skillArgs end
 
     if recipe.requireBlueprint or recipe.blueprintId then
@@ -231,9 +274,17 @@ local function validateStart(src, recipeId, benchKey, batch)
         end
     end
 
-    local ingredients, okIng = resolveIngredients(src, recipe, batch)
-    if not okIng or not ingredients then return nil, 'craft_no_ingredients' end
-    if not Validation.HasIngredients(src, ingredients) then return nil, 'craft_no_ingredients' end
+    local ingredients, okIng
+    if recipeHasSteps(recipe) then
+        -- start: valider + consommer uniquement l'étape 1 ; étapes suivantes à l'avance
+        ingredients = stepIngredients(recipe, 1, batch)
+        okIng = Validation.HasIngredients(src, ingredients)
+        if not okIng then return nil, 'craft_no_ingredients' end
+    else
+        ingredients, okIng = resolveIngredients(src, recipe, batch)
+        if not okIng or not ingredients then return nil, 'craft_no_ingredients' end
+        if not Validation.HasIngredients(src, ingredients) then return nil, 'craft_no_ingredients' end
+    end
 
     local resultCount = (recipe.result.count or 1) * batch
     if not Validation.CanCarry(src, recipe.result.item, resultCount) then
@@ -269,10 +320,16 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
         removed = true
     end
 
-    local duration = CraftingSkills.ApplyCraftTimeBonus(recipe.duration or 5000, src)
+    local stepIndex = 1
+    local totalSteps = recipeHasSteps(recipe) and #recipe.steps or 1
+    local rawDur = stepDuration(recipe, stepIndex)
+    local duration = CraftingSkills.ApplyCraftTimeBonus(rawDur, src)
     if ctx.batch > 1 then
         duration = math.floor(duration * ctx.batch * 0.85) -- slight batch efficiency
     end
+
+    local step = select(1, currentStepInfo(recipe, stepIndex))
+    local stepLabel = (step and step.label) or recipe.label
 
     local craftId = GenerateCraftId()
     local craftUID = ('%s:%s:%d'):format(recipe.id, craftId:sub(1, 8), os.time())
@@ -283,15 +340,19 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
         duration = duration, batch = ctx.batch,
         ingredients = ctx.ingredients, removed = removed,
         completed = false,
+        stepIndex = stepIndex, totalSteps = totalSteps,
+        removedHistory = removed and { ctx.ingredients } or {},
     }
     registerActive(src, craft)
     emitNoise(src, recipe, bench)
     CraftingCore.Emit('craftStarted', src, craft)
 
-    DebugPrint('startCraft', src, craftId, recipe.id, duration)
+    DebugPrint('startCraft', src, craftId, recipe.id, duration, 'step', stepIndex, '/', totalSteps)
     return {
         ok = true, craftId = craftId, craftUID = craftUID,
-        duration = duration, label = recipe.label, batch = ctx.batch,
+        duration = duration, label = stepLabel, batch = ctx.batch,
+        stepIndex = stepIndex, totalSteps = totalSteps,
+        stepLabel = stepLabel,
         cancelDistance = Config.CraftCancelDistance,
         benchCoords = { x = bench.coords.x, y = bench.coords.y, z = bench.coords.z },
         anim = (Config.Animations and Config.Animations.Default) or nil,
@@ -317,7 +378,7 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
     end
 
     local recipe = Config.RecipeById[craft.recipeId]
-    local bench = Benches.Resolve(craft.benchKey)
+    local bench = Benches and Benches.Resolve and Benches.Resolve(craft.benchKey)
     if not recipe or not bench then
         clearActive(craftId, craft.removed)
         return { ok = false, reason = 'craft_invalid' }
@@ -328,13 +389,13 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
         return { ok = false, reason = 'craft_too_far' }
     end
 
-    local okSkill = CraftingSkills.CheckRecipeGates(src, recipe)
+    local okSkill = CraftingSkills and CraftingSkills.CheckRecipeGates and CraftingSkills.CheckRecipeGates(src, recipe)
     if not okSkill then
         clearActive(craftId, craft.removed)
         return { ok = false, reason = 'craft_failed' }
     end
 
-    -- Remove on complete if not removed at start
+    -- Remove on complete if not removed at start (single-step or current step)
     if not craft.removed then
         if not Validation.HasIngredients(src, craft.ingredients) then
             clearActive(craftId, false)
@@ -348,6 +409,66 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
             end
         end
         craft.removed = true
+        craft.removedHistory = craft.removedHistory or {}
+        craft.removedHistory[#craft.removedHistory + 1] = craft.ingredients
+    end
+
+    -- Multi-step: advance under SAME craftId (pas de nouveau UUID)
+    local stepIndex = craft.stepIndex or 1
+    local totalSteps = craft.totalSteps or (recipeHasSteps(recipe) and #recipe.steps or 1)
+    if recipeHasSteps(recipe) and stepIndex < totalSteps then
+        local nextIndex = stepIndex + 1
+        local nextIngs = stepIngredients(recipe, nextIndex, craft.batch or 1)
+        if not Validation.HasIngredients(src, nextIngs) then
+            -- ne consomme pas ; reste sur l'étape courante terminée → annule avec refund historique
+            clearActive(craftId, false)
+            -- refund all previously removed step ingredients
+            for _, hist in ipairs(craft.removedHistory or {}) do
+                for i = 1, #hist do
+                    exports.ox_inventory:AddItem(src, hist[i].item, hist[i].count)
+                end
+            end
+            return { ok = false, reason = 'craft_no_ingredients' }
+        end
+        for i = 1, #nextIngs do
+            local ing = nextIngs[i]
+            if not exports.ox_inventory:RemoveItem(src, ing.item, ing.count) then
+                for j = 1, i - 1 do
+                    exports.ox_inventory:AddItem(src, nextIngs[j].item, nextIngs[j].count)
+                end
+                clearActive(craftId, false)
+                for _, hist in ipairs(craft.removedHistory or {}) do
+                    for hi = 1, #hist do
+                        exports.ox_inventory:AddItem(src, hist[hi].item, hist[hi].count)
+                    end
+                end
+                return { ok = false, reason = 'craft_no_ingredients' }
+            end
+        end
+        craft.removedHistory = craft.removedHistory or {}
+        craft.removedHistory[#craft.removedHistory + 1] = nextIngs
+        craft.ingredients = nextIngs
+        craft.removed = true
+        craft.stepIndex = nextIndex
+        craft.completed = false -- réouvre one-shot pour l'étape suivante
+        local nextStep = recipe.steps[nextIndex]
+        local rawDur = stepDuration(recipe, nextIndex)
+        local duration = CraftingSkills.ApplyCraftTimeBonus(rawDur, src)
+        if (craft.batch or 1) > 1 then
+            duration = math.floor(duration * craft.batch * 0.85)
+        end
+        craft.duration = duration
+        craft.startedAt = GetGameTimer()
+        craft.startedUnix = os.time()
+        local stepLabel = (nextStep and nextStep.label) or recipe.label
+        CraftingCore.Emit('craftStepAdvanced', src, craft, nextIndex, totalSteps)
+        DebugPrint('advanceStep', src, craftId, nextIndex, '/', totalSteps)
+        return {
+            ok = true, advanced = true, craftId = craftId, craftUID = craft.craftUID,
+            stepIndex = nextIndex, totalSteps = totalSteps,
+            duration = duration, label = stepLabel, stepLabel = stepLabel,
+            batch = craft.batch,
+        }
     end
 
     local batch = craft.batch or 1
@@ -412,10 +533,19 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
     CraftingCore.Emit('craftCompleted', src, craft, given)
     DebugPrint('completeCraft ok', src, craftId)
 
+    -- chain: id(s) suivants sous même craftUID (client / project peut enchaîner)
+    local chainNext = nil
+    if type(recipe.chain) == 'table' and #recipe.chain > 0 then
+        chainNext = recipe.chain[1]
+    end
+
     return {
         ok = true, craftId = craftId, craftUID = craft.craftUID,
         result = given[1] or recipe.result, results = given,
         label = recipe.label, quality = given[1] and given[1].quality,
+        stepIndex = craft.stepIndex or totalSteps, totalSteps = totalSteps,
+        chainNext = chainNext, chain = recipe.chain,
+        advanced = false,
     }
 end)
 
@@ -440,9 +570,11 @@ end)
 -- Menu / NUI data
 local function buildRecipeEntry(src, r)
     local canCraft, lockReason, lockArgs = true, nil, nil
-    local okSkill, skillReason, skillArgs = CraftingSkills.CheckRecipeGates(src, r)
-    if not okSkill then
-        canCraft, lockReason, lockArgs = false, skillReason, skillArgs
+    if CraftingSkills and CraftingSkills.CheckRecipeGates then
+        local okSkill, skillReason, skillArgs = CraftingSkills.CheckRecipeGates(src, r)
+        if not okSkill then
+            canCraft, lockReason, lockArgs = false, skillReason, skillArgs
+        end
     end
     if r.requireBlueprint or r.blueprintId then
         local bpId = r.requireBlueprint or r.blueprintId
@@ -450,16 +582,29 @@ local function buildRecipeEntry(src, r)
             canCraft, lockReason, lockArgs = false, 'craft_blueprint_required', { bpId }
         end
     end
-    local hasItems = Validation.HasIngredients(src, scaleIngredients(r.ingredients, 1))
-    local mastery = (Config.Mastery and Config.Mastery.Enabled and Mastery) and Mastery.Get(src, r.id) or 0
+    local checkIngs = recipeHasSteps(r) and stepIngredients(r, 1, 1) or scaleIngredients(r.ingredients or {}, 1)
+    local hasItems = Validation and Validation.HasIngredients and Validation.HasIngredients(src, checkIngs) or false
+    local mastery = (Config.Mastery and Config.Mastery.Enabled and Mastery and Mastery.Get) and Mastery.Get(src, r.id) or 0
+    local stepsOut = nil
+    if recipeHasSteps(r) then
+        stepsOut = {}
+        for i = 1, #r.steps do
+            stepsOut[i] = {
+                label = r.steps[i].label, ingredients = r.steps[i].ingredients,
+                duration = r.steps[i].duration,
+            }
+        end
+    end
     return {
         id = r.id, label = r.label, category = r.category, tags = r.tags or {},
-        ingredients = r.ingredients, result = r.result, duration = r.duration,
+        ingredients = (checkIngs and #checkIngs > 0) and (recipeHasSteps(r) and r.steps[1].ingredients or r.ingredients) or (r.ingredients or {}),
+        result = r.result, duration = r.duration,
         xp = r.xp, requireLevel = r.requireLevel, requireSkill = r.requireSkill,
         requireBlueprint = r.requireBlueprint or r.blueprintId,
         requireTool = r.requireTool, quality = r.quality, byproducts = r.byproducts,
         queueable = r.queueable, batchMax = r.batchMax, dismantle = r.dismantle,
         stationLevel = r.stationLevel, powerCost = r.powerCost, noiseLevel = r.noiseLevel,
+        steps = stepsOut, chain = r.chain,
         canCraft = canCraft and hasItems, locked = not canCraft,
         missingItems = not hasItems, lockReason = lockReason, lockArgs = lockArgs,
         mastery = mastery,
@@ -488,7 +633,7 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
         ok = true, benchKey = benchKey, category = bench.category,
         label = _(Config.BenchLabels[bench.category] or 'bench_scrap'),
         stationLevel = bench.stationLevel or 1, modules = bench.modules or {},
-        powered = CraftingPower.HasPower(bench),
+        powered = (CraftingPower and CraftingPower.HasPower and CraftingPower.HasPower(bench)) or false,
         recipes = out, favorites = favorites,
         ui = Config.UI, flags = {
             quality = Config.Quality and Config.Quality.Enabled,

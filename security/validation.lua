@@ -92,6 +92,7 @@ function Validation.IsAdmin(src)
     if IsPlayerAceAllowed(src, Config.AdminAce or 'sanctuary.crafting.admin') then
         return true
     end
+    if not ESX or not ESX.GetPlayerFromId then return false end
     local xPlayer = ESX.GetPlayerFromId(src)
     if not xPlayer then return false end
     local group = xPlayer.getGroup and xPlayer.getGroup() or xPlayer.group

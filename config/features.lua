@@ -93,8 +93,21 @@ Config.UI = {
     Accent = '#9a8866',
     CompactDefault = false,
     Theme = 'industrial_dark',
+    -- SFX NUI (WebAudio + placeholders web/sounds/*.ogg) — désactivable
+    Sounds = {
+        Enabled = true,
+        Volume = 0.35,
+        Files = {
+            click = '../sounds/click.ogg',
+            success = '../sounds/success.ogg',
+            error = '../sounds/error.ogg',
+            blueprint = '../sounds/blueprint.ogg',
+        },
+    },
 }
 
--- Power / Quality / Blueprints already have top-level stubs in config.lua; sync Enabled
-if Config.Power then Config.Power.Enabled = Config.Power.Enabled or false end
-if Config.Quality and Config.Quality.Enabled == nil then end
+-- Power : conserver ExternalBridge / FallbackModules ; Enabled reste celui de config.lua
+Config.Power = Config.Power or { Enabled = false }
+if Config.Power.FallbackModules == nil then
+    Config.Power.FallbackModules = { 'power_cell', 'generator' }
+end

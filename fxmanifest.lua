@@ -13,6 +13,7 @@ files {
     'web/dist/index.html',
     'web/dist/style.css',
     'web/dist/app.js',
+    'web/sounds/*.ogg',
 }
 
 shared_scripts {

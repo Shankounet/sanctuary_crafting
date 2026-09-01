@@ -20,13 +20,42 @@ function RecipeRegistry.Validate(r)
     if type(r.category) ~= 'string' or not IsValidBenchCategory(r.category) then
         return fail(r.id, 'category invalide: ' .. tostring(r.category))
     end
-    if type(r.ingredients) ~= 'table' or #r.ingredients < 1 then
-        return fail(r.id, 'ingredients vides')
+    local hasSteps = type(r.steps) == 'table' and #r.steps > 0
+    if hasSteps then
+        for si = 1, #r.steps do
+            local step = r.steps[si]
+            if type(step) ~= 'table' then return fail(r.id, 'step #' .. si) end
+            if type(step.ingredients) ~= 'table' or #step.ingredients < 1 then
+                return fail(r.id, 'step #' .. si .. ' ingredients')
+            end
+            for i = 1, #step.ingredients do
+                local ing = step.ingredients[i]
+                if type(ing.item) ~= 'string' or type(ing.count) ~= 'number' or ing.count < 1 then
+                    return fail(r.id, 'step #' .. si .. ' ingredient #' .. i)
+                end
+            end
+            if step.duration ~= nil and (type(step.duration) ~= 'number' or step.duration < 500) then
+                return fail(r.id, 'step #' .. si .. ' duration')
+            end
+        end
+        r.ingredients = r.ingredients or {}
+    else
+        if type(r.ingredients) ~= 'table' or #r.ingredients < 1 then
+            return fail(r.id, 'ingredients vides')
+        end
     end
-    for i = 1, #r.ingredients do
+    for i = 1, #(r.ingredients or {}) do
         local ing = r.ingredients[i]
         if type(ing.item) ~= 'string' or type(ing.count) ~= 'number' or ing.count < 1 then
             return fail(r.id, 'ingredient #' .. i)
+        end
+    end
+    -- chain: liste d'ids recettes suivants (serveur avance sous même craftUID / project)
+    if r.chain ~= nil then
+        if type(r.chain) == 'string' then
+            r.chain = { r.chain }
+        elseif type(r.chain) ~= 'table' then
+            return fail(r.id, 'chain invalide')
         end
     end
     if type(r.result) ~= 'table' or type(r.result.item) ~= 'string' then
