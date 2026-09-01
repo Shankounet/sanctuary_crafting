@@ -129,10 +129,10 @@ Config.Skills = {
                                        si BypassRequirements = false
          NE JAMAIS activer BypassRequirements sur un serveur public / production.
     ]]
-    BypassRequirements = false,
+    BypassRequirements = true,
     BypassAce = 'sanctuary.crafting.bypassskills',
     BypassAlsoSkipXP = false, -- false = toujours tenter AddXp si ml_skills est up
-    BypassNotify = false,     -- true = notify ox_lib une fois (aussi si Config.Debug)
+    BypassNotify = true,     -- true = notify ox_lib une fois (aussi si Config.Debug)
 }
 
 --------------------------------------------------------------------------------
