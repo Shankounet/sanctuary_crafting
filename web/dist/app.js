@@ -322,8 +322,6 @@
       const favOn = isFavorite(r.id);
       const status = cardStatus(r);
       card.classList.add(`state-${status.cls || 'bad'}`);
-      const toneIdx = (String(r.category || r.id || '').length + (r.id || '').length) % 3;
-      card.classList.add(`tone-${['a', 'b', 'c'][toneIdx]}`);
       if (r.rarity) {
         const rk = String(r.rarity).toLowerCase().replace(/[^a-z0-9]+/g, '-');
         if (rk) card.classList.add(`rarity-${rk}`);
