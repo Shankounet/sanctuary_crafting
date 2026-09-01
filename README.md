@@ -1,15 +1,23 @@
-# sanctuary_crafting v2.1.1
+# sanctuary_crafting v2.1.2
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
 **ml_skills** (Micio Mods) est la **seule** source de compétences / XP / niveaux. Aucun XP craft parallèle.
 
-UI NUI **premium** (v2.1.1) : post-apo industriel moderne (pas Fallout / pas cyberpunk), accent `#9a8866`, panneaux semi-transparents grain métal, layout 3 colonnes utiles (nav/filtres · grille de cartes recettes · fiche détail), images ox_inventory, filtres Tous/Faisables/Favoris/Verrouillés/Nouveaux/Plans connus, file en cartes horizontales, arbre de dépendances cliquable, micro-interactions 100–180 ms. Callbacks NUI inchangés.
+UI NUI **premium** (v2.1.2) : post-apo industriel moderne (pas Fallout / pas cyberpunk), accent `#9a8866`. **Craft** = atelier / banc de production (chrome industriel net, grille 3 colonnes). **Carnet** = journal technique / dossier de terrain (chrome dossier plus doux, sidebar app + pages widgets). Micro-interactions 100–180 ms. Callbacks NUI inchangés.
 
 ---
 
 
 ## Notes de version
+
+### v2.1.2 — Identité visuelle Carnet (Book ≠ Craft)
+Refonte UI/UX du **Carnet de survie** (`web/dist/book.js` + `book.css` + mount HTML) : journal technique / dossier personnel, pas un clone du banc craft.
+
+- **Craft** = atelier / production : chrome industriel plus tranché, layout 3 colonnes (liste · détail · file).
+- **Book** = carnet / field dossier : spine + grain papier subtil, sidebar app (icônes + labels), pages riches qui changent fortement par onglet (widgets dashboard, cartes compétences, dossiers projets/plans, codex silhouettes, contacts, timeline…).
+- Accent partagé `#9a8866`, univers sombre premium — **structure et ressenti distincts** pour que le joueur sache immédiatement dans quelle app il est.
+- Modules navigables alignés sur `Config.Book` (Journal + Terrain). **Callbacks NUI book préservés** : `bookClose`, `bookDashboard`, `bookModule`, `bookAction`, `bookToggleHud`, `bookPinRecipe`, `bookObjectiveRecipe`, `bookOpenFromCraft` ; messages `bookOpen` / `bookClose` / `bookPins` / `bookEvent`.
 
 ### v2.1.1 — UI premium
 Refonte visuelle complète de l’UI craft (`web/dist`) : grille de cartes, fiche détail enrichie, navigation/filtres à gauche, file/arbre/courses redesignés. **Aucun changement** des callbacks NUI / ponts Lua (`close`, `refresh`, `craft`, `complete`, `cancel`, `favorite`, `queue`, `queueList`, `queueCollect`, `shopping`, `shoppingClear`, `tree`, `notify`, book*).
@@ -423,7 +431,7 @@ book/
     ├── api.lua              # callbacks lazy-load
     ├── bridge.lua           # hooks craftCompleted / blueprintLearned
     └── main.lua             # item export + exports publics
-web/dist/book.js + book.css  # UI field-manual
+web/dist/book.js + book.css  # UI dossier / journal (≠ craft atelier)
 config/book.lua              # Config.Book.*
 ```
 
