@@ -374,11 +374,21 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
     CraftingCore.Emit('craftStarted', src, craft)
 
     DebugPrint('startCraft', src, craftId, recipe.id, duration, 'step', stepIndex, '/', totalSteps)
+    local resultItem = recipe.result and recipe.result.item or nil
+    local resultCount = recipe.result and ((recipe.result.count or 1) * ctx.batch) or ctx.batch
+    local phaseFamily = recipe.category or bench.category
     return {
         ok = true, craftId = craftId, craftUID = craftUID,
         duration = duration, label = stepLabel, batch = ctx.batch,
         stepIndex = stepIndex, totalSteps = totalSteps,
         stepLabel = stepLabel,
+        recipeId = recipe.id,
+        resultItem = resultItem,
+        resultCount = resultCount,
+        benchKey = bench.key,
+        benchLabel = bench.label,
+        category = recipe.category or bench.category,
+        phaseFamily = phaseFamily,
         cancelDistance = Config.CraftCancelDistance,
         benchCoords = { x = bench.coords.x, y = bench.coords.y, z = bench.coords.z },
         anim = (Config.Animations and Config.Animations.Default) or nil,
@@ -1238,6 +1248,7 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
             batch = Config.Batch and Config.Batch.Enabled,
             mastery = Config.Mastery and Config.Mastery.Enabled,
             shopping = Config.ShoppingList and Config.ShoppingList.Enabled,
+            craftTracker = Config.CraftTracker and Config.CraftTracker.Enabled ~= false,
             almostCraftable = ux.AlmostCraftable ~= false,
             badgeTooltips = ux.BadgeTooltips ~= false,
             nouveauIndicator = ux.NouveauIndicator ~= false,

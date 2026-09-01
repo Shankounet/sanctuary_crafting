@@ -145,3 +145,31 @@ if Config.Power.FallbackModules == nil then
 end
 
 -- Survival Book : voir config/book.lua (Config.Book.*)
+
+-- Floating Craft Tracker (indépendant du menu atelier) — v2.6.0
+Config.CraftTracker = {
+    Enabled = true,
+    DefaultPosition = { top = 24, right = 24 }, -- px
+    DefaultMode = 'normal', -- normal | compact | minimal
+    AutoShowOnStart = true,
+    HideWithMenuIfUnpinned = true,
+    PersistPin = true,
+    PersistMode = true,
+    PersistPosition = true,
+    AllowDrag = true,
+    CompletedLingerMs = 4500,
+    AutoRemoveCompleted = true,
+    TickMs = 250, -- NUI local tick interval (NOT per-frame Lua)
+    Phases = {
+        medical = { 'Préparation', 'Assemblage', 'Stérilisation', 'Finalisation' },
+        mechanical = { 'Découpe', 'Assemblage', 'Calibrage', 'Finition' },
+        cooking = { 'Préparation', 'Cuisson', 'Conditionnement' },
+        default = { 'Préparation', 'Assemblage', 'Finition' },
+    },
+    Sounds = {
+        Enabled = true,
+        OnStart = true,
+        OnComplete = true,
+        OnError = true,
+    },
+}

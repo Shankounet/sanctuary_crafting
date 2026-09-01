@@ -5,7 +5,7 @@ lua54 'yes'
 name 'sanctuary_crafting'
 author 'Shankounet / Sanctuary'
 description 'Plateforme de craft post-apo + Carnet de survie — ESX, ox_*, ml_skills, NUI industrielle'
-version '2.5.0'
+version '2.6.0'
 
 ui_page 'web/dist/index.html'
 
@@ -13,6 +13,8 @@ files {
     'web/dist/index.html',
     'web/dist/style.css',
     'web/dist/app.js',
+    'web/dist/tracker.css',
+    'web/dist/tracker.js',
     'web/dist/book.css',
     'web/dist/book.js',
     'web/sounds/*.ogg',
@@ -38,6 +40,7 @@ client_scripts {
     'client/benches.lua',
     'client/place.lua',
     'client/nui.lua',
+    'client/tracker.lua',
     'client/craft.lua',
     'book/client/book.lua',
 }

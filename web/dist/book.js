@@ -811,7 +811,7 @@
     const left = `
       <p class="book-stamp">Atelier</p>
       <h2 class="book-page-title">Productions</h2>
-      <p class="hand-note">Journal de fabrication manuscrit — pas le panneau craft.</p>
+      <p class="hand-note">Journal de fabrication manuscrit — pas le panneau craft. Le suivi flottant (tracker) est séparé.</p>
       <hr class="ink-rule" />
       <h3 class="section-title">En file</h3>
       <div class="fab-log">
