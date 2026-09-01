@@ -12,51 +12,62 @@
 <div id="app" class="hidden" data-compact="0" data-side="">
   <!-- CONTROL CONSOLE HEADER -->
   <header class="ctrl-console" aria-label="Console atelier">
-    <div class="ctrl-identity">
-      <div class="ctrl-plate-mark" aria-hidden="true">
-        <span class="ctrl-screw"></span>
-        <span class="ctrl-screw"></span>
-      </div>
-      <div class="ctrl-id-body">
-        <p class="t-l4" id="station-stencil">STATION</p>
-        <h1 id="station-title" class="t-l1">Atelier</h1>
-        <p class="t-l6" id="station-meta">—</p>
-      </div>
-    </div>
-
-    <div class="ctrl-instruments" id="station-stats" aria-label="État atelier">
-      <div class="instr-plate" id="plate-type">
-        <span class="t-l4">Type</span>
-        <span class="t-l5" id="stat-type">—</span>
-      </div>
-      <div class="instr-plate" id="plate-level">
-        <span class="t-l4">Niveau</span>
-        <span class="t-l5" id="stat-level">—</span>
-      </div>
-      <div class="instr-plate instr-state" id="stat-state-wrap">
-        <span class="t-l4">État</span>
-        <div class="state-row">
-          <span class="led-dot" id="led-state" aria-hidden="true"></span>
-          <span class="t-l5" id="stat-state">—</span>
+    <div class="ctrl-deck">
+      <div class="ctrl-identity">
+        <div class="ctrl-plate-mark" aria-hidden="true">
+          <span class="ctrl-screw"></span>
+          <span class="ctrl-screw"></span>
         </div>
-        <div class="seg-gauge" aria-hidden="true"><i class="gauge-fill" id="gauge-state"></i></div>
+        <div class="ctrl-id-body">
+          <div class="ctrl-id-top">
+            <p class="t-l4" id="station-stencil">STATION</p>
+            <span class="ctrl-id-rail" aria-hidden="true"></span>
+          </div>
+          <h1 id="station-title" class="t-l1">Atelier</h1>
+          <p class="t-l6" id="station-meta">—</p>
+        </div>
       </div>
-      <div class="instr-plate instr-eff" id="plate-eff">
-        <span class="t-l4">Efficacité</span>
-        <span class="t-l5" id="stat-eff">—</span>
-        <div class="seg-gauge eff" aria-hidden="true"><i class="gauge-fill" id="gauge-eff"></i></div>
-      </div>
-      <div class="instr-plate instr-energy hidden" id="stat-energy-wrap">
-        <span class="t-l4"><i class="fa-solid fa-bolt led" id="led-power" aria-hidden="true"></i> Énergie</span>
-        <span class="t-l5" id="stat-energy">—</span>
-        <div class="seg-bar" aria-hidden="true">
-          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-          <span class="seg-fill" id="gauge-energy"></span>
+
+      <div class="ctrl-instruments" id="station-stats" aria-label="État atelier">
+        <div class="instr-group instr-meta" aria-label="Infos station">
+          <div class="instr-plate instr-secondary" id="plate-type">
+            <span class="t-l4">Type</span>
+            <span class="t-l5" id="stat-type">—</span>
+          </div>
+          <div class="instr-plate instr-secondary" id="plate-level">
+            <span class="t-l4">Niveau</span>
+            <span class="t-l5" id="stat-level">—</span>
+          </div>
+        </div>
+        <div class="instr-divider" aria-hidden="true"></div>
+        <div class="instr-group instr-system" aria-label="Indicateurs système">
+          <div class="instr-plate instr-primary instr-state" id="stat-state-wrap">
+            <span class="t-l4">État</span>
+            <div class="state-row">
+              <span class="led-dot" id="led-state" aria-hidden="true"></span>
+              <span class="t-l5" id="stat-state">—</span>
+            </div>
+            <div class="seg-gauge" aria-hidden="true"><i class="gauge-fill" id="gauge-state"></i></div>
+          </div>
+          <div class="instr-plate instr-primary instr-eff" id="plate-eff">
+            <span class="t-l4">Efficacité</span>
+            <span class="t-l5" id="stat-eff">—</span>
+            <div class="seg-gauge eff" aria-hidden="true"><i class="gauge-fill" id="gauge-eff"></i></div>
+          </div>
+          <div class="instr-plate instr-primary instr-energy hidden" id="stat-energy-wrap">
+            <span class="t-l4"><i class="fa-solid fa-bolt led" id="led-power" aria-hidden="true"></i> Énergie</span>
+            <span class="t-l5" id="stat-energy">—</span>
+            <div class="seg-bar" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <span class="seg-fill" id="gauge-energy"></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="ctrl-actions">
+      <span class="ctrl-actions-label" aria-hidden="true">SYS</span>
       <button type="button" id="btn-compact" class="icon-btn" title="Mode compact" aria-label="Compact">
         <i class="fa-solid fa-compress" aria-hidden="true"></i>
       </button>

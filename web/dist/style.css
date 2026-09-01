@@ -1,5 +1,5 @@
 /* sanctuary_crafting — Craft atelier design system (#app only). Book uses book.css. */
-/* v2.2.12 — ergonomics polish: badges, hover, fiche, FABRIQUER, nav, empty console */
+/* v2.2.13 — station header plate (control panel, not dashboard bar) */
 
 :root {
   /* —— Color tokens (canonical) — neutral charcoal hierarchy —— */
@@ -2383,4 +2383,270 @@ button, input { font: inherit; color: inherit; }
     width: 128px !important;
     height: 128px !important;
   }
+}
+
+
+/* ============================================================
+   v2.2.13 — HEADER: recovered station control plate
+   ============================================================ */
+#app .ctrl-console {
+  display: flex;
+  align-items: stretch;
+  min-height: 92px;
+  background:
+    linear-gradient(180deg, #262624 0%, #1f1f1d 48%, #1c1c1a 100%);
+  border-bottom: 2px solid #333;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 0 -1px 0 rgba(0,0,0,0.35);
+}
+#app .ctrl-console::before {
+  content: "SANCTUARY CRAFT";
+  right: 88px;
+  top: 10px;
+  transform: none;
+  font-size: 0.48rem;
+  letter-spacing: 0.24em;
+  color: rgba(255,255,255,0.04);
+}
+#app .ctrl-console::after {
+  height: 2px;
+  bottom: -2px;
+  background: linear-gradient(90deg, transparent, rgba(154,136,102,0.45) 18%, rgba(154,136,102,0.7) 50%, rgba(154,136,102,0.45) 82%, transparent);
+  opacity: 0.55;
+}
+
+#app .ctrl-deck {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(240px, 1.05fr) minmax(320px, 1.55fr);
+  gap: 0;
+}
+
+/* —— Identity plate (left) —— */
+#app .ctrl-identity {
+  flex: none;
+  border-right: 1px solid rgba(58,58,58,0.9);
+  background:
+    linear-gradient(105deg, rgba(154,136,102,0.06), transparent 42%),
+    linear-gradient(180deg, #242422, #1e1e1c);
+  position: relative;
+}
+#app .ctrl-identity::after {
+  content: "";
+  position: absolute;
+  right: 0; top: 12px; bottom: 12px;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(154,136,102,0.28), transparent);
+  pointer-events: none;
+}
+#app .ctrl-plate-mark {
+  width: 10px;
+  background: linear-gradient(180deg, #b09a72 0%, #9a8866 45%, #6a5c42 100%);
+  box-shadow: inset -1px 0 0 rgba(0,0,0,0.4), inset 1px 0 0 rgba(255,255,255,0.14);
+}
+#app .ctrl-id-body {
+  padding: 14px 18px 14px 16px;
+  gap: 4px;
+  justify-content: center;
+}
+#app .ctrl-id-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+#app .ctrl-id-rail {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(154,136,102,0.35), transparent);
+  opacity: 0.7;
+}
+#app #station-stencil {
+  color: rgba(154,136,102,0.55) !important;
+  font-size: 0.52rem !important;
+  letter-spacing: 0.16em;
+  font-weight: 650;
+  text-transform: uppercase;
+  padding-bottom: 0 !important;
+}
+#app #station-stencil::after { display: none !important; }
+#app #station-title {
+  font-size: 1.34rem !important;
+  font-weight: 820;
+  letter-spacing: 0.03em;
+  line-height: 1.12;
+  color: #f0ece4;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.45);
+  max-width: 100%;
+}
+#app #station-meta {
+  margin-top: 4px;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: rgba(154,154,154,0.62);
+  text-transform: none;
+}
+
+/* —— Instruments —— */
+#app .ctrl-instruments {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  flex: none;
+  padding: 10px 12px;
+  background:
+    radial-gradient(ellipse at 70% 0%, rgba(255,255,255,0.03), transparent 50%),
+    rgba(0,0,0,0.22);
+}
+#app .instr-group {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+#app .instr-group.instr-meta {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+#app .instr-group.instr-system {
+  flex: 1;
+  min-width: 0;
+}
+#app .instr-divider {
+  width: 1px;
+  margin: 6px 10px;
+  background: linear-gradient(180deg, transparent, rgba(154,136,102,0.35), transparent);
+  flex-shrink: 0;
+}
+#app .instr-plate {
+  border: 1px solid #333;
+  border-left: 1px solid #333;
+  background: linear-gradient(180deg, #262624, #1a1a18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), inset 0 -1px 0 rgba(0,0,0,0.3);
+  padding: 7px 10px 8px;
+  min-width: 72px;
+  gap: 3px;
+}
+#app .instr-plate:first-child { border-left: 1px solid #333; }
+#app .instr-secondary {
+  flex: 0 0 auto;
+  min-width: 78px;
+  max-width: 110px;
+  opacity: 0.92;
+  background: linear-gradient(180deg, #222220, #181816);
+}
+#app .instr-secondary .t-l4 {
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
+  opacity: 0.65;
+}
+#app .instr-secondary .t-l5 {
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: #c8c4bc;
+}
+#app .instr-primary {
+  flex: 1;
+  min-width: 100px;
+  background:
+    linear-gradient(180deg, #2a2a26 0%, #1c1c1a 100%);
+  border-color: #3a3a36;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 0 -1px 0 rgba(0,0,0,0.35),
+    0 2px 6px rgba(0,0,0,0.2);
+}
+#app .instr-primary .t-l4 {
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
+  color: rgba(154,136,102,0.65);
+  opacity: 1;
+}
+#app .instr-primary .t-l5 {
+  font-size: 0.82rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+#app .instr-state .state-row {
+  gap: 8px;
+}
+#app .instr-state .led-dot {
+  width: 9px;
+  height: 9px;
+}
+#app .seg-gauge {
+  margin-top: 6px;
+  height: 4px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+#app .seg-gauge .gauge-fill {
+  background: linear-gradient(90deg, #6a5c42, #9a8866);
+}
+#app .seg-gauge.eff .gauge-fill {
+  background: linear-gradient(90deg, #4a5a40, #7a8a68);
+}
+#app .seg-bar {
+  margin-top: 6px;
+  height: 8px;
+  gap: 2px;
+}
+#app .seg-bar .seg-fill {
+  box-shadow: inset 0 0 0 999px rgba(154,136,102,0.55);
+  mix-blend-mode: normal;
+  opacity: 0.9;
+}
+
+/* —— Action cluster —— */
+#app .ctrl-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-left: 1px solid #333;
+  background:
+    linear-gradient(180deg, #222220, #1a1a18);
+  min-width: 56px;
+}
+#app .ctrl-actions-label {
+  font-size: 0.46rem;
+  letter-spacing: 0.18em;
+  color: rgba(154,136,102,0.45);
+  font-weight: 750;
+}
+#app .ctrl-actions .icon-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #3a3a3a;
+  background: linear-gradient(180deg, #2c2c2a, #1e1e1c);
+  color: rgba(180,180,180,0.7);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 4px rgba(0,0,0,0.25);
+}
+#app .ctrl-actions .icon-btn:hover {
+  border-color: rgba(154,136,102,0.55);
+  color: #9a8866;
+  background: linear-gradient(180deg, #32322e, #242420);
+}
+#app .ctrl-actions .icon-btn.danger-icon:hover {
+  border-color: rgba(138,90,78,0.65);
+  color: #9a7066;
+  background: rgba(40,24,20,0.55);
+}
+
+@media (max-width: 1280px) {
+  #app .ctrl-deck {
+    grid-template-columns: minmax(200px, 0.9fr) minmax(280px, 1.4fr);
+  }
+  #app #station-title { font-size: 1.16rem !important; }
+  #app .instr-secondary { min-width: 68px; }
+}
+@media (max-width: 1100px) {
+  #app .ctrl-deck {
+    grid-template-columns: 1fr;
+  }
+  #app .ctrl-identity { border-right: none; border-bottom: 1px solid #333; }
+  #app .ctrl-console { min-height: 0; }
 }
