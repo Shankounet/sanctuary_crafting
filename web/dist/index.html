@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Sanctuary Crafting</title>
 <link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="book.css" />
 </head>
 <body>
 <div id="app" class="hidden" data-compact="0">
@@ -63,6 +64,9 @@
           <button type="button" id="btn-fav" class="ghost">★</button>
           <button type="button" id="btn-shop" class="ghost">Liste</button>
           <button type="button" id="btn-tree" class="ghost">Arbre</button>
+          <button type="button" id="btn-pin" class="ghost" title="Épingler au carnet">📌</button>
+          <button type="button" id="btn-obj" class="ghost" title="Objectif carnet">◎</button>
+          <button type="button" id="btn-book" class="ghost" title="Ouvrir le carnet">📔</button>
         </div>
         <div id="progress-wrap" class="progress-wrap hidden">
           <div class="progress-bar"><div id="progress-fill"></div></div>
@@ -92,6 +96,28 @@
     </section>
   </main>
 </div>
+
+<!-- Survival Book (field manual) -->
+<div id="book-app" class="hidden">
+  <header class="book-top">
+    <div class="book-brand">
+      <div class="book-mark" aria-hidden="true"></div>
+      <div>
+        <h1 id="book-title">Carnet de survie</h1>
+        <p class="book-sub" id="book-sub">Manuel de terrain</p>
+      </div>
+    </div>
+    <div class="book-actions">
+      <input id="book-search" type="search" placeholder="Recherche globale…" autocomplete="off" />
+      <button type="button" id="book-btn-close" class="ghost" title="Fermer">✕</button>
+    </div>
+  </header>
+  <div class="book-body">
+    <nav class="book-nav" id="book-nav" aria-label="Modules"></nav>
+    <main class="book-main" id="book-main"></main>
+  </div>
+</div>
 <script src="app.js"></script>
+<script src="book.js"></script>
 </body>
 </html>

@@ -328,6 +328,28 @@
     document.querySelector('.tab[data-tab="tree"]').click();
   });
 
+  
+  const btnPin = $('#btn-pin');
+  if (btnPin) btnPin.addEventListener('click', () => {
+    if (!state.selected) return;
+    post('bookPinRecipe', { recipeId: state.selected }).then((r) => {
+      post('notify', { type: r && r.ok ? 'success' : 'error', reason: r && r.ok ? 'book_pinned' : (r && r.reason) || 'craft_failed' });
+      beep(r && r.ok ? 'click' : 'error');
+    });
+  });
+  const btnObj = $('#btn-obj');
+  if (btnObj) btnObj.addEventListener('click', () => {
+    if (!state.selected) return;
+    post('bookObjectiveRecipe', { recipeId: state.selected }).then((r) => {
+      post('notify', { type: r && r.ok ? 'success' : 'error', reason: r && r.ok ? 'book_objective_added' : (r && r.reason) || 'craft_failed' });
+      beep(r && r.ok ? 'click' : 'error');
+    });
+  });
+  const btnBook = $('#btn-book');
+  if (btnBook) btnBook.addEventListener('click', () => {
+    post('bookOpenFromCraft', { page: 'dashboard' });
+  });
+
   window.addEventListener('message', (event) => {
     const msg = event.data || {};
     if (msg.action === 'open') {

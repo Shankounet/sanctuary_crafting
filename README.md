@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.0.0
+# sanctuary_crafting v2.1.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -53,6 +53,8 @@ sanctuary_crafting/
 ├── web/dist/                  # NUI (html/css/js)
 ├── web/sounds/                # SFX .ogg (click/success/error/blueprint)
 ├── locales/fr.lua + en.lua    # parité complète
+├── book/                      # Carnet de survie (Survival Book)
+├── config/book.lua            # Config.Book.* modules
 └── sql/
 ```
 
@@ -274,6 +276,82 @@ Config.Power = {
 - [x] Nil-guards pipeline + `fxmanifest` fichiers `web/sounds/*.ogg`
 
 **ml_skills** reste la seule source XP via `CraftingSkills` (pas d'XP craft parallèle).
+
+
+---
+
+## Carnet de survie (Survival Book)
+
+Manuel de terrain **personnel** (dossier technique sombre, accent `#9a8866`) — pas un wiki omniscient, pas de cliché « rusty Fallout ».
+
+### Principes
+
+- **ml_skills** = seule vérité XP/niveaux via `CraftingSkills` (**lecture seule** dans le carnet). Aucune table XP parallèle.
+- Réutilise recettes / stations / blueprints / file / projets du craft — **pas** de duplication `Config.Recipes`.
+- Connaissance **par découverte** : ressources inconnues → `???`. **Pas de GPS**. Pas de niveaux/licences/inventaires exacts des autres joueurs (tiers artisans qualitatifs seulement).
+- Serveur valide : découvertes, contacts, objectifs, pins, notes, commandes.
+- NUI **lazy-load** par module (`Config.Book.*.Enabled`).
+
+### Activation
+
+`config/book.lua` → `Config.Book.Enabled = true` (+ flags par module : Dashboard, Progression, NextUnlocks, Objectives, Pins, Shopping, CraftTree, Resources, Discoveries, Blueprints, Artisans, Network, Orders, Projects, Notes, Search, Suggestions, CanCraft, Workshop, Maintenance, Productions, Notifications, History, Stats).
+
+### Item ox_inventory
+
+```lua
+['survival_book'] = {
+  label = 'Carnet de survie',
+  weight = 200,
+  stack = false,
+  close = true,
+  description = 'Manuel de terrain personnel — craft, objectifs, réseau.',
+  client = { export = nil },
+  server = { export = 'sanctuary_crafting.useSurvivalBook' },
+},
+-- optionnel (futur confort) :
+-- ['artisan_card'] = { label = 'Carte artisan', weight = 10, stack = false, close = true,
+--   server = { export = 'sanctuary_crafting.useArtisanCard' } },
+```
+
+Ouvrir aussi : `exports.sanctuary_crafting:OpenSurvivalBook(src, 'dashboard')` ou commande client `/carnet`.
+
+### Architecture
+
+```
+book/
+├── client/book.lua          # open/close NUI, mini HUD pins, ox_target meet
+└── server/
+    ├── db.lua               # tables minimales
+    ├── core.lua             # discoveries, objectives, pins, notes, artisans, orders, history
+    ├── services.lua         # shopping récursif, suggestions, progression RO, dashboard…
+    ├── api.lua              # callbacks lazy-load
+    ├── bridge.lua           # hooks craftCompleted / blueprintLearned
+    └── main.lua             # item export + exports publics
+web/dist/book.js + book.css  # UI field-manual
+config/book.lua              # Config.Book.*
+```
+
+### SQL (minimal)
+
+`sanctuary_book_player`, `_objectives`, `_pins`, `_notes`, `_discovered_resources`, `_artisans`, `_history`, `_orders` — **aucun** stockage XP ml_skills.
+
+### Exports / events book
+
+```lua
+exports.sanctuary_crafting:OpenSurvivalBook(src, page?)
+exports.sanctuary_crafting:DiscoverResource(src, item, label?, reason?)
+exports.sanctuary_crafting:HasDiscoveredResource(src, item)
+exports.sanctuary_crafting:AddObjective(src, title, kind?, payload?)
+exports.sanctuary_crafting:PinRecipe(src, recipeId)
+exports.sanctuary_crafting:AddArtisanContact(src, { contactId, displayName, specialty?, tier?, source? })
+```
+
+Events : `sanctuary_crafting:book:resourceDiscovered`, `book:artisanMet`, `book:objectiveCompleted`.
+
+Shopping smart : expansion récursive des intermédiaires craftables, crédit inventaire (pas de double-compte), garde anti-cycle (`Config.Book.Shopping.MaxDepth`).
+
+Commandes craft : **pas de téléport d'items** (`Orders.AllowTeleport` forcé false) — échange RP / physique.
+
 
 ## Licence
 
