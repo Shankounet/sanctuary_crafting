@@ -1,5 +1,5 @@
 /* sanctuary_crafting — Craft atelier design system (#app only). Book uses book.css. */
-/* v2.2.10 — catalogue cards: status-only, no ingredients on cards */
+/* v2.2.11 — catalogue: corner state badge in image bay (no full-width banner) */
 
 :root {
   /* —— Color tokens (canonical) — neutral charcoal hierarchy —— */
@@ -2030,17 +2030,17 @@ button, input { font: inherit; color: inherit; }
 
 
 /* ============================================================
-   v2.2.10 — Catalogue cards: light scan + binary status badge
+   v2.2.11 — Catalogue cards: image bay corner state badge
    ============================================================ */
 #app .recipe-card .card-ings,
 #app .card-ings,
-#app .card-dur {
+#app .card-dur,
+#app .recipe-card .card-status-row {
   display: none !important;
 }
 #app .card-body {
-  gap: 8px;
-  padding: 10px 11px 11px;
-  justify-content: space-between;
+  gap: 4px;
+  padding: 9px 11px 10px;
   min-height: 0;
 }
 #app .card-identity {
@@ -2064,61 +2064,64 @@ button, input { font: inherit; color: inherit; }
   opacity: 0.55;
   font-size: 0.48rem;
 }
-#app .card-status-row {
-  margin-top: 2px;
+
+/* Compact state plaque — bottom-right of image zone */
+#app .card-img-zone {
+  position: relative;
 }
-#app .recipe-card .status-pill,
-#app .recipe-card .status-plate {
-  flex: 1;
-  font-size: 0.62rem;
-  padding: 5px 8px;
-  letter-spacing: 0.14em;
+#app .card-state-badge {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  z-index: 4;
+  max-width: calc(100% - 18px);
+  padding: 3px 7px;
+  font-size: 0.5rem;
   font-weight: 750;
-  text-align: center;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
   border: 1px solid #3a3a3a;
   color: #8a8278;
-  background: linear-gradient(180deg, #262626 0%, #1a1a1a 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), inset 0 -1px 0 rgba(0,0,0,0.4);
+  background: rgba(18, 18, 18, 0.88);
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+  clip-path: polygon(0 2px, 2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px));
 }
-/* FAISABLE — soft desaturated olive */
-#app .recipe-card .status-pill.ok,
-#app .recipe-card .status-plate.ok {
+#app .card-state-badge.ok {
   color: #7a8a68;
-  border-color: rgba(90, 100, 72, 0.5);
-  background: linear-gradient(180deg, #2a2e26 0%, #1a1c18 100%);
+  border-color: rgba(90, 100, 72, 0.55);
+  background: rgba(22, 26, 20, 0.9);
 }
-/* NON FAISABLE — discrete brown-red / dark red */
-#app .recipe-card .status-pill.bad,
-#app .recipe-card .status-plate.bad {
+#app .card-state-badge.bad,
+#app .card-state-badge.warn {
   color: #8a655c;
-  border-color: rgba(96, 64, 56, 0.45);
-  background: linear-gradient(180deg, #282220 0%, #1a1614 100%);
+  border-color: rgba(96, 64, 56, 0.5);
+  background: rgba(26, 20, 18, 0.9);
 }
-/* warn unused on catalogue cards but keep quiet if present */
-#app .recipe-card .status-pill.warn,
-#app .recipe-card .status-plate.warn {
-  color: #8a655c;
-  border-color: rgba(96, 64, 56, 0.45);
-  background: linear-gradient(180deg, #282220 0%, #1a1614 100%);
+#app .recipe-card.selected .card-state-badge.ok {
+  color: #8a9a76;
+  border-color: rgba(106, 118, 88, 0.6);
+}
+#app .recipe-card.selected .card-state-badge.bad {
+  color: #9a7268;
 }
 #app .recipe-card.state-ok {
-  border-color: rgba(90, 100, 72, 0.55);
+  border-color: rgba(90, 100, 72, 0.45);
 }
 #app .recipe-card.state-bad,
 #app .recipe-card.state-warn {
-  border-color: rgba(72, 52, 44, 0.75);
+  border-color: rgba(72, 52, 44, 0.65);
 }
 #app .recipe-card.selected.state-ok,
 #app .recipe-card.selected.state-bad,
 #app .recipe-card.selected.state-warn {
   border-color: var(--color-accent);
 }
-#app .recipe-card.selected .status-pill.ok,
-#app .recipe-card.selected .status-plate.ok {
-  color: #8a9a76;
-  border-color: rgba(106, 118, 88, 0.55);
-}
-#app .recipe-card.selected .status-pill.bad,
-#app .recipe-card.selected .status-plate.bad {
-  color: #9a7268;
+/* Keep object clear of badge: slight bottom-right safe margin via object position bias */
+#app .card-img-zone img {
+  object-position: center 42%;
 }
