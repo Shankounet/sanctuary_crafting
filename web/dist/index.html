@@ -223,24 +223,39 @@
   </main>
 </div>
 
-<!-- Survival Book (field manual) -->
-<div id="book-app" class="hidden">
+<!-- Survival Book — personal technical journal / field dossier (NOT craft atelier) -->
+<div id="book-app" class="hidden" data-identity="dossier">
+  <div class="book-chrome" aria-hidden="true">
+    <div class="book-spine"></div>
+    <div class="book-paper-grain"></div>
+  </div>
   <header class="book-top">
     <div class="book-brand">
-      <div class="book-mark" aria-hidden="true"></div>
-      <div>
-        <h1 id="book-title">Carnet de survie</h1>
-        <p class="book-sub" id="book-sub">Manuel de terrain</p>
+      <div class="book-mark" aria-hidden="true">
+        <i class="fa-solid fa-book-open"></i>
+      </div>
+      <div class="book-brand-text">
+        <p class="book-stamp">Dossier personnel</p>
+        <h1 id="book-title">CARNET DE SURVIE</h1>
+        <p class="book-sub" id="book-sub">Journal technique de terrain</p>
       </div>
     </div>
     <div class="book-actions">
-      <input id="book-search" type="search" placeholder="Recherche globale…" autocomplete="off" />
-      <button type="button" id="book-btn-close" class="ghost" title="Fermer"><i class="fa-solid fa-xmark"></i></button>
+      <label class="book-search-wrap">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <input id="book-search" type="search" placeholder="Rechercher dans le carnet…" autocomplete="off" />
+      </label>
+      <button type="button" id="book-btn-close" class="book-icon-btn" title="Fermer" aria-label="Fermer">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
     </div>
   </header>
   <div class="book-body">
-    <nav class="book-nav" id="book-nav" aria-label="Modules"></nav>
-    <main class="book-main" id="book-main"></main>
+    <aside class="book-side">
+      <nav class="book-nav" id="book-nav" aria-label="Modules du carnet"></nav>
+    </aside>
+    <main class="book-main" id="book-main" tabindex="-1"></main>
+    <aside class="book-context hidden" id="book-context" aria-label="Contexte"></aside>
   </div>
 </div>
 <script src="app.js"></script>
