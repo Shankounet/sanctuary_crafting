@@ -1,5 +1,5 @@
 /* sanctuary_crafting — Craft atelier design system (#app only). Book uses book.css. */
-/* v2.2.13 — station header plate (control panel, not dashboard bar) */
+/* v2.2.14 — fabrication module (ready / active / done) */
 
 :root {
   /* —— Color tokens (canonical) — neutral charcoal hierarchy —— */
@@ -2649,4 +2649,302 @@ button, input { font: inherit; color: inherit; }
   }
   #app .ctrl-identity { border-right: none; border-bottom: 1px solid #333; }
   #app .ctrl-console { min-height: 0; }
+}
+
+
+/* ============================================================
+   v2.2.14 — FABRICATION MODULE (ready / active / done)
+   ============================================================ */
+#app #fab-module.panel-action,
+#app #fab-module.actions {
+  gap: 10px;
+  padding: 12px;
+  position: relative;
+  background:
+    linear-gradient(180deg, #2c2c28 0%, #222220 42%, #1a1a1a 100%) !important;
+  border: 1px solid #4a4438 !important;
+  border-top: 3px solid #9a8866 !important;
+  box-shadow:
+    0 -12px 26px rgba(0,0,0,0.48),
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 0 0 0 1px rgba(154,136,102,0.06) !important;
+}
+#app #fab-module::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 12px; right: 12px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(200,180,140,0.22), transparent);
+  pointer-events: none;
+}
+#app .fab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+#app .fab-panel.hidden {
+  display: none !important;
+}
+
+/* —— Ready readouts —— */
+#app .fab-readouts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+#app .fab-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 8px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.28), rgba(0,0,0,0.16));
+  border: 1px solid rgba(74,68,58,0.85);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  clip-path: polygon(0 3px, 3px 0, calc(100% - 3px) 0, 100% 3px, 100% calc(100% - 3px), calc(100% - 3px) 100%, 3px 100%, 0 calc(100% - 3px));
+}
+#app .fab-chip-k {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(154,154,154,0.72);
+}
+#app .fab-chip-v {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #e4e0d8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#app .fab-chip.hidden { display: none !important; }
+
+#app .fab-queue-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 0.68rem;
+  border: 1px solid rgba(74,68,58,0.7);
+  background: rgba(0,0,0,0.22);
+  color: var(--color-muted);
+}
+#app .fab-queue-mini.hidden { display: none !important; }
+#app .fab-q-k {
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(154,136,102,0.85);
+}
+#app .fab-q-v { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#app .fab-q-eta { color: #c8b898; font-variant-numeric: tabular-nums; }
+
+/* —— Active console —— */
+#app .fab-active {
+  gap: 12px;
+}
+#app #fab-module[data-fab-state="active"] {
+  border-top-color: #b09a72 !important;
+  box-shadow:
+    0 -12px 28px rgba(0,0,0,0.52),
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 0 0 1px rgba(154,136,102,0.12) !important;
+}
+#app .fab-active-head {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+#app .fab-active-bay {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(180deg, #2a2a26, #1c1c1c);
+  border: 1px solid #4a4438;
+  box-shadow: inset 0 0 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+  clip-path: polygon(0 4px, 4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px));
+  overflow: hidden;
+}
+#app .fab-active-bay img {
+  width: 86%;
+  height: 86%;
+  object-fit: contain;
+  filter: brightness(1.08) contrast(1.04);
+}
+#app .fab-active-bay img.is-fallback { display: none; }
+#app .fab-img-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(154,136,102,0.45);
+  font-size: 1.1rem;
+}
+#app .fab-active-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+#app #fab-active-name {
+  font-size: 0.95rem;
+  font-weight: 780;
+  color: #f0ebe3;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#app .fab-active-qty {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #9a8866;
+  letter-spacing: 0.06em;
+}
+#app .fab-active-phase-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+#app .fab-phase {
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #b09a72;
+}
+#app .fab-active-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+#app .fab-time {
+  font-size: 0.72rem;
+  color: var(--color-muted);
+}
+#app .fab-pct {
+  font-size: 0.78rem;
+  font-weight: 780;
+  color: #e4e0d8;
+  min-width: 2.6em;
+  text-align: right;
+}
+
+/* Premium progress track */
+#app .fab-active .progress-wrap {
+  margin-top: 0;
+}
+#app .fab-active .progress-bar {
+  height: 8px;
+  margin-bottom: 0;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255,255,255,0.03) 0 1px,
+      transparent 1px 8px
+    ),
+    rgba(0,0,0,0.55);
+  border: 1px solid rgba(74,68,58,0.95);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.55);
+  clip-path: polygon(0 2px, 2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px));
+}
+#app .fab-active #progress-fill {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.18), transparent 45%),
+    linear-gradient(90deg, #6a5c44 0%, #9a8866 55%, #b09a72 100%);
+  box-shadow: 0 0 10px rgba(154,136,102,0.28);
+  transition: width 120ms linear;
+}
+
+#app .fab-active-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+#app .fab-cancel {
+  padding: 7px 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b8a090;
+  border: 1px solid rgba(122,85,76,0.45);
+  background: rgba(40,28,24,0.55);
+}
+#app .fab-cancel:hover {
+  color: #e8c4c4;
+  border-color: rgba(168,106,90,0.65);
+  background: rgba(56,32,28,0.72);
+}
+
+/* —— Done / success —— */
+#app .fab-done {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 4px;
+  min-height: 72px;
+}
+#app #fab-module[data-fab-state="done"] {
+  border-top-color: #6a7658 !important;
+}
+#app .fab-done-mark {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(106,118,88,0.55);
+  background: linear-gradient(180deg, rgba(106,118,88,0.22), rgba(106,118,88,0.08));
+  color: #9aaa80;
+  font-size: 1.05rem;
+  clip-path: polygon(0 4px, 4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+#app .fab-done-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 780;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9aaa80;
+}
+#app .fab-done-label {
+  margin: 4px 0 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #e8e4dc;
+}
+#app .fab-done-hint {
+  margin: 4px 0 0;
+  font-size: 0.68rem;
+  color: rgba(154,154,154,0.8);
+}
+
+/* FABRIQUER press/hover micro enhance */
+#app #fab-module .primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  border-color: #a89470 !important;
+}
+#app #fab-module .primary:active:not(:disabled) {
+  transform: translateY(3px) scale(0.99);
+}
+
+@media (max-width: 1440px) {
+  #app .fab-readouts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

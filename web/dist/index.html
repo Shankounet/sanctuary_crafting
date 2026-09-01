@@ -286,52 +286,115 @@
           <div class="kv-row" id="row-mastery"><span>Maîtrise</span><span id="d-mastery">—</span></div>
         </div>
 
-        <!-- PANEL ACTION -->
-        <div class="panel-action actions">
-          <div class="action-primary-row">
-            <label class="batch" id="batch-wrap">Lot
-              <input id="batch" type="number" min="1" max="10" value="1" />
-            </label>
-            <button type="button" id="btn-craft" class="primary" title="">
-              <i class="fa-solid fa-hammer"></i> FABRIQUER
-            </button>
-          </div>
-          <div class="action-secondary-row">
-            <button type="button" id="btn-queue" class="ghost action-tool" title="Ajouter à la file de production" aria-label="File de production">
-              <i class="fa-solid fa-list-ol" aria-hidden="true"></i><span class="tool-label">File</span>
-            </button>
-            <button type="button" id="btn-shop" class="ghost action-tool" title="Ajouter à la liste de récupération" aria-label="Liste de récupération">
-              <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i><span class="tool-label">Courses</span>
-            </button>
-            <button type="button" id="btn-tree" class="ghost action-tool" title="Ouvrir le schéma de dépendances" aria-label="Schéma de dépendances">
-              <i class="fa-solid fa-diagram-project" aria-hidden="true"></i><span class="tool-label">Arbre</span>
-            </button>
-            <button type="button" id="btn-pin" class="ghost action-tool" title="Épingler la recette au carnet" aria-label="Épingler au carnet">
-              <i class="fa-solid fa-thumbtack" aria-hidden="true"></i><span class="tool-label">Pin</span>
-            </button>
-            <details class="action-more">
-              <summary class="ghost icon-only" title="Plus d’actions" aria-label="Plus d’actions">
-                <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
-              </summary>
-              <div class="action-more-menu">
-                <button type="button" id="btn-obj" class="ghost" title="Ajouter un objectif carnet" aria-label="Objectif carnet">
-                  <i class="fa-solid fa-bullseye" aria-hidden="true"></i> Objectif
-                </button>
-                <button type="button" id="btn-book" class="ghost" title="Ouvrir le carnet de survie" aria-label="Ouvrir le carnet">
-                  <i class="fa-solid fa-book" aria-hidden="true"></i> Carnet
-                </button>
+        <!-- PANEL ACTION — module fabrication (ready / active / done) -->
+        <div class="panel-action actions" id="fab-module" data-fab-state="ready">
+          <div id="fab-ready" class="fab-panel fab-ready">
+            <div class="fab-readouts" aria-label="Résumé fabrication">
+              <div class="fab-chip" id="fab-chip-lot">
+                <span class="fab-chip-k">Lot</span>
+                <span class="fab-chip-v" id="fab-ready-lot">×1</span>
               </div>
-            </details>
+              <div class="fab-chip" id="fab-chip-result">
+                <span class="fab-chip-k">Résultat</span>
+                <span class="fab-chip-v" id="fab-ready-result">—</span>
+              </div>
+              <div class="fab-chip" id="fab-chip-dur">
+                <span class="fab-chip-k">Durée</span>
+                <span class="fab-chip-v" id="fab-ready-dur">—</span>
+              </div>
+              <div class="fab-chip" id="fab-chip-xp">
+                <span class="fab-chip-k">XP</span>
+                <span class="fab-chip-v" id="fab-ready-xp">—</span>
+              </div>
+              <div class="fab-chip hidden" id="fab-chip-noise">
+                <span class="fab-chip-k">Bruit</span>
+                <span class="fab-chip-v" id="fab-ready-noise">—</span>
+              </div>
+              <div class="fab-chip hidden" id="fab-chip-energy">
+                <span class="fab-chip-k">Énergie</span>
+                <span class="fab-chip-v" id="fab-ready-energy">—</span>
+              </div>
+            </div>
+            <div class="action-primary-row">
+              <label class="batch" id="batch-wrap">Lot
+                <input id="batch" type="number" min="1" max="10" value="1" />
+              </label>
+              <button type="button" id="btn-craft" class="primary" title="">
+                <i class="fa-solid fa-hammer"></i> FABRIQUER
+              </button>
+            </div>
+            <div class="action-secondary-row">
+              <button type="button" id="btn-queue" class="ghost action-tool" title="Ajouter à la file de production" aria-label="File de production">
+                <i class="fa-solid fa-list-ol" aria-hidden="true"></i><span class="tool-label">File</span>
+              </button>
+              <button type="button" id="btn-shop" class="ghost action-tool" title="Ajouter à la liste de récupération" aria-label="Liste de récupération">
+                <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i><span class="tool-label">Courses</span>
+              </button>
+              <button type="button" id="btn-tree" class="ghost action-tool" title="Ouvrir le schéma de dépendances" aria-label="Schéma de dépendances">
+                <i class="fa-solid fa-diagram-project" aria-hidden="true"></i><span class="tool-label">Arbre</span>
+              </button>
+              <button type="button" id="btn-pin" class="ghost action-tool" title="Épingler la recette au carnet" aria-label="Épingler au carnet">
+                <i class="fa-solid fa-thumbtack" aria-hidden="true"></i><span class="tool-label">Pin</span>
+              </button>
+              <details class="action-more">
+                <summary class="ghost icon-only" title="Plus d’actions" aria-label="Plus d’actions">
+                  <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+                </summary>
+                <div class="action-more-menu">
+                  <button type="button" id="btn-obj" class="ghost" title="Ajouter un objectif carnet" aria-label="Objectif carnet">
+                    <i class="fa-solid fa-bullseye" aria-hidden="true"></i> Objectif
+                  </button>
+                  <button type="button" id="btn-book" class="ghost" title="Ouvrir le carnet de survie" aria-label="Ouvrir le carnet">
+                    <i class="fa-solid fa-book" aria-hidden="true"></i> Carnet
+                  </button>
+                </div>
+              </details>
+            </div>
+            <div id="fab-queue-mini" class="fab-queue-mini hidden" aria-live="polite"></div>
+          </div>
+
+          <div id="fab-active" class="fab-panel fab-active hidden" aria-live="polite">
+            <div class="fab-active-head">
+              <div class="fab-active-bay tech-frame">
+                <img id="fab-active-img" alt="" />
+                <span id="fab-active-img-fallback" class="fab-img-fallback" aria-hidden="true">
+                  <i class="fa-solid fa-cube"></i>
+                </span>
+              </div>
+              <div class="fab-active-meta">
+                <div class="fab-active-title-row">
+                  <span id="fab-active-name">—</span>
+                  <span id="fab-active-qty" class="fab-active-qty">×1</span>
+                </div>
+                <div class="fab-active-phase-row">
+                  <span id="fab-active-phase" class="fab-phase">Préparation</span>
+                  <span class="fab-active-stats">
+                    <span id="fab-active-time" class="fab-time">—</span>
+                    <span id="fab-active-pct" class="fab-pct">0%</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div id="progress-wrap" class="progress-wrap">
+              <div class="progress-bar"><div id="progress-fill"></div></div>
+            </div>
+            <div class="fab-active-footer">
+              <button type="button" id="btn-cancel" class="ghost fab-cancel">
+                <i class="fa-solid fa-ban"></i> Annuler
+              </button>
+            </div>
+          </div>
+
+          <div id="fab-done" class="fab-panel fab-done hidden" aria-live="polite">
+            <div class="fab-done-mark" aria-hidden="true"><i class="fa-solid fa-check"></i></div>
+            <div class="fab-done-text">
+              <p class="fab-done-title">Fabrication terminée</p>
+              <p id="fab-done-label" class="fab-done-label">—</p>
+              <p class="fab-done-hint">Ajouté à l’inventaire</p>
+            </div>
           </div>
         </div>
         <p id="craft-why" class="craft-why panel-alert hidden"></p>
-
-        <div id="progress-wrap" class="progress-wrap hidden">
-          <div class="progress-bar"><div id="progress-fill"></div></div>
-          <button type="button" id="btn-cancel" class="danger">
-            <i class="fa-solid fa-ban"></i> Annuler
-          </button>
-        </div>
       </div>
     </section>
   </main>
