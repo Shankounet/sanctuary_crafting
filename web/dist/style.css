@@ -1,5 +1,5 @@
 /* sanctuary_crafting — Craft atelier design system (#app only). Book uses book.css. */
-/* v2.2.15 — neutralize warm/brass veils; charcoal surfaces, accent-only #9a8866 */
+/* v2.2.16 — recipe card footer breathing + readable category */
 
 :root {
   /* —— Color tokens (canonical) — neutral charcoal hierarchy —— */
@@ -3090,4 +3090,69 @@ button, input { font: inherit; color: inherit; }
     0 10px 20px rgba(0,0,0,0.34),
     inset 0 1px 0 rgba(255,255,255,0.05),
     inset 3px 0 0 #9a8866 !important;
+}
+
+
+/* ============================================================
+   v2.2.16 — Card footer breath (name / cat / code)
+   ============================================================ */
+#app .card-body,
+#app .recipe-card.selected .card-body {
+  padding: 10px 11px 13px !important;
+  gap: 0 !important;
+  min-height: 58px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+#app .card-identity {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-bottom: 2px;
+}
+#app .card-title {
+  font-size: 0.86rem;
+  font-weight: 780;
+  line-height: 1.25;
+  margin: 0;
+  -webkit-line-clamp: 2;
+}
+#app .card-meta-line {
+  margin-top: 0 !important;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  align-items: center;
+  gap: 8px;
+  min-height: 1.1em;
+}
+#app .card-cat {
+  font-size: 0.54rem !important;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(180,180,180,0.72) !important;
+  opacity: 1 !important;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#app .card-code,
+#app .recipe-card.selected .card-code {
+  font-size: 0.46rem !important;
+  letter-spacing: 0.08em;
+  color: rgba(154,154,154,0.38) !important;
+  opacity: 0.9 !important;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
+#app .recipe-card.selected .card-cat {
+  color: rgba(200,196,188,0.78) !important;
+}
+/* Badge: clean inset from image bay edges */
+#app .card-state-badge {
+  right: 8px !important;
+  bottom: 8px !important;
+  max-width: calc(100% - 20px);
 }
