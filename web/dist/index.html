@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Sanctuary Crafting</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <link rel="stylesheet" href="style.css" />
 <link rel="stylesheet" href="book.css" />
 </head>
@@ -11,87 +12,212 @@
 <div id="app" class="hidden" data-compact="0">
   <header class="topbar">
     <div class="brand">
-      <span class="accent-bar"></span>
-      <div>
+      <span class="accent-bar" aria-hidden="true"></span>
+      <div class="brand-text">
         <h1 id="station-title">Atelier</h1>
         <p class="sub" id="station-meta">—</p>
       </div>
     </div>
+    <div class="station-stats" id="station-stats" aria-label="État atelier">
+      <div class="stat"><span class="stat-k">Type</span><span class="stat-v" id="stat-type">—</span></div>
+      <div class="stat"><span class="stat-k">Niveau</span><span class="stat-v" id="stat-level">—</span></div>
+      <div class="stat"><span class="stat-k">État</span><span class="stat-v" id="stat-state">—</span></div>
+      <div class="stat"><span class="stat-k">Efficacité</span><span class="stat-v" id="stat-eff">—</span></div>
+      <div class="stat hidden" id="stat-energy-wrap"><span class="stat-k">Énergie</span><span class="stat-v" id="stat-energy">—</span></div>
+    </div>
     <div class="top-actions">
-      <input id="search" type="search" placeholder="Rechercher…" autocomplete="off" />
-      <button type="button" id="btn-compact" title="Mode compact" aria-label="Compact">▣</button>
-      <button type="button" id="btn-close" title="Fermer" aria-label="Fermer">✕</button>
+      <button type="button" id="btn-compact" class="icon-btn" title="Mode compact" aria-label="Compact">
+        <i class="fa-solid fa-compress" aria-hidden="true"></i>
+      </button>
+      <button type="button" id="btn-close" class="icon-btn" title="Fermer" aria-label="Fermer">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
     </div>
   </header>
 
-  <nav class="filters" id="filters">
-    <button type="button" class="chip active" data-filter="all">Tous</button>
-    <button type="button" class="chip" data-filter="craftable">Faisables</button>
-    <button type="button" class="chip" data-filter="favorites">★ Favoris</button>
-    <button type="button" class="chip" data-filter="locked">Verrouillés</button>
-  </nav>
+  <main class="layout-3">
+    <!-- LEFT: nav / categories / filters / search + side tabs -->
+    <aside class="panel col-nav" aria-label="Navigation">
+      <div class="search-wrap">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <input id="search" type="search" placeholder="Rechercher une recette..." autocomplete="off" />
+      </div>
 
-  <main class="grid-3">
-    <!-- Col 1: recipes -->
-    <section class="panel col-list" aria-label="Recettes">
-      <h2>Recettes</h2>
-      <ul id="recipe-list" class="recipe-list"></ul>
+      <div class="nav-section">
+        <h2 class="nav-heading">Filtres</h2>
+        <nav class="filters" id="filters" aria-label="Filtres">
+          <button type="button" class="chip active" data-filter="all"><i class="fa-solid fa-border-all"></i><span>Tous</span></button>
+          <button type="button" class="chip" data-filter="craftable"><i class="fa-solid fa-check"></i><span>Faisables</span></button>
+          <button type="button" class="chip" data-filter="favorites"><i class="fa-solid fa-star"></i><span>Favoris</span></button>
+          <button type="button" class="chip" data-filter="locked"><i class="fa-solid fa-lock"></i><span>Verrouillés</span></button>
+          <button type="button" class="chip" data-filter="new"><i class="fa-solid fa-certificate"></i><span>Nouveaux</span></button>
+          <button type="button" class="chip" data-filter="plans"><i class="fa-solid fa-scroll"></i><span>Plans connus</span></button>
+        </nav>
+      </div>
+
+      <div class="nav-section flex-grow">
+        <h2 class="nav-heading">Catégories</h2>
+        <nav class="cat-list" id="cat-list" aria-label="Catégories"></nav>
+      </div>
+
+      <div class="side-tabs-wrap">
+        <div class="tabs" role="tablist">
+          <button type="button" class="tab active" data-tab="queue" role="tab"><i class="fa-solid fa-list-ol"></i><span>File</span></button>
+          <button type="button" class="tab" data-tab="tree" role="tab"><i class="fa-solid fa-sitemap"></i><span>Arbre</span></button>
+          <button type="button" class="tab" data-tab="shop" role="tab"><i class="fa-solid fa-basket-shopping"></i><span>Courses</span></button>
+        </div>
+        <div id="tab-queue" class="tab-body">
+          <div id="queue-list" class="queue-track"></div>
+          <div class="empty-state" id="queue-empty">
+            <i class="fa-solid fa-industry" aria-hidden="true"></i>
+            <p>Aucune fabrication en cours</p>
+          </div>
+        </div>
+        <div id="tab-tree" class="tab-body hidden">
+          <div id="tree-view" class="tree-graph" aria-live="polite">
+            <div class="empty-state compact">
+              <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
+              <p>Sélectionnez une recette puis ouvrez l’arbre</p>
+            </div>
+          </div>
+        </div>
+        <div id="tab-shop" class="tab-body hidden">
+          <ul id="shop-list" class="shop-list"></ul>
+          <div class="empty-state compact" id="shop-empty">
+            <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+            <p>Liste vide</p>
+          </div>
+          <button type="button" id="btn-shop-clear" class="ghost small">
+            <i class="fa-solid fa-trash"></i> Vider
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: recipe cards -->
+    <section class="panel col-grid" aria-label="Recettes">
+      <div class="panel-head">
+        <h2>Recettes</h2>
+        <span class="muted" id="recipe-count"></span>
+      </div>
+      <div id="recipe-grid" class="recipe-grid"></div>
+      <div class="empty-state" id="recipe-empty">
+        <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+        <p>Aucune recette ne correspond</p>
+      </div>
     </section>
 
-    <!-- Col 2: detail -->
-    <section class="panel col-detail" aria-label="Détail">
-      <div id="detail-empty" class="empty">Sélectionnez une recette</div>
-      <div id="detail" class="hidden">
-        <h2 id="d-title"></h2>
-        <p id="d-locks" class="locks"></p>
+    <!-- RIGHT: detail sheet -->
+    <section class="panel col-detail" aria-label="Détail recette">
+      <div id="detail-empty" class="empty-state">
+        <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i>
+        <p>Sélectionnez une recette</p>
+      </div>
+      <div id="detail" class="detail-sheet hidden">
+        <div class="detail-hero">
+          <div class="detail-img-wrap">
+            <img id="d-image" alt="" />
+            <div class="img-fallback" id="d-image-fallback"><i class="fa-solid fa-cube"></i></div>
+          </div>
+          <div class="detail-hero-text">
+            <div class="detail-badges">
+              <span class="badge" id="d-category"></span>
+              <span class="badge soft" id="d-rarity"></span>
+            </div>
+            <h2 id="d-title" class="detail-title"></h2>
+            <p id="d-desc" class="detail-desc"></p>
+            <p id="d-locks" class="locks"></p>
+          </div>
+          <button type="button" id="btn-fav" class="fav-btn" title="Favori" aria-label="Favori">
+            <i class="fa-regular fa-star" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="detail-meta-grid">
+          <div class="meta-card"><span class="k">Qualité estimée</span><span class="v" id="d-quality">—</span></div>
+          <div class="meta-card"><span class="k">Résultat</span><span class="v" id="d-result">—</span></div>
+          <div class="meta-card"><span class="k">Durée</span><span class="v" id="d-duration">—</span></div>
+          <div class="meta-card"><span class="k">Quantité</span><span class="v" id="d-qty">—</span></div>
+        </div>
+
+        <div class="block" id="block-skill">
+          <h3><i class="fa-solid fa-brain"></i> Compétence</h3>
+          <div class="kv-row"><span>Skill</span><span id="d-skill">—</span></div>
+          <div class="kv-row"><span>Niveau</span><span id="d-skill-level">—</span></div>
+          <div class="kv-row"><span>Spécialisation</span><span id="d-spec">—</span></div>
+        </div>
+
+        <div class="block" id="block-station">
+          <h3><i class="fa-solid fa-warehouse"></i> Atelier</h3>
+          <div class="kv-row"><span>Station</span><span id="d-station">—</span></div>
+          <div class="kv-row"><span>Niveau requis</span><span id="d-station-lvl">—</span></div>
+        </div>
+
         <div class="block">
-          <h3>Ingrédients</h3>
-          <ul id="d-ings"></ul>
+          <h3><i class="fa-solid fa-cubes"></i> Matériaux</h3>
+          <ul id="d-ings" class="ing-list"></ul>
         </div>
-        <div class="block">
-          <h3>Résultat</h3>
-          <p id="d-result"></p>
+
+        <div class="block" id="block-tools">
+          <h3><i class="fa-solid fa-screwdriver-wrench"></i> Outils</h3>
+          <ul id="d-tools" class="ing-list"></ul>
         </div>
-        <div class="meta-row">
-          <span id="d-duration"></span>
-          <span id="d-xp"></span>
-          <span id="d-mastery"></span>
+
+        <div class="block dual" id="block-power-noise">
+          <div>
+            <h3><i class="fa-solid fa-bolt"></i> Énergie</h3>
+            <p id="d-power" class="block-text">—</p>
+          </div>
+          <div>
+            <h3><i class="fa-solid fa-volume-high"></i> Bruit</h3>
+            <p id="d-noise" class="block-text">—</p>
+          </div>
         </div>
+
+        <div class="block" id="block-bp">
+          <h3><i class="fa-solid fa-scroll"></i> Plan / Blueprint</h3>
+          <p id="d-bp" class="block-text">—</p>
+        </div>
+
+        <div class="block" id="block-xp">
+          <div class="kv-row"><span>XP</span><span id="d-xp">—</span></div>
+          <div class="kv-row"><span>Maîtrise</span><span id="d-mastery">—</span></div>
+        </div>
+
         <div class="actions">
-          <label class="batch" id="batch-wrap">x<input id="batch" type="number" min="1" max="10" value="1" /></label>
-          <button type="button" id="btn-craft" class="primary">Fabriquer</button>
-          <button type="button" id="btn-queue" class="ghost">File</button>
-          <button type="button" id="btn-fav" class="ghost">★</button>
-          <button type="button" id="btn-shop" class="ghost">Liste</button>
-          <button type="button" id="btn-tree" class="ghost">Arbre</button>
-          <button type="button" id="btn-pin" class="ghost" title="Épingler au carnet">📌</button>
-          <button type="button" id="btn-obj" class="ghost" title="Objectif carnet">◎</button>
-          <button type="button" id="btn-book" class="ghost" title="Ouvrir le carnet">📔</button>
+          <label class="batch" id="batch-wrap">Lot
+            <input id="batch" type="number" min="1" max="10" value="1" />
+          </label>
+          <button type="button" id="btn-craft" class="primary">
+            <i class="fa-solid fa-hammer"></i> FABRIQUER
+          </button>
+          <button type="button" id="btn-queue" class="ghost" title="Ajouter à la file">
+            <i class="fa-solid fa-list-ol"></i> File
+          </button>
+          <button type="button" id="btn-shop" class="ghost" title="Liste de courses">
+            <i class="fa-solid fa-basket-shopping"></i>
+          </button>
+          <button type="button" id="btn-tree" class="ghost" title="Arbre de dépendances">
+            <i class="fa-solid fa-sitemap"></i>
+          </button>
+          <button type="button" id="btn-pin" class="ghost" title="Épingler au carnet">
+            <i class="fa-solid fa-thumbtack"></i>
+          </button>
+          <button type="button" id="btn-obj" class="ghost" title="Objectif carnet">
+            <i class="fa-solid fa-bullseye"></i>
+          </button>
+          <button type="button" id="btn-book" class="ghost" title="Ouvrir le carnet">
+            <i class="fa-solid fa-book"></i>
+          </button>
         </div>
+        <p id="craft-why" class="craft-why hidden"></p>
+
         <div id="progress-wrap" class="progress-wrap hidden">
           <div class="progress-bar"><div id="progress-fill"></div></div>
-          <button type="button" id="btn-cancel" class="danger">Annuler</button>
+          <button type="button" id="btn-cancel" class="danger">
+            <i class="fa-solid fa-ban"></i> Annuler
+          </button>
         </div>
-      </div>
-    </section>
-
-    <!-- Col 3: queue / tree / shopping -->
-    <section class="panel col-side" aria-label="Panneau">
-      <div class="tabs">
-        <button type="button" class="tab active" data-tab="queue">File</button>
-        <button type="button" class="tab" data-tab="tree">Arbre</button>
-        <button type="button" class="tab" data-tab="shop">Courses</button>
-      </div>
-      <div id="tab-queue" class="tab-body">
-        <ul id="queue-list" class="side-list"></ul>
-        <p class="hint" id="queue-empty">File vide</p>
-      </div>
-      <div id="tab-tree" class="tab-body hidden">
-        <pre id="tree-view" class="tree-view">—</pre>
-      </div>
-      <div id="tab-shop" class="tab-body hidden">
-        <ul id="shop-list" class="side-list"></ul>
-        <button type="button" id="btn-shop-clear" class="ghost small">Vider</button>
       </div>
     </section>
   </main>
@@ -109,7 +235,7 @@
     </div>
     <div class="book-actions">
       <input id="book-search" type="search" placeholder="Recherche globale…" autocomplete="off" />
-      <button type="button" id="book-btn-close" class="ghost" title="Fermer">✕</button>
+      <button type="button" id="book-btn-close" class="ghost" title="Fermer"><i class="fa-solid fa-xmark"></i></button>
     </div>
   </header>
   <div class="book-body">

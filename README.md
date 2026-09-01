@@ -1,10 +1,18 @@
-# sanctuary_crafting v2.1.0
+# sanctuary_crafting v2.1.1
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
 **ml_skills** (Micio Mods) est la **seule** source de compétences / XP / niveaux. Aucun XP craft parallèle.
 
-UI NUI : thème industriel sombre moderne (pas « rusty »), accent `#9a8866`, layout 3 colonnes (recettes · détail · file/arbre/courses), recherche, filtres, favoris, raisons de verrouillage ✓/✕, mode compact, micro-interactions courtes.
+UI NUI **premium** (v2.1.1) : post-apo industriel moderne (pas Fallout / pas cyberpunk), accent `#9a8866`, panneaux semi-transparents grain métal, layout 3 colonnes utiles (nav/filtres · grille de cartes recettes · fiche détail), images ox_inventory, filtres Tous/Faisables/Favoris/Verrouillés/Nouveaux/Plans connus, file en cartes horizontales, arbre de dépendances cliquable, micro-interactions 100–180 ms. Callbacks NUI inchangés.
+
+---
+
+
+## Notes de version
+
+### v2.1.1 — UI premium
+Refonte visuelle complète de l’UI craft (`web/dist`) : grille de cartes, fiche détail enrichie, navigation/filtres à gauche, file/arbre/courses redesignés. **Aucun changement** des callbacks NUI / ponts Lua (`close`, `refresh`, `craft`, `complete`, `cancel`, `favorite`, `queue`, `queueList`, `queueCollect`, `shopping`, `shoppingClear`, `tree`, `notify`, book*).
 
 ---
 
