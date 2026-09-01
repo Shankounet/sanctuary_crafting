@@ -4684,3 +4684,108 @@ button, input { font: inherit; color: inherit; }
 #app .recipe-card .card-identity {
   gap: 3px !important;
 }
+
+
+/* ============================================================
+   v2.7.2 — Catalogue grid: FIXED card size, independent scroll
+   Card size NEVER depends on recipe count. Excess → vertical scroll.
+   ============================================================ */
+#app .panel-primary,
+#app .family-recipe,
+#app .col-grid {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+#app .panel-primary > .panel-head,
+#app .family-recipe > .panel-head,
+#app .col-grid > .panel-head {
+  flex: 0 0 auto !important;
+  position: relative;
+  z-index: 3;
+  margin-bottom: 8px !important;
+  background: transparent;
+}
+
+#app .recipe-grid {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)) !important;
+  grid-auto-rows: max-content !important;
+  grid-template-rows: none !important;
+  align-content: start !important;
+  align-items: start !important;
+  justify-items: stretch !important;
+  gap: 8px !important;
+  padding: 2px 6px 18px 2px !important;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(154,136,102,0.45) rgba(0,0,0,0.15);
+}
+
+#app .recipe-card {
+  flex-shrink: 0 !important;
+  align-self: start !important;
+  min-height: 148px !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+#app .card-img-zone,
+#app .recipe-card.selected .card-img-zone,
+#app .recipe-card[class*="cat-"] .card-img-zone {
+  flex: 0 0 100px !important;
+  height: 100px !important;
+  min-height: 100px !important;
+  max-height: 100px !important;
+}
+
+#app .recipe-card .card-body,
+#app .card-body {
+  flex: 0 0 auto !important;
+  min-height: 44px !important;
+  overflow: visible !important;
+}
+
+#app .recipe-grid::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+#app .recipe-grid::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.18);
+  border-radius: 0;
+}
+#app .recipe-grid::-webkit-scrollbar-thumb {
+  background: rgba(154,136,102,0.38);
+  border: 1px solid rgba(58,51,43,0.6);
+}
+#app .recipe-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(154,136,102,0.62);
+}
+
+@media (max-width: 1440px) {
+  #app .recipe-grid {
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)) !important;
+  }
+  #app .card-img-zone,
+  #app .recipe-card.selected .card-img-zone,
+  #app .recipe-card[class*="cat-"] .card-img-zone {
+    flex-basis: 100px !important;
+    height: 100px !important;
+    min-height: 100px !important;
+    max-height: 100px !important;
+  }
+  #app .recipe-card { min-height: 148px !important; }
+}
+
+@media (min-width: 1600px) {
+  #app .recipe-grid {
+    grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)) !important;
+  }
+}
