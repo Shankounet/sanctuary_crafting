@@ -196,11 +196,27 @@
   };
 
   function lockText(r) {
+    if (r.canCraft) return { text: 'Conditions remplies', cls: 'ok', tag: 'FAISABLE' };
     if (!r.locked && r.missingItems) return { text: 'Matériaux manquants', cls: 'bad', tag: 'MANQUANT' };
-    if (!r.locked) return { text: 'Disponible', cls: 'ok', tag: 'OPÉRATIONNEL' };
+    if (!r.locked) return { text: 'Disponible', cls: 'ok', tag: 'FAISABLE' };
     const fn = LOCK_LABELS[r.lockReason];
     const text = fn ? fn(r) : (r.lockReason ? humanize(r.lockReason) : 'Verrouillé');
-    return { text, cls: 'warn', tag: 'VERROUILLÉ' };
+    let tag = 'VERROUILLÉ';
+    if (r.lockReason === 'craft_blueprint_required') tag = 'PLAN REQUIS';
+    else if (r.lockReason === 'craft_level_required' || r.lockReason === 'craft_station_level') tag = 'NIVEAU REQUIS';
+    else if (r.lockReason === 'craft_skill_required') tag = 'VERROUILLÉ';
+    return { text, cls: 'warn', tag };
+  }
+
+  function cardStatus(r) {
+    if (r.canCraft) return { text: 'FAISABLE', cls: 'ok' };
+    if (r.lockReason === 'craft_blueprint_required') return { text: 'PLAN REQUIS', cls: 'warn' };
+    if (r.lockReason === 'craft_level_required' || r.lockReason === 'craft_station_level') {
+      return { text: 'NIVEAU REQUIS', cls: 'warn' };
+    }
+    if (r.locked) return { text: 'VERROUILLÉ', cls: 'warn' };
+    if (r.missingItems) return { text: 'MANQUANT', cls: 'bad' };
+    return { text: 'MANQUANT', cls: 'bad' };
   }
 
   function disableReasons(r) {
@@ -304,46 +320,41 @@
       card.dataset.id = r.id;
 
       const favOn = isFavorite(r.id);
-      const lock = lockText(r);
+      const status = cardStatus(r);
       const resultItem = (r.result && r.result.item) || r.id;
-      const ings = (r.ingredients || []).slice(0, 4);
-      const more = (r.ingredients || []).length - ings.length;
-      const availCls = r.canCraft ? 'ok' : (r.locked ? 'warn' : 'bad');
-      const availTxt = r.canCraft ? 'OPÉRATIONNEL' : (r.locked ? 'VERROUILLÉ' : 'MANQUANT');
-      const code = recipeCode(r);
+      const allIngs = r.ingredients || [];
+      const ings = allIngs.slice(0, 3);
+      const more = allIngs.length - ings.length;
 
       card.innerHTML = `
         <button type="button" class="card-fav${favOn ? ' on' : ''}" data-fav="${escapeHtml(r.id)}" title="Favori" aria-label="Favori">
           <i class="fa-${favOn ? 'solid' : 'regular'} fa-star" aria-hidden="true"></i>
         </button>
-        <div class="card-top">
-          <div class="card-img">
-            <span class="ph"><i class="fa-solid fa-cube"></i></span>
-            <img alt="" />
-          </div>
-          <div class="card-title-wrap">
+        <div class="card-img-zone">
+          <span class="ph"><i class="fa-solid fa-cube"></i></span>
+          <img alt="" />
+        </div>
+        <div class="card-body">
+          <div>
             <div class="card-title">${escapeHtml(r.label)}</div>
             <div class="card-cat">${escapeHtml(categoryLabel(r.category))}</div>
-            <div class="card-code">${escapeHtml(code)}</div>
+          </div>
+          <div class="card-status-row">
+            <span class="status-pill ${status.cls}">${status.text}</span>
+            <span class="card-dur"><i class="fa-regular fa-clock" aria-hidden="true"></i>${escapeHtml(durationLabel(r.duration))}</span>
+          </div>
+          <div class="card-ings">
+            ${ings.map((ing) => {
+              const info = ingOwnedRequired(ing, r);
+              return `<span class="ing-chip ${info.cls}">${escapeHtml(info.text)} ${escapeHtml(ing.item)}</span>`;
+            }).join('')}
+            ${more > 0 ? `<span class="ing-chip more">+${more} autres</span>` : ''}
           </div>
         </div>
-        <div class="card-meta">
-          <span class="pill ${availCls}">${availTxt}</span>
-          ${r.requireLevel != null ? `<span class="pill">Niv. ${escapeHtml(r.requireLevel)}</span>` : ''}
-          <span class="pill"><i class="fa-regular fa-clock"></i> ${escapeHtml(durationLabel(r.duration))}</span>
-        </div>
-        <div class="card-ings">
-          ${ings.map((ing) => {
-            const info = ingOwnedRequired(ing, r);
-            return `<span class="ing-chip ${info.cls}">${info.mark} ${escapeHtml(info.text)} ${escapeHtml(ing.item)}</span>`;
-          }).join('')}
-          ${more > 0 ? `<span class="ing-chip">+${more}</span>` : ''}
-        </div>
-        ${(r.locked || r.missingItems) && lock.cls !== 'ok' ? `<div class="card-lock">${escapeHtml(lock.text)}</div>` : ''}
       `;
 
-      const img = card.querySelector('.card-img img');
-      const ph = card.querySelector('.card-img .ph');
+      const img = card.querySelector('.card-img-zone img');
+      const ph = card.querySelector('.card-img-zone .ph');
       bindItemImg(img, resultItem, ph);
 
       card.addEventListener('click', (e) => {
@@ -415,7 +426,7 @@
     const locksEl = $('#d-locks');
     locksEl.textContent = lock.tag || lock.text;
     locksEl.title = lock.text;
-    locksEl.className = `locks status-tag ${lock.cls}`;
+    locksEl.className = `status-tag ${lock.cls}`;
 
     const qh = qualityHint(r);
     $('#d-quality').textContent = qh || '—';
@@ -729,37 +740,80 @@
       efficiency: data.efficiency,
       condition: data.condition || data.etat,
     };
-    $('#station-title').textContent = data.label || 'Atelier';
+    const title = data.label || 'Atelier';
+    $('#station-title').textContent = title;
     const powered = data.powered !== false;
     const lvl = data.stationLevel || 1;
-    $('#station-meta').textContent = `${categoryLabel(data.category)} · niveau ${lvl}${powered ? '' : ' · hors tension'}`;
+    const catLabel = categoryLabel(data.category);
+    const stencil = $('#station-stencil');
+    if (stencil) {
+      const code = String(data.benchKey || data.category || '03').replace(/[^a-zA-Z0-9]/g, '').slice(-2).toUpperCase() || '03';
+      stencil.textContent = `STATION ${code} · ${catLabel}`;
+    }
+    const metaBits = [];
+    if (data.category) metaBits.push(catLabel);
+    metaBits.push(`niveau ${lvl}`);
+    if (!powered) metaBits.push('hors tension');
+    $('#station-meta').textContent = metaBits.join(' · ');
 
-    $('#stat-type').textContent = categoryLabel(data.category);
+    const typeEl = $('#stat-type');
+    const plateType = $('#plate-type');
+    if (data.category) {
+      typeEl.textContent = catLabel;
+      if (plateType) plateType.classList.remove('hidden');
+    } else if (plateType) {
+      plateType.classList.add('hidden');
+    }
+
     $('#stat-level').textContent = String(lvl);
 
     const stateEl = $('#stat-state');
     const gaugeState = $('#gauge-state');
+    const ledState = $('#led-state');
     let statePct = 72;
+    let stateCls = 'ok';
+    let stateLabel = 'OPÉRATIONNEL';
+
     if (data.condition != null || data.etat != null) {
       const raw = data.condition != null ? data.condition : data.etat;
-      stateEl.textContent = String(raw);
-      stateEl.className = 'stat-v';
       const n = Number(raw);
       if (!Number.isNaN(n)) {
         statePct = Math.max(5, Math.min(100, n > 1 ? n : n * 100));
-        stateEl.className = `stat-v ${statePct >= 60 ? 'ok' : (statePct >= 30 ? 'warn' : 'bad')}`;
+        if (statePct >= 60) { stateCls = 'ok'; stateLabel = 'OPÉRATIONNEL'; }
+        else if (statePct >= 30) { stateCls = 'warn'; stateLabel = 'DÉGRADÉ'; }
+        else { stateCls = 'bad'; stateLabel = 'HORS SERVICE'; }
+      } else {
+        const s = String(raw).toLowerCase();
+        if (/hors|off|down|critique|fail/.test(s)) { stateCls = 'bad'; stateLabel = 'HORS SERVICE'; statePct = 12; }
+        else if (/dégrad|degrad|warn|moyen/.test(s)) { stateCls = 'warn'; stateLabel = 'DÉGRADÉ'; statePct = 45; }
+        else { stateCls = 'ok'; stateLabel = 'OPÉRATIONNEL'; statePct = 88; }
       }
+    } else if (!powered) {
+      stateCls = 'bad'; stateLabel = 'HORS SERVICE'; statePct = 12;
     } else {
-      stateEl.textContent = powered ? 'Opérationnel' : 'Hors tension';
-      stateEl.className = `stat-v ${powered ? 'ok' : 'bad'}`;
-      statePct = powered ? 88 : 12;
+      stateCls = 'ok'; stateLabel = 'OPÉRATIONNEL'; statePct = 88;
     }
+    stateEl.textContent = stateLabel;
+    stateEl.className = `t-l5 ${stateCls}`;
+    if (ledState) ledState.className = `led-dot ${stateCls}`;
     if (gaugeState) gaugeState.style.width = `${statePct}%`;
 
     const mods = data.modules || {};
     const modCount = Array.isArray(mods) ? mods.length : Object.keys(mods).length;
     const eff = data.efficiency != null ? data.efficiency : (100 + modCount * 5);
-    $('#stat-eff').textContent = typeof eff === 'number' ? `${eff}%` : String(eff);
+    const effEl = $('#stat-eff');
+    const gaugeEff = $('#gauge-eff');
+    const plateEff = $('#plate-eff');
+    if (eff != null && String(eff) !== '—' && String(eff) !== '') {
+      const effNum = typeof eff === 'number' ? eff : Number(eff);
+      effEl.textContent = typeof eff === 'number' || !Number.isNaN(effNum) ? `${Number.isNaN(effNum) ? eff : effNum}%` : String(eff);
+      if (plateEff) plateEff.classList.remove('hidden');
+      if (gaugeEff && !Number.isNaN(effNum)) {
+        gaugeEff.style.width = `${Math.max(5, Math.min(100, effNum))}%`;
+      }
+    } else if (plateEff) {
+      plateEff.classList.add('hidden');
+    }
 
     const energyWrap = $('#stat-energy-wrap');
     const led = $('#led-power');
@@ -778,7 +832,7 @@
     } else if (data.powered != null) {
       energyWrap.classList.remove('hidden');
       $('#stat-energy').textContent = data.powered ? 'OK' : 'Off';
-      $('#stat-energy').className = `stat-v ${data.powered ? 'ok' : 'bad'}`;
+      $('#stat-energy').className = `t-l5 ${data.powered ? 'ok' : 'bad'}`;
       if (gaugeEnergy) gaugeEnergy.style.width = data.powered ? '90%' : '8%';
       if (led) {
         led.classList.toggle('on', !!data.powered);
@@ -818,11 +872,13 @@
       const left = Math.max(0, finishAt - now);
       const total = Math.max(1, finishAt - startAt);
       const done = finishAt ? Math.min(1, Math.max(0, 1 - left / total)) : (left <= 0 ? 1 : 0);
+      const qty = e.batch || e.count || e.qty || 1;
       const card = document.createElement('div');
       card.className = `queue-card${left <= 0 ? ' ready' : ''}`;
+      const eta = left > 0 ? `ETA ${left}s` : 'PRÊT';
       card.innerHTML = `
         <div class="qlabel">${escapeHtml(e.label || e.recipeId)}</div>
-        <div class="qmeta">${left > 0 ? left + 's restantes' : 'Prêt — collecter'}</div>
+        <div class="qmeta"><span>×${escapeHtml(qty)} · ${Math.round(done * 100)}%</span><span>${eta}</span></div>
         <div class="qbar"><div class="qfill" style="width:${Math.round(done * 100)}%"></div></div>
       `;
       card.addEventListener('click', async () => {
@@ -850,10 +906,19 @@
     setEmpty(empty, entries.length === 0);
     entries.forEach(([item, count]) => {
       const li = document.createElement('li');
+      const need = typeof count === 'object' && count != null
+        ? (count.need || count.count || count.required || 1)
+        : count;
+      const owned = typeof count === 'object' && count != null && typeof count.owned === 'number'
+        ? count.owned
+        : null;
+      const ownedTxt = owned != null ? `${owned}/${need}` : `×${need}`;
+      const miss = owned != null ? owned < need : true;
       li.innerHTML = `
+        <span class="check-mark" aria-hidden="true"><i class="fa-regular fa-square"></i></span>
         <img class="ing-thumb" alt="" />
-        <span>${escapeHtml(humanize(item))}</span>
-        <span class="icount">×${escapeHtml(count)}</span>
+        <span class="iname">${escapeHtml(humanize(item))}</span>
+        <span class="shop-need${miss ? '' : ' ok'}">${escapeHtml(ownedTxt)}</span>
         <button type="button" class="pin" title="Épingler au carnet" data-pin-item="${escapeHtml(item)}">
           <i class="fa-solid fa-thumbtack"></i>
         </button>
@@ -877,7 +942,7 @@
   function renderTreeNode(node, depth = 0) {
     if (!node) return '';
     if (node.type === 'raw') {
-      return `<div class="tree-node raw" style="margin-left:${depth * 4}px">
+      return `<div class="tree-node raw">
         <div class="t-label">${escapeHtml(humanize(node.item))} ×${escapeHtml(node.count)}</div>
         <div class="t-sub">Ressource brute</div>
       </div>`;
@@ -885,9 +950,9 @@
     const rid = node.recipeId || node.id || '';
     const label = node.label || rid || 'Recette';
     const result = node.result && node.result.item ? `${node.result.item}` : '';
-    let html = `<div class="tree-node" data-tree-id="${escapeHtml(rid)}" style="margin-left:${depth * 4}px">
+    let html = `<div class="tree-node" data-tree-id="${escapeHtml(rid)}">
       <div class="t-label">${escapeHtml(label)}</div>
-      <div class="t-sub">${result ? '→ ' + escapeHtml(humanize(result)) : 'Étape de craft'}</div>
+      <div class="t-sub">${result ? 'Produit · ' + escapeHtml(humanize(result)) : 'Nœud de fabrication'}</div>
     </div>`;
     const kids = node.children || [];
     if (kids.length) {
