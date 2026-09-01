@@ -902,14 +902,12 @@
     post('bookClose', {});
   }
 
-  $('#book-btn-close').addEventListener('click', closeBook);
-  $('#book-search').addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter') doSearch(ev.target.value.trim());
-  });
-
+  // Register open/close handlers BEFORE optional DOM binds — a missing node must never kill bookOpen
   window.addEventListener('message', (ev) => {
     const data = ev.data || {};
-    if (data.action === 'bookOpen') openBook(data);
+    if (data.action === 'bookOpen') {
+      try { openBook(data); } catch (err) { console.error('[sanctuary_crafting bookOpen]', err); }
+    }
     if (data.action === 'bookClose') {
       state.open = false;
       book.classList.add('hidden');
@@ -919,7 +917,6 @@
       // HUD handled in Lua
     }
     if (data.action === 'bookEvent' && state.open) {
-      // soft refresh dashboard-ish pages if relevant
       if (state.page === 'dashboard' || state.page === 'history' || state.page === 'artisans' || state.page === 'resources') {
         navigate(state.page);
       }
@@ -928,5 +925,12 @@
 
   window.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape' && state.open) closeBook();
+  });
+
+  const closeBtn = $('#book-btn-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeBook);
+  const searchEl = $('#book-search');
+  if (searchEl) searchEl.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') doSearch(ev.target.value.trim());
   });
 })();
