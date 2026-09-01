@@ -1,58 +1,103 @@
 Config = {}
 
 --[[
-    sanctuary_crafting — configuration
-    Thème : post-apo (ferraille, médical de fortune, pièces d'armes, survie)
+================================================================================
+  sanctuary_crafting — configuration (v2.0.0-phase1)
+  Thème : post-apo (ferraille, médical de fortune, pièces d'armes, survie)
 
-    Remplissez Config.Recipes avec VOS recettes. Schéma d'une entrée :
+  ml_skills est la SEULE source de skill / XP / niveaux.
+  Ne créez JAMAIS de XP/niveaux craft parallèles.
 
-    {
-        id = 'mon_item',
-        label = 'Mon objet',
-        category = 'scrap',          -- scrap | medical | weapons | survival (type de banc)
-        ingredients = {
-            { item = 'scrap_metal', count = 5 },
-        },
-        result = { item = 'metal_plate', count = 1 },
-        duration = 8000,             -- ms
-        xp = { category = 'crafting', amount = 15 },  -- optionnel ; category ml_skills
-        requireLevel = 1,            -- optionnel ; niveau min dans xp.category ou Skills.craftingCategory
-        requireSkill = 'crafting_basic', -- optionnel ; UID skill ml_skills
-    }
+--------------------------------------------------------------------------------
+  Schéma d'une recette (Config.Recipes) — Phase 1
+
+  {
+      id          = 'mon_item',              -- string unique (requis)
+      label       = 'Mon objet',             -- string (requis)
+      category    = 'scrap',                 -- scrap|medical|weapons|survival (requis)
+      ingredients = {                        -- table (requis, >=1)
+          { item = 'scrap_metal', count = 5 },
+      },
+      result      = { item = 'metal_plate', count = 1 },  -- requis
+      duration    = 8000,                    -- ms (requis)
+      xp          = { category = 'crafting', amount = 15 }, -- optionnel ml_skills
+      requireLevel = 1,                      -- optionnel ; si ml_skills down → refuse
+      requireSkill = 'crafting_basic',       -- optionnel UID ml_skills ; idem
+
+      -- Champs Phase 2+ (ignorés tant que les feature flags sont false) :
+      -- blueprintId   = 'bp_metal_plate',   -- Config.Blueprints.Enabled
+      -- quality       = true,               -- Config.Quality.Enabled
+      -- powerCost     = 0,                  -- Config.Power.Enabled
+      -- noiseLevel    = 0,                  -- Config.Noise.Enabled
+      -- queueSlot     = 1,                  -- Config.Queue.Enabled
+      -- projectId     = nil,                -- Config.Projects.Enabled
+      -- dismantleFrom = nil,                -- Config.Dismantling.Enabled
+  }
+================================================================================
 ]]
 
 Config.Locale = 'fr'
 Config.Debug = false
+Config.Version = '2.0.0'
 
--- Distance max joueur ↔ banc pour craft / interaction
+--------------------------------------------------------------------------------
+-- Feature flags (Phase 2–7) — stubs uniquement, aucun comportement Phase 1
+--------------------------------------------------------------------------------
+Config.Quality     = { Enabled = false }
+Config.Blueprints  = { Enabled = false }
+Config.Queue       = { Enabled = false }
+Config.Projects    = { Enabled = false }
+Config.Power       = { Enabled = false }   -- CraftingPower.HasPower → true si false
+Config.Noise       = { Enabled = false }
+Config.Dismantling = { Enabled = false }
+
+--------------------------------------------------------------------------------
+-- Distances
+--------------------------------------------------------------------------------
 Config.InteractDistance = 2.5
 Config.CraftCancelDistance = 3.0
 
--- Anti-exploit
-Config.RateLimitMs = 1500          -- délai min entre deux tentatives de craft
+--------------------------------------------------------------------------------
+-- Anti-exploit / pipeline craft
+--------------------------------------------------------------------------------
+Config.RateLimitMs = 1500
 Config.MaxConcurrentCrafts = 1
 
--- Admin : ACE ou groupe ESX
-Config.AdminAce = 'sanctuary.crafting.admin'
-Config.AdminGroups = { 'admin', 'superadmin' } -- groupes ESX Legacy
+Config.Crafting = {
+    --- Retire les ingrédients au start (après validation complète) ; sinon au complete
+    RemoveIngredientsOnStart = true,
+    --- Rembourse les ingrédients si retirés et craft annulé
+    RefundOnCancel = true,
+    --- Rembourse à la déconnexion (si ingrédients déjà retirés)
+    RefundOnDisconnect = true,
+    --- Floor timing anti-speedhack (0.85 = 15% de marge latence)
+    MinDurationFactor = 0.85,
+    --- Remboursement partiel si annulation après X% (0 = full refund rules only)
+    PartialRefund = true,
+    PartialRefundAfter = 0.5, -- après 50% de progression : 50% des stacks arrondis
+}
 
--- Commande optionnelle pour prévisualiser un banc monde (coords à reporter dans Config.WorldBenches)
+--------------------------------------------------------------------------------
+-- Admin
+--------------------------------------------------------------------------------
+Config.AdminAce = 'sanctuary.crafting.admin'
+Config.AdminGroups = { 'admin', 'superadmin' }
+
 Config.EnableWorldBenchCommand = true
 Config.WorldBenchCommand = 'placeworldbench'
 
 --------------------------------------------------------------------------------
--- ml_skills (Micio Mods) — soft-fail si la ressource n'est pas démarrée
+-- ml_skills (Micio Mods) — soft-fail via CraftingSkills
+-- Si une recette a requireLevel / requireSkill et ml_skills est down → refuse
+-- (PAS de bypass silencieux).
 --------------------------------------------------------------------------------
 Config.Skills = {
     enabled = true,
     resource = 'ml_skills',
-    -- Catégories utilisées par ce craft
     craftingCategory = 'crafting',
     survivalCategory = 'survival',
-    -- Bonus craft-time : GetTotalCategoryBonus('crafting') réduit la durée
-    -- duration = base * (1 - min(bonus/100, maxReduction))
     craftTimeBonus = true,
-    maxCraftTimeReduction = 0.40, -- 40% max
+    maxCraftTimeReduction = 0.40,
 }
 
 --------------------------------------------------------------------------------
@@ -63,6 +108,7 @@ Config.BenchModels = {
     medical   = `prop_table_03`,
     weapons   = `prop_toolchest_05`,
     survival  = `prop_washer_01`,
+    mechanic  = `prop_toolchest_01`,
 }
 
 Config.BenchLabels = {
@@ -70,30 +116,30 @@ Config.BenchLabels = {
     medical  = 'bench_medical',
     weapons  = 'bench_weapons',
     survival = 'bench_survival',
+    mechanic = 'bench_mechanic',
 }
 
 --------------------------------------------------------------------------------
 -- Items ox_inventory pour bancs placeables
--- Ajoutez ces items dans ox_inventory/data/items.lua (voir README)
 --------------------------------------------------------------------------------
 Config.PlaceableItems = {
     scrap_bench    = { category = 'scrap',    model = Config.BenchModels.scrap },
     medical_bench  = { category = 'medical',  model = Config.BenchModels.medical },
     weapons_bench  = { category = 'weapons',  model = Config.BenchModels.weapons },
     survival_bench = { category = 'survival', model = Config.BenchModels.survival },
+    mechanic_bench  = { category = 'mechanic',  model = Config.BenchModels.mechanic },
 }
 
--- Placement
 Config.Place = {
     maxDistance = 5.0,
     snapToGround = true,
     allowPickupOwner = true,
     allowPickupAdmin = true,
+    requireOwnerToCraft = false,
 }
 
 --------------------------------------------------------------------------------
--- Bancs monde (fixes) — coords + modèle + heading + catégorie
--- Adaptez les coords à votre map
+-- Bancs monde (fixes)
 --------------------------------------------------------------------------------
 Config.WorldBenches = {
     {
@@ -127,12 +173,16 @@ Config.WorldBenches = {
 }
 
 --------------------------------------------------------------------------------
--- Recettes — à remplir par le serveur
--- Voir le commentaire en tête de fichier pour le schéma
+-- Recettes — à remplir par le serveur (ne PAS inventer un gros pack)
 --------------------------------------------------------------------------------
 Config.Recipes = {}
 
 --------------------------------------------------------------------------------
--- Lookup helpers (remplis au chargement shared)
+-- Lookup (rempli par recipes/registry.lua)
 --------------------------------------------------------------------------------
 Config.RecipeById = {}
+
+--------------------------------------------------------------------------------
+-- Feature modules (flags Phase 2+) — chargés après Config de base
+-- Voir config/features.lua (inclus via fxmanifest shared)
+--------------------------------------------------------------------------------

@@ -1,10 +1,9 @@
---- Métadonnées bancs (partagées client/server)
-
 BenchTypes = {
     scrap = true,
     medical = true,
     weapons = true,
     survival = true,
+    mechanic = true, -- station v2 example type
 }
 
 ---@param category string
@@ -14,7 +13,7 @@ function IsValidBenchCategory(category)
 end
 
 ---@param category string
----@return number|nil hash
+---@return number|nil
 function GetBenchModel(category)
-    return Config.BenchModels[category]
+    return Config.BenchModels and Config.BenchModels[category]
 end

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sanctuary Crafting</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="app" class="hidden" data-compact="0">
+  <header class="topbar">
+    <div class="brand">
+      <span class="accent-bar"></span>
+      <div>
+        <h1 id="station-title">Atelier</h1>
+        <p class="sub" id="station-meta">—</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <input id="search" type="search" placeholder="Rechercher…" autocomplete="off" />
+      <button type="button" id="btn-compact" title="Mode compact" aria-label="Compact">▣</button>
+      <button type="button" id="btn-close" title="Fermer" aria-label="Fermer">✕</button>
+    </div>
+  </header>
+
+  <nav class="filters" id="filters">
+    <button type="button" class="chip active" data-filter="all">Tous</button>
+    <button type="button" class="chip" data-filter="craftable">Faisables</button>
+    <button type="button" class="chip" data-filter="favorites">★ Favoris</button>
+    <button type="button" class="chip" data-filter="locked">Verrouillés</button>
+  </nav>
+
+  <main class="grid-3">
+    <!-- Col 1: recipes -->
+    <section class="panel col-list" aria-label="Recettes">
+      <h2>Recettes</h2>
+      <ul id="recipe-list" class="recipe-list"></ul>
+    </section>
+
+    <!-- Col 2: detail -->
+    <section class="panel col-detail" aria-label="Détail">
+      <div id="detail-empty" class="empty">Sélectionnez une recette</div>
+      <div id="detail" class="hidden">
+        <h2 id="d-title"></h2>
+        <p id="d-locks" class="locks"></p>
+        <div class="block">
+          <h3>Ingrédients</h3>
+          <ul id="d-ings"></ul>
+        </div>
+        <div class="block">
+          <h3>Résultat</h3>
+          <p id="d-result"></p>
+        </div>
+        <div class="meta-row">
+          <span id="d-duration"></span>
+          <span id="d-xp"></span>
+          <span id="d-mastery"></span>
+        </div>
+        <div class="actions">
+          <label class="batch" id="batch-wrap">x<input id="batch" type="number" min="1" max="10" value="1" /></label>
+          <button type="button" id="btn-craft" class="primary">Fabriquer</button>
+          <button type="button" id="btn-queue" class="ghost">File</button>
+          <button type="button" id="btn-fav" class="ghost">★</button>
+          <button type="button" id="btn-shop" class="ghost">Liste</button>
+          <button type="button" id="btn-tree" class="ghost">Arbre</button>
+        </div>
+        <div id="progress-wrap" class="progress-wrap hidden">
+          <div class="progress-bar"><div id="progress-fill"></div></div>
+          <button type="button" id="btn-cancel" class="danger">Annuler</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Col 3: queue / tree / shopping -->
+    <section class="panel col-side" aria-label="Panneau">
+      <div class="tabs">
+        <button type="button" class="tab active" data-tab="queue">File</button>
+        <button type="button" class="tab" data-tab="tree">Arbre</button>
+        <button type="button" class="tab" data-tab="shop">Courses</button>
+      </div>
+      <div id="tab-queue" class="tab-body">
+        <ul id="queue-list" class="side-list"></ul>
+        <p class="hint" id="queue-empty">File vide</p>
+      </div>
+      <div id="tab-tree" class="tab-body hidden">
+        <pre id="tree-view" class="tree-view">—</pre>
+      </div>
+      <div id="tab-shop" class="tab-body hidden">
+        <ul id="shop-list" class="side-list"></ul>
+        <button type="button" id="btn-shop-clear" class="ghost small">Vider</button>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

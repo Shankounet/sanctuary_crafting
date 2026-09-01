@@ -1,5 +1,5 @@
 --[[
-    Menu craft (ox_lib context) + progress serveur-autoritaire
+    Menu craft — NUI prioritaire, fallback ox_lib context
 ]]
 
 local crafting = false
@@ -25,11 +25,13 @@ function OpenCraftMenu(benchKey)
         return
     end
 
+    if OpenCraftNui and Config.UI and Config.UI.UseNui ~= false then
+        if OpenCraftNui(data) then return end
+    end
+
+    -- Fallback ox_lib
     if not data.recipes or #data.recipes == 0 then
-        lib.notify({
-            type = 'inform',
-            description = 'Aucune recette configurée pour cet atelier (Config.Recipes).',
-        })
+        lib.notify({ type = 'inform', description = 'Aucune recette configurée pour cet atelier.' })
         return
     end
 
@@ -40,26 +42,16 @@ function OpenCraftMenu(benchKey)
             _('ingredients') .. ': ' .. formatIngredients(r.ingredients),
             _('duration', math.floor((r.duration or 0) / 1000)),
         }
-        if r.xp then
-            descParts[#descParts + 1] = _('xp_reward', r.xp.amount, r.xp.category)
-        end
-        if r.requireLevel then
-            descParts[#descParts + 1] = _('req_level', r.requireLevel)
-        end
-        if r.requireSkill then
-            descParts[#descParts + 1] = _('req_skill', r.requireSkill)
-        end
-
-        local disabled = r.locked or r.missingItems
-        local icon = 'fa-solid fa-wrench'
-        if r.locked then icon = 'fa-solid fa-lock' end
-        if r.missingItems and not r.locked then icon = 'fa-solid fa-box-open' end
+        if r.xp then descParts[#descParts + 1] = _('xp_reward', r.xp.amount, r.xp.category) end
+        if r.requireLevel then descParts[#descParts + 1] = _('req_level', r.requireLevel) end
+        if r.requireSkill then descParts[#descParts + 1] = _('req_skill', r.requireSkill) end
+        if r.locked and r.lockReason then descParts[#descParts + 1] = _(r.lockReason, table.unpack(r.lockArgs or {})) end
 
         options[#options + 1] = {
             title = r.label,
             description = table.concat(descParts, '\n'),
-            icon = icon,
-            disabled = disabled,
+            icon = r.locked and 'fa-solid fa-lock' or 'fa-solid fa-wrench',
+            disabled = r.locked or r.missingItems,
             onSelect = function()
                 StartCraft(r.id, benchKey)
             end,
@@ -74,10 +66,9 @@ function OpenCraftMenu(benchKey)
     lib.showContext('sanctuary_craft_menu')
 end
 
-function StartCraft(recipeId, benchKey)
+function StartCraft(recipeId, benchKey, batch)
     if crafting then return end
-
-    local start = lib.callback.await('sanctuary_crafting:startCraft', false, recipeId, benchKey)
+    local start = lib.callback.await('sanctuary_crafting:startCraft', false, recipeId, benchKey, batch or 1)
     if not start or not start.ok then
         local reason = start and start.reason or 'craft_failed'
         if start and start.args then
@@ -89,51 +80,42 @@ function StartCraft(recipeId, benchKey)
     end
 
     crafting = true
-    local benchCoords = start.benchCoords
-    local cancelDist = start.cancelDistance or Config.CraftCancelDistance or 3.0
-
+    local anim = start.anim or (Config.Animations and Config.Animations.Default) or {
+        dict = 'mini@repair', clip = 'fixing_a_ped',
+    }
     local success = lib.progressBar({
         duration = start.duration,
         label = _('craft_progress', start.label or recipeId),
         useWhileDead = false,
         canCancel = true,
         disable = { move = true, car = true, combat = true },
-        anim = {
-            dict = 'mini@repair',
-            clip = 'fixing_a_ped',
-        },
+        anim = anim,
     })
 
-    -- Cancel if moved away during progress (extra check)
-    if success and benchCoords then
+    if success and start.benchCoords then
         local ped = cache.ped or PlayerPedId()
-        local pcoords = GetEntityCoords(ped)
-        if Dist3(pcoords, benchCoords) > cancelDist then
+        if Dist3(GetEntityCoords(ped), start.benchCoords) > (start.cancelDistance or 3.0) then
             success = false
         end
     end
 
     if not success then
-        TriggerServerEvent('sanctuary_crafting:server:cancelCraft')
+        TriggerServerEvent('sanctuary_crafting:server:cancelCraft', start.craftId)
         crafting = false
         lib.notify({ type = 'error', description = _('craft_cancelled') })
         return
     end
 
-    local result = lib.callback.await('sanctuary_crafting:completeCraft', false, recipeId, benchKey)
+    local result = lib.callback.await('sanctuary_crafting:completeCraft', false, start.craftId)
     crafting = false
 
     if result and result.ok then
-        local res = result.result
+        local res = result.result or {}
         lib.notify({
             type = 'success',
-            description = _('craft_success', res.count or 1, result.label or res.item),
+            description = _('craft_success', res.count or 1, result.label or res.item or '?'),
         })
     else
-        local reason = result and result.reason or 'craft_failed'
-        lib.notify({ type = 'error', description = _(reason) })
+        lib.notify({ type = 'error', description = _(result and result.reason or 'craft_failed') })
     end
 end
-
--- Thread: cancel craft if player walks away while progress runs
--- (ox_lib progress already canCancel; distance enforced on complete)
