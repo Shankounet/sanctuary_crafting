@@ -23,13 +23,34 @@ local function openBookFor(src, page)
     return true
 end
 
---- ox_inventory server export
+--- ox_inventory SERVER export (also keep client export — see book/client/book.lua)
+--- Prefer CLIENT export for UI: client = { export = 'sanctuary_crafting.useSurvivalBook' }
 exports('useSurvivalBook', function(event, item, inventory, slot, data)
-    if event == 'usingItem' then
-        local src = inventory.id
-        openBookFor(src, 'dashboard')
+    if event == 'usingItem' or event == 'usedItem' then
+        local src = inventory and inventory.id
+        if type(src) ~= 'number' then
+            src = source
+        end
+        if type(src) == 'number' and src > 0 then
+            openBookFor(src, 'dashboard')
+        end
         return false -- don't consume
     end
+end)
+
+-- ESX usable fallback if item has no ox export wired
+CreateThread(function()
+    local itemName = (Config.Book and Config.Book.ItemName) or 'survival_book'
+    if GetResourceState('es_extended') ~= 'started' then return end
+    pcall(function()
+        local ESX = exports['es_extended']:getSharedObject()
+        if ESX and ESX.RegisterUsableItem then
+            ESX.RegisterUsableItem(itemName, function(src)
+                openBookFor(src, 'dashboard')
+            end)
+            print(('[^2sanctuary_crafting^0] ESX usable item registered: %s'):format(itemName))
+        end
+    end)
 end)
 
 exports('OpenSurvivalBook', function(src, page)

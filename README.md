@@ -419,15 +419,16 @@ Manuel de terrain **personnel** (dossier technique sombre, accent `#9a8866`) —
   stack = false,
   close = true,
   description = 'Manuel de terrain personnel — craft, objectifs, réseau.',
-  client = { export = nil },
-  server = { export = 'sanctuary_crafting.useSurvivalBook' },
+  -- CLIENT export = ouverture NUI fiable (recommandé)
+  client = { export = 'sanctuary_crafting.useSurvivalBook' },
+  -- SERVER export = fallback TriggerClientEvent (optionnel si client est défini)
+  -- server = { export = 'sanctuary_crafting.useSurvivalBook' },
 },
--- optionnel (futur confort) :
--- ['artisan_card'] = { label = 'Carte artisan', weight = 10, stack = false, close = true,
---   server = { export = 'sanctuary_crafting.useArtisanCard' } },
 ```
 
-Ouvrir aussi : `exports.sanctuary_crafting:OpenSurvivalBook(src, 'dashboard')` ou commande client `/carnet`.
+**Important :** sans cet item dans `ox_inventory/data/items.lua`, utiliser le carnet depuis l’inventaire ne fera **rien**. Test rapide hors item : commande client `/carnet`.
+
+Ouvrir aussi : `exports.sanctuary_crafting:OpenSurvivalBook(src, 'dashboard')` (serveur) ou export client `OpenSurvivalBook`.
 
 ### Architecture
 

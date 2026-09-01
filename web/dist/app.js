@@ -989,13 +989,14 @@
     });
   }
 
-  // events
-  $('#btn-close').addEventListener('click', () => post('close', {}));
-  $('#btn-compact').addEventListener('click', () => {
+  // events — null-safe so a missing craft control never kills the NUI page (book.js needs the page alive)
+  const bindUi = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
+  bindUi('#btn-close', 'click', () => post('close', {}));
+  bindUi('#btn-compact', 'click', () => {
     state.compact = !state.compact;
     app.dataset.compact = state.compact ? '1' : '0';
   });
-  $('#search').addEventListener('input', (e) => { state.search = e.target.value; renderList(); });
+  bindUi('#search', 'input', (e) => { state.search = e.target.value; renderList(); });
 
   $$('.chip').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -1014,34 +1015,36 @@
     });
   });
 
-  $('#btn-craft').addEventListener('click', startCraft);
-  $('#btn-cancel').addEventListener('click', cancelCraft);
-  $('#btn-fav').addEventListener('click', async () => {
+  bindUi('#btn-craft', 'click', startCraft);
+  bindUi('#btn-cancel', 'click', cancelCraft);
+  bindUi('#btn-fav', 'click', async () => {
     if (!state.selected) return;
     await post('favorite', { recipeId: state.selected.id });
     await refresh();
   });
-  $('#btn-queue').addEventListener('click', async () => {
+  bindUi('#btn-queue', 'click', async () => {
     if (!state.selected) return;
-    const batch = parseInt($('#batch').value, 10) || 1;
+    const batchEl = $('#batch');
+    const batch = parseInt(batchEl && batchEl.value, 10) || 1;
     await post('queue', { recipeId: state.selected.id, benchKey: state.benchKey, batch });
     await loadQueue();
     openTab('queue');
   });
-  $('#btn-shop').addEventListener('click', async () => {
+  bindUi('#btn-shop', 'click', async () => {
     if (!state.selected) return;
-    const batch = parseInt($('#batch').value, 10) || 1;
+    const batchEl = $('#batch');
+    const batch = parseInt(batchEl && batchEl.value, 10) || 1;
     const data = await post('shopping', { recipeId: state.selected.id, batch });
     state.shop = (data && data.list) || {};
     renderShop();
     openTab('shop');
   });
-  $('#btn-shop-clear').addEventListener('click', async () => {
+  bindUi('#btn-shop-clear', 'click', async () => {
     await post('shoppingClear', {});
     state.shop = {};
     renderShop();
   });
-  $('#btn-tree').addEventListener('click', async () => {
+  bindUi('#btn-tree', 'click', async () => {
     if (!state.selected) return;
     const data = await post('tree', { recipeId: state.selected.id });
     mountTree(data && data.tree);

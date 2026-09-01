@@ -53,6 +53,15 @@ local function bookFallbackMeta()
     }
 end
 
+local function pushBookOpen(pageName, meta, lazy)
+    SendNUIMessage({
+        action = 'bookOpen',
+        page = pageName,
+        meta = meta or bookFallbackMeta(),
+        lazy = lazy,
+    })
+end
+
 function OpenSurvivalBook(page)
     if not bookEnabled() then
         lib.notify({ type = 'error', description = _('book_disabled') })
@@ -63,38 +72,39 @@ function OpenSurvivalBook(page)
 
     local pageName = page or 'dashboard'
     local lazy = Config.Book.LazyLoad ~= false
+    local meta = bookFallbackMeta()
 
-    -- Show NUI FIRST, then focus — never leave mouse up with a blank page if shell awaits/errors
+    -- Paint NUI first, then focus, then re-send (CEF sometimes drops the first message)
     bookOpen = true
-    SendNUIMessage({
-        action = 'bookOpen',
-        page = pageName,
-        meta = bookFallbackMeta(),
-        lazy = lazy,
-    })
+    pushBookOpen(pageName, meta, lazy)
     SetNuiFocus(true, true)
+    SetNuiFocusKeepInput(false)
+    pushBookOpen(pageName, meta, lazy)
 
-    local okShell, shell = pcall(function()
-        return lib.callback.await('sanctuary_crafting:book:shell', false)
-    end)
-    if okShell and type(shell) == 'table' and shell.meta then
-        SendNUIMessage({
-            action = 'bookOpen',
-            page = pageName,
-            meta = shell.meta,
-            lazy = lazy,
-        })
-    elseif not okShell then
-        print(('[^3sanctuary_crafting^0] book:shell failed: %s'):format(tostring(shell)))
-    end
+    CreateThread(function()
+        Wait(75)
+        if not bookOpen then return end
+        pushBookOpen(pageName, meta, lazy)
 
-    local okPins, pinRes = pcall(function()
-        return lib.callback.await('sanctuary_crafting:book:module', false, 'pins', {})
+        local okShell, shell = pcall(function()
+            return lib.callback.await('sanctuary_crafting:book:shell', false)
+        end)
+        if okShell and type(shell) == 'table' and shell.meta then
+            meta = shell.meta
+            pushBookOpen(pageName, meta, lazy)
+        elseif not okShell then
+            print(('[^3sanctuary_crafting^0] book:shell failed: %s'):format(tostring(shell)))
+        end
+
+        local okPins, pinRes = pcall(function()
+            return lib.callback.await('sanctuary_crafting:book:module', false, 'pins', {})
+        end)
+        if okPins and type(pinRes) == 'table' and pinRes.ok then
+            pins = pinRes.data or {}
+            SendNUIMessage({ action = 'bookPins', pins = pins })
+        end
     end)
-    if okPins and type(pinRes) == 'table' and pinRes.ok then
-        pins = pinRes.data or {}
-        SendNUIMessage({ action = 'bookPins', pins = pins })
-    end
+
     return true
 end
 
@@ -252,5 +262,11 @@ AddEventHandler('onResourceStop', function(res)
 end)
 
 -- Export client
+-- ox_inventory CLIENT export (preferred for opening NUI from item use)
+-- items: client = { export = 'sanctuary_crafting.useSurvivalBook' }
+exports('useSurvivalBook', function(_data, _slot)
+    OpenSurvivalBook('dashboard')
+end)
+
 exports('OpenSurvivalBook', OpenSurvivalBook)
 exports('CloseSurvivalBook', CloseSurvivalBook)
