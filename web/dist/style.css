@@ -1,5 +1,5 @@
 /* sanctuary_crafting — Craft atelier design system (#app only). Book uses book.css. */
-/* v2.2.8 — micro-polish: image presence, selected/hover, matte brass, fiche */
+/* v2.2.9 — signature polish: iconic fiche, card character, 4 families, Sanctuary ID */
 
 :root {
   /* —— Color tokens (canonical) — neutral charcoal hierarchy —— */
@@ -1518,4 +1518,512 @@ button, input { font: inherit; color: inherit; }
 #app .tab-body::-webkit-scrollbar-thumb,
 #app .queue-track::-webkit-scrollbar-thumb {
   background: rgba(154,136,102,0.3);
+}
+
+
+/* ============================================================
+   v2.2.9 — SANCTUARY SIGNATURE LAYER (polish only, no restructure)
+   ============================================================ */
+
+/* —— Signature ID: station stencil / recovered plate —— */
+#app #station-stencil {
+  color: rgba(154, 136, 102, 0.78);
+  letter-spacing: 0.22em;
+  font-weight: 750;
+  text-transform: uppercase;
+  position: relative;
+  display: inline-block;
+  padding-bottom: 2px;
+}
+#app #station-stencil::after {
+  content: "";
+  position: absolute;
+  left: 0; bottom: 0;
+  width: 100%; height: 1px;
+  background: linear-gradient(90deg, var(--color-accent), transparent 85%);
+  opacity: 0.55;
+}
+#app #station-title {
+  font-weight: 780;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.45);
+}
+#app .ctrl-console {
+  background:
+    linear-gradient(180deg, #242424 0%, #1f1f1f 55%, #1c1c1c 100%);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.35);
+}
+#app .ctrl-console::before {
+  content: "SANCTUARY";
+  position: absolute;
+  right: 72px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.52rem;
+  letter-spacing: 0.28em;
+  font-weight: 750;
+  color: rgba(255,255,255,0.045);
+  pointer-events: none;
+  user-select: none;
+}
+#app .ctrl-plate-mark {
+  background: linear-gradient(180deg, #b09a72 0%, #9a8866 40%, #6a5c42 100%);
+  box-shadow: inset -1px 0 0 rgba(0,0,0,0.4), inset 1px 0 0 rgba(255,255,255,0.12);
+}
+#app .led-dot.ok {
+  animation: ledPulse 2.4s ease-in-out infinite;
+}
+@keyframes ledPulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(106,118,88,0.35), inset 0 1px 0 rgba(255,255,255,0.18); }
+  50% { box-shadow: 0 0 7px rgba(106,118,88,0.55), inset 0 1px 0 rgba(255,255,255,0.22); }
+}
+
+/* —— 4 visual families: richer differentiation —— */
+#app .panel-list,
+#app .family-nav,
+#app .col-nav {
+  border-left: 3px solid #3a3a3a !important;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,0.22), transparent 28%),
+    #1e1e1e !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.03),
+    inset 5px 0 18px rgba(0,0,0,0.22) !important;
+}
+#app .panel-primary,
+#app .family-recipe,
+#app .col-grid {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.035), transparent 55%),
+    #1c1c1c !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.45),
+    inset 0 14px 32px rgba(0,0,0,0.28),
+    0 4px 14px rgba(0,0,0,0.28) !important;
+}
+#app .panel-tech,
+#app .family-tech,
+#app .col-detail {
+  border-top: 3px solid #7a6c52 !important;
+  background:
+    linear-gradient(180deg, #242420 0%, #1f1f1f 18%, #1e1e1e 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 4px 14px rgba(0,0,0,0.28) !important;
+}
+#app .panel-action,
+#app .actions {
+  background:
+    linear-gradient(180deg, #2a2a26 0%, #222220 40%, #1c1c1c 100%) !important;
+  border-top: 3px solid #9a8866 !important;
+  box-shadow:
+    0 -12px 26px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+#app .panel-band span {
+  color: rgba(154,136,102,0.22);
+  letter-spacing: 0.22em;
+}
+
+/* —— Left nav: secondary station console —— */
+#app .nav-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(154,154,154,0.7);
+  letter-spacing: 0.14em;
+}
+#app .nav-heading::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
+}
+#app .cat-item {
+  background: rgba(0,0,0,0.18);
+  border-color: rgba(58,58,58,0.7);
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+#app .cat-item:hover {
+  background: #262626;
+  border-color: rgba(154,136,102,0.28);
+}
+#app .cat-item.active {
+  background: linear-gradient(90deg, rgba(154,136,102,0.12), rgba(255,255,255,0.03));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), inset 3px 0 0 var(--color-accent);
+}
+#app .cat-item .count {
+  border-color: #333;
+  background: rgba(0,0,0,0.45);
+  letter-spacing: 0.04em;
+}
+#app .side-console, #app .side-tabs-wrap {
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.08));
+  border: 1px solid rgba(58,58,58,0.55);
+  border-top: 1px solid rgba(154,136,102,0.18);
+  padding: 10px 8px 8px;
+  margin-top: 6px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+#app .side-console-head .t-l4 {
+  letter-spacing: 0.14em;
+  color: rgba(154,136,102,0.55);
+}
+#app .empty-prod {
+  border: 1px dashed rgba(154,136,102,0.28);
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(154,136,102,0.06), transparent 60%),
+    rgba(0,0,0,0.28);
+  box-shadow: inset 0 0 16px rgba(0,0,0,0.35);
+}
+#app .empty-state .empty-kicker {
+  color: rgba(154,136,102,0.75);
+}
+#app .chip {
+  background: rgba(14,14,14,0.95);
+  border-color: #333;
+}
+#app .chip:hover {
+  border-color: rgba(154,136,102,0.4);
+}
+#app .chip.active {
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+/* —— Recipe cards: more character / depth —— */
+#app .recipe-card {
+  background: #1f1f1f;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 8px 16px rgba(0,0,0,0.32),
+    inset 0 -1px 0 rgba(0,0,0,0.35);
+}
+#app .recipe-card::before {
+  content: "";
+  position: absolute;
+  top: 6px; left: 6px;
+  width: 7px; height: 7px;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  border-left: 1px solid rgba(255,255,255,0.12);
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0.55;
+}
+#app .recipe-card::after {
+  content: "";
+  position: absolute;
+  bottom: 6px; right: 6px;
+  width: 7px; height: 7px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-right: 1px solid rgba(255,255,255,0.08);
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0.45;
+}
+#app .card-img-zone {
+  background:
+    radial-gradient(ellipse at 50% 42%, #2e2e2e 0%, #242424 55%, #1e1e1e 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 0 -12px 18px rgba(0,0,0,0.32),
+    inset 0 0 28px rgba(0,0,0,0.22);
+}
+#app .card-body {
+  background: #1c1c1c;
+  gap: 7px;
+  padding: 9px 10px 10px;
+}
+#app .card-title {
+  font-size: 0.86rem;
+  font-weight: 780;
+  letter-spacing: 0.01em;
+}
+#app .card-code {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: rgba(154,136,102,0.42);
+  letter-spacing: 0.1em;
+}
+#app .status-pill, #app .status-plate {
+  opacity: 0.92;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+#app .recipe-card:hover {
+  border-color: rgba(154,136,102,0.58);
+  background: #232323;
+  box-shadow:
+    0 10px 20px rgba(0,0,0,0.34),
+    inset 0 1px 0 rgba(255,255,255,0.055);
+}
+#app .recipe-card:hover .card-img-zone img {
+  transform: scale(1.03);
+}
+#app .recipe-card.selected {
+  border-color: #9a8866;
+  background: #2a2a24;
+  box-shadow:
+    0 0 0 1px rgba(154,136,102,0.5),
+    0 12px 22px rgba(0,0,0,0.38),
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    inset 3px 0 0 #9a8866;
+  animation: selectSettle 160ms ease;
+}
+@keyframes selectSettle {
+  from { box-shadow: 0 0 0 1px rgba(154,136,102,0.15), 0 8px 16px rgba(0,0,0,0.3); }
+  to {
+    box-shadow:
+      0 0 0 1px rgba(154,136,102,0.5),
+      0 12px 22px rgba(0,0,0,0.38),
+      inset 0 1px 0 rgba(255,255,255,0.07),
+      inset 3px 0 0 #9a8866;
+  }
+}
+#app .recipe-card.selected .card-img-zone {
+  background:
+    radial-gradient(ellipse at 50% 40%, #34342e 0%, #2c2c26 55%, #22221c 100%);
+}
+#app .recipe-card.selected .card-img-zone img {
+  filter: brightness(1.14) contrast(1.05);
+}
+#app .recipe-card.selected .card-title {
+  color: #f0ece4;
+}
+#app .recipe-card.selected .card-code {
+  color: rgba(154,136,102,0.7);
+}
+
+/* Subtle category plate tints (accent only, no brown veil) */
+#app .recipe-card[data-cat]::before {
+  border-color: rgba(154,136,102,0.28);
+}
+#app .recipe-card.cat-weapons .card-img-zone,
+#app .recipe-card.cat-armurier .card-img-zone,
+#app .recipe-card.cat-munition .card-img-zone {
+  background:
+    radial-gradient(ellipse at 50% 42%, #2f2c2a 0%, #242220 55%, #1e1c1b 100%);
+}
+#app .recipe-card.cat-medical .card-img-zone,
+#app .recipe-card.cat-cuisine .card-img-zone,
+#app .recipe-card.cat-agriculture .card-img-zone {
+  background:
+    radial-gradient(ellipse at 50% 42%, #2a2e2a 0%, #222622 55%, #1c1e1c 100%);
+}
+#app .recipe-card.cat-ingenieur .card-img-zone,
+#app .recipe-card.cat-mecano .card-img-zone,
+#app .recipe-card.cat-mechanic .card-img-zone,
+#app .recipe-card.cat-construction .card-img-zone {
+  background:
+    radial-gradient(ellipse at 50% 42%, #2c2e30 0%, #222426 55%, #1c1e20 100%);
+}
+#app .recipe-card.cat-forgeron .card-img-zone,
+#app .recipe-card.cat-fonderie-forgeron .card-img-zone,
+#app .recipe-card.cat-scrap .card-img-zone {
+  background:
+    radial-gradient(ellipse at 50% 42%, #302c28 0%, #262420 55%, #1e1c1a 100%);
+}
+#app .recipe-card.rarity-rare .card-img-zone::before {
+  border-color: rgba(154,136,102,0.22);
+}
+#app .recipe-card.rarity-epic .card-img-zone::before,
+#app .recipe-card.rarity-legendary .card-img-zone::before {
+  border-color: rgba(154,136,102,0.35);
+}
+
+/* —— Right panel: noble object fiche —— */
+#app .fiche-hero {
+  position: relative;
+  padding: 16px;
+  background:
+    linear-gradient(145deg, #282824 0%, #222220 45%, #1e1e1c 100%);
+  border: 1px solid #3a3a3a;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    inset 0 0 40px rgba(0,0,0,0.18),
+    0 8px 18px rgba(0,0,0,0.25);
+}
+#app .fiche-hero::before {
+  content: "";
+  position: absolute;
+  top: 10px; left: 10px; right: 10px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(154,136,102,0.45), transparent 70%);
+  pointer-events: none;
+  opacity: 0.7;
+}
+#app .fiche-l1-label {
+  color: rgba(154,136,102,0.65) !important;
+  letter-spacing: 0.18em;
+  font-weight: 750;
+  opacity: 0.85 !important;
+}
+#app .fiche-identity, #app .identity-block {
+  grid-template-columns: 160px 1fr auto;
+  gap: 18px;
+  align-items: center;
+}
+#app .fiche-img, #app .detail-img-wrap,
+#app .fiche-img.tech-frame, #app .detail-img-wrap.tech-frame {
+  width: 152px !important;
+  height: 152px !important;
+  background:
+    radial-gradient(ellipse at 50% 45%, #2e2e2a 0%, #242422 50%, #1c1c1a 100%) !important;
+  border: 1px solid rgba(154,136,102,0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    inset 0 0 28px rgba(0,0,0,0.28),
+    0 4px 12px rgba(0,0,0,0.25) !important;
+}
+#app .fiche-img::before, #app .detail-img-wrap::before {
+  inset: 8px;
+  border: 1px solid rgba(154,136,102,0.2);
+}
+#app .fiche-img img, #app .detail-img-wrap img {
+  width: 90% !important;
+  height: 90% !important;
+  max-width: 132px !important;
+  max-height: 132px !important;
+  padding: 4px !important;
+  filter: brightness(1.1) contrast(1.05) !important;
+}
+#app .detail-title {
+  font-size: 1.34rem;
+  font-weight: 800;
+  letter-spacing: 0.025em;
+  line-height: 1.15;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.4);
+}
+#app .detail-desc {
+  margin-top: 10px;
+  max-width: 34ch;
+  line-height: 1.62;
+  color: #b4b0a8;
+  font-size: 0.79rem;
+}
+#app .detail-badges {
+  gap: 6px;
+  margin-bottom: 6px;
+}
+#app .badge {
+  border-color: rgba(154,136,102,0.42);
+  background: rgba(154,136,102,0.1);
+  letter-spacing: 0.1em;
+}
+#app .badge.soft, #app .rarity-plate {
+  filter: saturate(0.5);
+  opacity: 0.9;
+}
+#app .recipe-code {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: rgba(154,136,102,0.55);
+  letter-spacing: 0.14em;
+  padding: 2px 6px;
+  border: 1px solid rgba(154,136,102,0.18);
+  background: rgba(0,0,0,0.25);
+}
+#app .status-tag, #app .locks {
+  margin-top: 12px;
+  border-left: 2px solid currentColor;
+  padding-left: 10px;
+  background: rgba(0,0,0,0.28);
+}
+#app .detail-fiche {
+  animation: craftFadeIn 150ms ease;
+}
+#app .instr-cluster, #app .detail-meta-grid {
+  background: linear-gradient(180deg, #262622, #1c1c1c);
+  border-color: #3a3a3a;
+}
+
+/* —— FABRIQUER: mechanical atelier press —— */
+#app .primary {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 26%),
+    linear-gradient(180deg, #8a7858 0%, #746448 38%, #5a4e3c 72%, #3e362c 100%) !important;
+  color: #f4f0e8 !important;
+  border: 1px solid #6e624c !important;
+  letter-spacing: 0.18em;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.4);
+  box-shadow:
+    0 4px 0 #1a1612,
+    0 8px 16px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(220,200,160,0.1),
+    inset 0 -3px 0 rgba(0,0,0,0.4),
+    inset 2px 0 0 rgba(0,0,0,0.15),
+    inset -2px 0 0 rgba(0,0,0,0.2) !important;
+}
+#app .primary::before {
+  content: "";
+  position: absolute;
+  left: 10px; right: 10px; top: 5px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  pointer-events: none;
+}
+#app .primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  border-color: #9a8866 !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), transparent 28%),
+    linear-gradient(180deg, #968464 0%, #807054 40%, #645644 75%, #4a4034 100%) !important;
+  box-shadow:
+    0 4px 0 #1a1612,
+    0 10px 18px rgba(0,0,0,0.48),
+    inset 0 1px 0 rgba(220,200,160,0.14),
+    inset 0 -3px 0 rgba(0,0,0,0.36) !important;
+  transform: translateY(-1px);
+}
+#app .primary:active:not(:disabled) {
+  transform: translateY(3px) scale(0.992);
+  box-shadow:
+    0 1px 0 #2a241c,
+    inset 0 3px 8px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.08) !important;
+}
+
+/* —— Micro-interactions —— */
+#app .recipe-card,
+#app .cat-item,
+#app .chip,
+#app .tab,
+#app .ghost,
+#app .icon-btn {
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 90ms ease,
+    opacity 140ms ease;
+}
+#app .card-img-zone img {
+  transition: transform 140ms ease, filter 140ms ease;
+}
+#app .status-pill, #app .status-plate, #app .status-tag {
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease, opacity 140ms ease;
+}
+#app .empty-state {
+  animation: craftFadeIn 180ms ease;
+}
+#app [title]:hover {
+  /* native tooltip; subtle cursor affordance */
+  cursor: pointer;
+}
+#app .ghost:hover {
+  border-color: rgba(154,136,102,0.4);
+  color: #e4e4e4;
+}
+#app .fav-btn:hover,
+#app .card-fav:hover {
+  transform: scale(1.06);
+}
+
+@media (max-width: 1440px) {
+  #app .fiche-identity { grid-template-columns: 128px 1fr auto; }
+  #app .fiche-img, #app .detail-img-wrap,
+  #app .fiche-img.tech-frame, #app .detail-img-wrap.tech-frame {
+    width: 124px !important;
+    height: 124px !important;
+  }
+  #app .ctrl-console::before { display: none; }
 }
