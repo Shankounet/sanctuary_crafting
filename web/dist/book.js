@@ -14,10 +14,10 @@
     indexOpen: false,
   };
 
-  /* Primary edge tabs — Accueil + 7 modules */
+  /* Primary edge tabs — short labels so they do not clip */
   const PRIMARY_TABS = [
     { id: 'dashboard', label: 'Accueil', mod: 'Dashboard' },
-    { id: 'progression', label: 'Progression', mod: 'Progression' },
+    { id: 'progression', label: 'Progrès', mod: 'Progression' },
     { id: 'objectives', label: 'Objectifs', mod: 'Objectives' },
     { id: 'projects', label: 'Projets', mod: 'Projects' },
     { id: 'resources', label: 'Ressources', mod: 'Resources' },
@@ -73,18 +73,124 @@
       .replace(/"/g, '&quot;');
   }
 
-  function itemLabel(it) {
-    if (!it) return '???';
-    if (it.known === false || it.label === '???') {
-      return `<span class="unknown">Ressource inconnue</span>`;
+  function prettySkill(k) {
+    const map = {
+      crafting: 'Artisanat', survival: 'Survie', survie: 'Survie',
+      ingenieur: 'Ingénieur', engineer: 'Ingénieur', engineering: 'Ingénierie',
+      medical: 'Médical', mechanic: 'Mécanique', cooking: 'Cuisine',
+      scavenging: 'Récupération', farming: 'Culture',
+      general: 'Général',
+    };
+    if (!k) return '';
+    const key = String(k).toLowerCase();
+    if (map[key]) return map[key];
+    return String(k).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function humanizeItemId(id) {
+    if (!id) return 'Objet';
+    const map = { chest4: 'Caisse', medical_chest: 'Caisse médicale', ifak: 'IFAK' };
+    if (map[id]) return map[id];
+    let s = String(id).replace(/[_-]+/g, ' ').replace(/\d+$/, '').trim();
+    if (!s) return 'Objet';
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  function displayItem(it) {
+    if (!it) return "Quelque chose d'inconnu";
+    if (typeof it === 'string') {
+      if (/^[a-z0-9_]+$/.test(it) && !/\s/.test(it)) {
+        const fromMeta = state.meta && state.meta.itemLabels && state.meta.itemLabels[it];
+        if (fromMeta) return fromMeta;
+        return humanizeItemId(it);
+      }
+      return it;
     }
-    return esc(it.label || it.item || '???');
+    if (it.known === false || it.label === '???') return 'Ressource inconnue';
+    if (it.label && it.label !== '???') return it.label;
+    return humanizeItemId(it.item || it.id || it.recipeId) || 'Objet';
+  }
+
+  function emptyPhrase(kind) {
+    const m = {
+      skills: "Aucune competence notée pour l'instant.",
+      objective: 'Aucun objectif pour le moment.',
+      project: 'Aucun projet suivi.',
+      artisan: 'Aucun artisan rencontré.',
+      discovery: "Rien de nouveau aujourd'hui.",
+      unlock: 'Rien de proche à débloquer.',
+      name: 'Nom encore à inscrire.',
+      place: 'Lieu non noté.',
+      date: '',
+    };
+    return m[kind] || "Rien de noté pour l'instant.";
+  }
+
+  function looksLikeId(s) {
+    return typeof s === 'string' && /^[a-z0-9_]+$/.test(s) && !/\s/.test(s);
+  }
+
+  function itemLabel(it) {
+    const lab = displayItem(it);
+    if (!it) return esc(lab);
+    if (typeof it !== 'string' && (it.known === false || it.label === '???')) {
+      return `<span class="unknown">${esc(lab)}</span>`;
+    }
+    return esc(lab);
+  }
+
+  function pencilDate(ts) {
+    if (ts) {
+      const t = fmtTime(ts);
+      if (t) return t;
+    }
+    try {
+      return new Date().toLocaleDateString('fr-FR', { dateStyle: 'short' });
+    } catch (_) {
+      const d = new Date();
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      return dd + '/' + mm + '/' + d.getFullYear();
+    }
+  }
+
+  function objectiveTitle(o) {
+    if (!o) return emptyPhrase('objective');
+    const payload = o.payload || {};
+    const recipeLab = payload.label || payload.recipeLabel || o.recipeLabel || o.label;
+    const raw = o.title || '';
+    if (raw && !looksLikeId(raw)) return raw;
+    if (recipeLab && !looksLikeId(String(recipeLab))) return recipeLab;
+    if (recipeLab) return displayItem(recipeLab);
+    if (raw) return humanizeItemId(raw);
+    return emptyPhrase('objective');
+  }
+
+  function kindDisplay(k) {
+    if (!k) return '';
+    const key = String(k).toLowerCase();
+    if (key === 'manual' || key === 'recipe' || key === 'craft' || key === 'gather' || key === 'system' || key === 'internal') return '';
+    return prettySkill(k);
+  }
+
+  function unlockNeed(x) {
+    if (!x) return '';
+    if (x.requireSkill) return 'Compétence : ' + prettySkill(x.requireSkill);
+    if (x.requireLevel != null && x.requireLevel !== '') return 'Niv. ' + String(x.requireLevel);
+    return '';
+  }
+
+  function sketchClass(cat) {
+    const c = String(cat || '').toLowerCase();
+    if (/mech|eng|gear|metal|tool|craft|technic/.test(c)) return 'gear';
+    if (/tool|atelier/.test(c)) return 'tool';
+    return 'plant';
   }
 
   function fmtTime(ts) {
-    if (!ts) return '—';
+    if (!ts) return '';
     const d = new Date((Number(ts) < 1e12 ? Number(ts) * 1000 : Number(ts)));
-    if (Number.isNaN(d.getTime())) return '—';
+    if (Number.isNaN(d.getTime())) return '';
     try {
       return d.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
     } catch (_) {
@@ -110,8 +216,7 @@
   }
 
   function skillLabel(k) {
-    const map = { crafting: 'Artisanat', survival: 'Survie' };
-    return map[k] || k;
+    return prettySkill(k);
   }
 
   function pickSpecialization(levels) {
@@ -133,23 +238,66 @@
 
   function msSkillLines(levels) {
     const keys = Object.keys(levels || {});
-    if (!keys.length) return '<p class="hand-note">ml_skills indisponible — aucune ligne de compétence.</p>';
+    if (!keys.length) return `<p class="hand-note">${emptyPhrase('skills')}</p>`;
     return `<div class="ms-lines">${keys.map((k) => {
       const lv = levels[k] || {};
       const level = Math.max(0, Number(lv.level) || 0);
-      const pct = Math.min(100, Math.max(4, level * 8));
-      const ticks = Array.from({ length: 5 }).map((_, i) =>
-        `<span class="tick ${level > i * 2 ? 'on' : ''}"></span>`
+      const filled = Math.max(0, Math.min(10, Math.round(level)));
+      const ticks = Array.from({ length: 10 }).map((_, i) =>
+        `<span class="tick ${i < filled ? 'on' : ''}"></span>`
       ).join('');
       const stampCls = level >= 8 ? 'stamp-maitrise' : (level >= 4 ? 'stamp-valide' : '');
       const stampLab = level >= 8 ? 'MAÎTRISÉ' : (level >= 4 ? 'VALIDÉ' : (level > 0 ? 'OUVERT' : ''));
+      const bonus = Number(lv.bonus) || 0;
+      const bonusNote = bonus > 0
+        ? `<p class="ms-bonus hand-note">Bonus de competence : ${esc(bonus)}%</p>`
+        : '';
       return `<div class="ms-line">
-        <span class="ms-name">${esc(skillLabel(k))}</span>
-        <span class="ms-lvl">Niv. ${esc(level)}${stampLab ? `<span class="lvl-stamp ${stampCls}">${stampLab}</span>` : ''}</span>
-        <div class="ms-gauge">${ticks}<div class="ms-bar"><span style="width:${pct}%"></span></div></div>
-        <div class="widget-foot" style="grid-column:1/-1">Bonus ${esc(lv.bonus || 0)}% · lecture ml_skills</div>
+        <span class="ms-name">${esc(prettySkill(k))}</span>
+        <span class="ms-lvl hand-note">Niv. ${esc(level)}${stampLab ? `<span class="lvl-stamp ${stampCls}">${stampLab}</span>` : ''}</span>
+        <div class="ms-ticks" aria-hidden="true">${ticks}</div>
+        ${bonusNote}
       </div>`;
     }).join('')}</div>`;
+  }
+
+  function pickLastArtisan(d, st) {
+    const metaA = state.meta && state.meta.lastArtisan;
+    const fromObj = (a) => {
+      if (!a) return '';
+      if (typeof a === 'string') {
+        if (/recens/i.test(a) || /contact/i.test(a) && /\d/.test(a)) return '';
+        if (looksLikeId(a)) return '';
+        return a;
+      }
+      return a.name || a.displayName || a.label || '';
+    };
+    let n = fromObj(metaA);
+    if (n) return n;
+    const list = d.artisans || [];
+    n = fromObj(list[0]);
+    if (n) return n;
+    n = fromObj(d.lastArtisan);
+    if (n) return n;
+    const count = Number((st && st.artisans) || 0);
+    if (count === 1) return 'Un contact noté, nom à compléter.';
+    if (count > 1) return 'Quelques contacts notés, noms à compléter.';
+    return emptyPhrase('artisan');
+  }
+
+  function projectNeeds(p) {
+    if (!p) return [];
+    const arr = p.needs || p.ingredients || p.missing || [];
+    if (!Array.isArray(arr)) return [];
+    return arr.slice(0, 3).map((x) => displayItem(x)).filter(Boolean);
+  }
+
+  function projectPct(p) {
+    if (!p) return null;
+    const n = p.progress != null ? p.progress : (p.pct != null ? p.pct : p.percent);
+    if (n == null || n === '') return null;
+    const num = Number(n);
+    return Number.isFinite(num) ? num : null;
   }
 
 
@@ -303,8 +451,9 @@
     const r = await postWithTimeout('bookDashboard', {}, 2500);
     if (!r || !r.ok) {
       setPages(
-        pageHead('Accueil', 'Synthèse indisponible') + emptyBox('fa-book-open', 'Dashboard indisponible', 'Le module Tableau de bord est désactivé ou inaccessible.'),
-        ''
+        pageHead('Accueil', 'Feuillet du jour indisponible') +
+          `<p class="hand-note">Le carnet n'a pas pu ouvrir la synthèse. Réessayer plus tard.</p>`,
+        folio('ii')
       );
       return;
     }
@@ -320,38 +469,96 @@
     const almost = (d.suggestions && d.suggestions.almost) || [];
     const canCraft = d.canCraft || [];
     const title = (state.meta && state.meta.title) || 'Carnet de survie';
-    const subtitle = (state.meta && state.meta.subtitle) || 'Journal technique de terrain';
     const charName = characterName();
     const spec = pickSpecialization(levels);
     const discovery = almost[0] || canCraft[0] || null;
-    const artisanHint = (st.artisans || 0) > 0
-      ? `${st.artisans} contact${st.artisans > 1 ? 's' : ''} recensés`
-      : 'Aucun artisan noté';
+
+    let artisansList = Array.isArray(d.artisans) ? d.artisans : [];
+    if (!artisansList.length && modEnabled('Artisans')) {
+      try {
+        const artsR = await loadModule('artisans');
+        artisansList = (artsR && artsR.data) || [];
+        d.artisans = artisansList;
+      } catch (_) { /* ignore */ }
+    }
 
     const place = (state.meta && (state.meta.place || state.meta.location)) || null;
     const dateStr = (state.meta && (state.meta.date || state.meta.openedAt || state.meta.day)) || null;
     const daily = (state.meta && (state.meta.dailyNote || state.meta.noteDuJour)) || dayNoteFromStats(st, objs);
-    const mainObj = (state.meta && (state.meta.mainObjective || state.meta.objectif)) || (objs[0] && objs[0].title) || null;
-    const lastArtisan = (state.meta && state.meta.lastArtisan) || ((st.artisans || 0) > 0 ? artisanHint : null);
-    const lastDisc = (state.meta && state.meta.lastDiscovery) || (discovery && discovery.label) || null;
+    const mainObj = (state.meta && (state.meta.mainObjective || state.meta.objectif))
+      || (objs[0] && objectiveTitle(objs[0]))
+      || (projects[0] && (projects[0].label || projects[0].name))
+      || emptyPhrase('objective');
+    const lastArtisan = pickLastArtisan(d, st);
+    const lastDiscRaw = (state.meta && state.meta.lastDiscovery)
+      || (discovery && (discovery.label || discovery.name))
+      || null;
+    const lastDisc = lastDiscRaw
+      ? (looksLikeId(String(lastDiscRaw)) ? displayItem(lastDiscRaw) : lastDiscRaw)
+      : emptyPhrase('discovery');
+
+    const proj = projects[0];
+    const needs = projectNeeds(proj);
+    const pct = projectPct(proj);
+    let projHtml;
+    if (!proj) {
+      projHtml = `<div class="scrap-body"><p class="hand-note">${emptyPhrase('project')}</p></div>`;
+    } else {
+      const pname = proj.label || proj.name || 'Projet';
+      const needLis = needs.map((n) => `<li><span class="box"></span><span>${esc(n)}</span></li>`).join('');
+      projHtml = `<div class="scrap-body">
+        <strong>${esc(displayItem(pname))}</strong>
+        ${pct != null ? `<p class="hand-note pencil">Avancement ~ ${esc(pct)}%</p>` : ''}
+        ${needLis ? `<ul class="checklist">${needLis}</ul>` : ''}
+        <p class="hand-note">annot. : tenir le chantier</p>
+        ${modEnabled('Projects') ? `<a href="#" class="hand-link" data-open-project="${esc(proj.projectUid || '')}">voir le dossier →</a>` : ''}
+      </div>`;
+    }
+
+    const objLis = objs.slice(0, 4).map((o) =>
+      `<li class="${o.done ? 'done' : ''}"><span class="box ${o.done ? 'checked' : ''}"></span><span>${esc(objectiveTitle(o))}</span>${o.done ? '<span class="check-annot">ok ✓</span>' : ''}</li>`
+    ).join('');
+
+    const discCat = discovery && (discovery.category || discovery.kind || discovery.type);
+    const discSketch = sketchClass(discCat);
+    let discHtml;
+    if (!discovery) {
+      discHtml = `<div class="scrap-body"><p class="hand-note">${emptyPhrase('discovery')}</p></div>`;
+    } else {
+      const dlab = discovery.label || discovery.name || displayItem(discovery);
+      const ddate = pencilDate(discovery.at || discovery.ts || discovery.createdAt);
+      const annot = almost[0] ? 'Encore quelques pièces à réunir.' : 'Noté sur le terrain.';
+      discHtml = `<div class="scrap-body">
+        <strong>${esc(looksLikeId(String(dlab)) ? displayItem(dlab) : dlab)}</strong>
+        <p class="id-date">${esc(ddate)}</p>
+        ${discCat ? `<p class="hand-note">${esc(prettySkill(discCat))}</p>` : ''}
+        <p class="hand-note">${annot}</p>
+        <span class="stamp stamp-decouvert" style="font-size:9px;padding:2px 6px">DÉCOUVERT</span>
+        <span class="ink-sketch ${discSketch}" aria-hidden="true"></span>
+      </div>`;
+    }
 
     const left = `
       <div class="accueil-hero">
-        <p class="book-stamp">Dossier personnel</p>
+        <p class="book-stamp">Carnet de terrain</p>
+        <div class="id-polaroid">
+          <span class="tape top-r extra-tape"></span>
+          <div class="id-photo" aria-hidden="true"><span class="id-silhouette"></span></div>
+          <p class="hand-name">${esc(charName || emptyPhrase('name'))}</p>
+          <p class="id-date">${esc(pencilDate(dateStr))}</p>
+          ${place
+            ? `<p class="id-place hand-note">${esc(place)}</p>`
+            : `<p class="id-place hand-note pencil">${emptyPhrase('place')}</p>`}
+        </div>
         <h2 class="accueil-title">${esc(String(title))}</h2>
-        ${charName ? `<p class="accueil-char">Propriétaire : ${esc(charName)}</p>` : `<p class="accueil-char">${esc(subtitle)}</p>`}
         <div class="accueil-seal-row">
           ${spec ? `<span class="stamp stamp-specialisation">SPÉCIALISATION · ${esc(spec)}</span>` : `<span class="stamp">Terrain</span>`}
           <span class="stamp seal">SC<br/>OK</span>
-          <span class="ink-sketch gear" aria-hidden="true" title=""></span>
+          <span class="ink-sketch gear" aria-hidden="true"></span>
         </div>
         <hr class="ink-rule" />
-        ${fieldRow('Nom', charName)}
-        ${fieldRow('Spécialisation', spec)}
-        ${fieldRow('Date', dateStr)}
-        ${fieldRow('Lieu', place)}
       </div>
-      <h3 class="section-title">Compétences — manuscrit</h3>
+      <h3 class="section-title">Compétences</h3>
       ${msSkillLines(levels)}
       <div class="day-note">${esc(daily)}</div>
       ${folio('i')}`;
@@ -361,51 +568,52 @@
       <h2 class="book-page-title">Situation</h2>
       <hr class="ink-rule" />
 
-      ${fieldRow('Objectif principal', mainObj || (projects[0] && projects[0].label))}
-      ${fieldRow('Dernier artisan', lastArtisan)}
-      ${fieldRow('Dernière découverte', lastDisc)}
+      <p class="sit-block"><span class="sit-k">Objectif principal</span>
+      <span class="sit-v hand-note">${esc(mainObj)}</span></p>
+      <p class="sit-block"><span class="sit-k">Dernier contact</span>
+      <span class="sit-v hand-note">${esc(lastArtisan)}</span></p>
+      <p class="sit-block"><span class="sit-k">Dernière découverte</span>
+      <span class="sit-v hand-note">${esc(lastDisc)}</span></p>
 
       <div class="scrap-note rot-l tint-warm">
         <span class="tape top-l"></span>
         <span class="tape top-r"></span>
         <span class="paperclip"></span>
         <div class="scrap-title">Projet principal</div>
-        ${projects[0]
-          ? `<div class="scrap-body"><strong>${esc(projects[0].label)}</strong></div>
-             <div class="scrap-foot">${projects[0].isOwner ? 'Propriétaire' : 'Contributeur'} · ${esc(projects[0].status || 'open')}</div>`
-          : `<div class="scrap-body empty">—</div>`}
+        ${projHtml}
       </div>
 
       <h3 class="section-title">Objectifs</h3>
       <ul class="checklist">
-        ${(objs.slice(0, 4).map((o) =>
-          `<li class="${o.done ? 'done' : ''}"><span class="box ${o.done ? 'checked' : ''}"></span><span>${esc(o.title)}${o.kind ? ` <em>(${esc(o.kind)})</em>` : ''}</span>${o.done ? '<span class="check-annot">ok ✓</span>' : ''}</li>`
-        ).join('')) || '<li><span class="box"></span><span class="empty">—</span></li>'}
+        ${objLis || `<li><span class="box"></span><span class="hand-note">${emptyPhrase('objective')}</span></li>`}
       </ul>
 
       <div class="scrap-note rot-r tint-cool" style="margin-top:14px">
         <span class="tape top-l"></span>
         <div class="scrap-title">Dernière découverte</div>
-        ${discovery
-          ? `<div class="scrap-body"><strong>${esc(discovery.label)}</strong></div>
-             <div class="scrap-foot">${almost[0] ? `Presque craftable · manque ${(almost[0].missing || []).length}` : 'Faisable maintenant'}</div>
-             <span class="stamp stamp-decouvert" style="font-size:9px;padding:2px 6px">DÉCOUVERT</span>`
-          : `<div class="scrap-body empty">—</div>`}
+        ${discHtml}
       </div>
 
       <div class="dossier-sheet">
         <div class="dossier-mark">Prochain déblocage</div>
         ${next
-          ? `<h4>${esc(next.label)}</h4>
-             <p class="hand-note" style="font-size:14px;margin:4px 0">${next.requireSkill ? `Skill : ${esc(next.requireSkill)}` : `Niv. ${esc(next.requireLevel)} (Δ ${esc(next.delta || '?')})`}</p>`
-          : `<p class="empty">—</p>`}
+          ? `<h4>${esc(next.label || displayItem(next))}</h4>
+             <p class="hand-note" style="font-size:14px;margin:4px 0">${esc(unlockNeed(next))}</p>`
+          : `<p class="hand-note">${emptyPhrase('unlock')}</p>`}
       </div>
 
-      <p class="hand-note" style="margin-top:10px">Artisan récent — ${esc(artisanHint)}. ${pins.length ? `Épingles : ${pins.length}.` : ''}</p>
-      ${prods.length ? `<p class="hand-note">File atelier : ${prods.slice(0, 2).map((q) => esc(q.label)).join(', ')}</p>` : ''}
+      ${pins.length ? `<p class="hand-note" style="margin-top:10px">Épingles : ${pins.length}.</p>` : ''}
+      ${prods.length ? `<p class="hand-note">File atelier : ${prods.slice(0, 2).map((q) => esc(q.label || displayItem(q))).join(', ')}</p>` : ''}
       ${folio('ii')}`;
 
     setPages(left, right);
+    const R = rightEl();
+    if (R) R.querySelectorAll('[data-open-project]').forEach((a) => {
+      a.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        navigate('projects');
+      });
+    });
   }
 
 
@@ -417,8 +625,8 @@
     const next = (unlocks && unlocks.data) || [];
     if (!p.available) {
       setPages(
-        pageHead('Progression', 'Lecture seule ml_skills — aucune XP parallèle') +
-          emptyBox('fa-chart-line', 'ml_skills indisponible', 'Le carnet lit CraftingSkills en lecture seule.'),
+        pageHead('Progrès', 'Cahier de competences') +
+          `<p class="hand-note">Les competences ne sont pas encore lisibles.</p>`,
         folio('12')
       );
       return;
@@ -428,7 +636,7 @@
     const left = `
       <p class="book-stamp">Cahier de progression</p>
       <h2 class="book-page-title">Compétences</h2>
-      <p class="hand-note">Lignes de manuscrit — ml_skills en lecture seule.</p>
+      <p class="hand-note">Lignes de manuscrit — expérience actuelle.</p>
       <hr class="ink-rule" />
       ${spec ? `<span class="stamp stamp-specialisation">SPÉCIALISATION · ${esc(spec)}</span>` : ''}
       <span class="ink-sketch tool" aria-hidden="true"></span>
@@ -441,10 +649,10 @@
       <div class="unlock-list">${next.length ? next.map((x) => `
         <div class="unlock-row">
           <span>${esc(x.label)}</span>
-          <span class="stamp" style="transform:rotate(-2deg);padding:2px 6px;font-size:9px;margin:0">${x.requireSkill ? `skill · ${esc(x.requireSkill)}` : `niv. ${esc(x.requireLevel)} · Δ${esc(x.delta || '')}`}</span>
-        </div>`).join('') : '<p class="empty">Aucun déblocage proche</p>'}
+          <span class="stamp" style="transform:rotate(-2deg);padding:2px 6px;font-size:9px;margin:0">${esc(unlockNeed(x))}</span>
+        </div>`).join('') : `<p class="hand-note">${emptyPhrase('unlock')}</p>`}
       </div>
-      <p class="hand-note" style="margin-top:14px">Tampons de niveau = jalons, pas de barre SaaS.</p>
+      <p class="hand-note" style="margin-top:14px">Tampons de niveau = jalons notés à la main.</p>
       ${folio('13')}`;
     setPages(left, right);
   }
@@ -454,10 +662,10 @@
     const r = await loadModule('nextUnlocks');
     const arr = (r && r.data) || [];
     setPages(
-      pageHead('Déblocages', 'Recettes proches de votre niveau / skill') +
+      pageHead('Déblocages', 'Ce qui est presque à portée') +
         `<div class="unlock-list">${arr.length ? arr.map((x) => `
           <div class="unlock-row"><span>${esc(x.label)}</span>
-          <span class="badge warn">${x.requireSkill ? 'skill' : 'niv. ' + esc(x.requireLevel)}</span></div>`).join('') : emptyBox('fa-unlock', 'Rien à débloquer', 'Revenez après progression ml_skills.')}
+          <span class="stamp" style="transform:rotate(-2deg);padding:2px 6px;font-size:9px;margin:0">${esc(unlockNeed(x))}</span></div>`).join('') : `<p class="hand-note">${emptyPhrase('unlock')}</p>`}
         </div>${folio('40')}`,
       `<p class="hand-note">Ces pages listent ce qui est presque à portée — sans spoil des recettes lointaines.</p>${folio('41')}`
     );
@@ -486,24 +694,27 @@
 
     let cards = '';
     if (!arr.length) {
-      cards = emptyBox('fa-bullseye', 'Aucun objectif', 'Ajoutez une mission manuelle ou depuis le craft.');
+      cards = `<p class="hand-note">${emptyPhrase('objective')}</p>`;
     } else {
       cards = `<div id="obj-grid">${arr.map((o) => {
         const rid = o.payload && o.payload.recipeId;
         const pinned = rid && pinIds.has(rid);
+        const kd = kindDisplay(o.kind);
+        const kindLine = kd ? `<span class="hand-note">${esc(kd)}${pinned ? ' · épinglé' : ''}</span>` : (pinned ? '<span class="hand-note">épinglé</span>' : '');
         return `<article class="sticky-note ${o.done ? 'done' : ''}" data-id="${o.id}">
-          <div class="st-title">${o.done ? '☑ ' : '☐ '}${esc(o.title)}</div>
+          <div class="st-title">${esc(objectiveTitle(o))}</div>
           ${o.done ? '<span class="check-annot">fait — rayé</span>' : ''}
           <ul class="checklist">
-            <li class="${o.done ? 'done' : ''}"><span class="box ${o.done ? 'checked' : ''}"></span><span>${esc(o.kind || 'manual')}${pinned ? ' · épinglé' : ''}${rid ? ` · ${esc(rid)}` : ''}</span>${o.done ? '<span class="check-annot">✓</span>' : ''}</li>
+            <li class="${o.done ? 'done' : ''}"><span class="box ${o.done ? 'checked' : ''}"></span><span>${esc(objectiveTitle(o))}</span>${o.done ? '<span class="check-annot">✓</span>' : ''}</li>
           </ul>
+          ${kindLine}
           <div class="st-actions obj-actions">
             ${!o.done ? `<button type="button" class="primary small" data-act="done">Terminer</button>` : ''}
             ${rid && modEnabled('Pins') && !pinned ? `<button type="button" class="ghost small" data-act="pin" data-rid="${esc(rid)}">Épingler</button>` : ''}
             ${rid && modEnabled('CraftTree') ? `<button type="button" class="ghost small" data-act="tree" data-rid="${esc(rid)}">Arbre</button>` : ''}
             <button type="button" class="ghost small" data-act="del">Retirer</button>
           </div>
-          <div class="widget-foot">${fmtTime(o.createdAt)}</div>
+          <p class="hand-note id-date">${esc(fmtTime(o.createdAt))}</p>
         </article>`;
       }).join('')}</div>`;
     }
@@ -557,16 +768,16 @@
       ${folio('30')}`;
     let right;
     if (!projects.length) {
-      right = emptyBox('fa-folder-open', 'Aucun projet ouvert', 'Les projets craft auxquels vous participez apparaîtront ici.') + folio('31');
+      right = `<p class="hand-note">${emptyPhrase('project')}</p>` + folio('31');
     } else {
       right = `<div id="proj-grid">${projects.map((p) => `
         <article class="tech-plan" data-rid="${esc(p.recipeId || '')}">
           <span class="paperclip"></span>
           <div class="tp-head">
-            <h4>${esc(p.label || p.recipeId)}</h4>
-            <span class="stamp" style="margin:0;transform:rotate(3deg);padding:3px 6px;font-size:9px">${esc(p.status || 'open')}</span>
+            <h4>${esc(p.label || displayItem(p.name) || 'Projet')}</h4>
+            <span class="stamp" style="margin:0;transform:rotate(3deg);padding:3px 6px;font-size:9px">${esc(p.status === 'open' ? 'ouvert' : (p.status || 'ouvert'))}</span>
           </div>
-          <div class="tp-arrow">→ ${p.isOwner ? 'Propriétaire du chantier' : 'Contributeur'} ${p.projectUid ? '· réf. ' + esc(String(p.projectUid).slice(0, 8)) : ''}</div>
+          <div class="tp-arrow">→ ${p.isOwner ? 'Responsable du chantier' : 'Contributeur'}</div>
           <ul class="checklist">
             <li><span class="box"></span><span>Composants via arbre / courses</span></li>
             <li><span class="box"></span><span>Suivi d'avancement terrain</span></li>
@@ -596,9 +807,9 @@
     const left = `
       <p class="book-stamp">Encyclopédie de terrain</p>
       <h2 class="book-page-title">Ressources</h2>
-      <p class="hand-note">Silhouettes jusqu'à découverte — jamais de wiki omniscient.</p>
+      <p class="hand-note">Silhouettes jusqu'à découverte — on n'écrit que ce qu'on a vu.</p>
       <hr class="ink-rule" />
-      <p class="hand-note">Marquer « Non identifié » tant que MaskItem / known = false.</p>
+      <p class="hand-note">Marquer « Non identifié » tant que l'objet n'a pas été vu de près.</p>
       <span class="ink-sketch plant" aria-hidden="true"></span>
       ${folio('50')}`;
     let right;
@@ -615,8 +826,8 @@
         const unknown = !x.label || x.label === '???' || x.known === false;
         return `<article class="ency-entry ${unknown ? 'unknown' : 'known'}">
           <div class="sil">${unknown ? '?' : '◆'}</div>
-          <div class="ency-label">${unknown ? 'Non identifié' : esc(x.label)}</div>
-          <div class="ency-id">${unknown ? '???' : esc(x.item || '')}</div>
+          <div class="ency-label">${unknown ? 'Non identifié' : esc(displayItem(x))}</div>
+          <div class="ency-id">${unknown ? '???' : ''}</div>
         </article>`;
       }).join('')}</div>${folio('51')}`;
     }
@@ -653,8 +864,8 @@
             <span class="tape top-l"></span>
             ${i % 3 === 0 ? '<span class="paperclip"></span>' : ''}
             <div class="bp-mark">Plan technique · connu</div>
-            <h4>${esc(x.label || x.id)}</h4>
-            <div class="bp-id">${esc(x.id)}</div>
+            <h4>${esc(x.label || displayItem(x.id) || 'Plan')}</h4>
+            <div class="bp-id"></div>
             <p class="bp-annot">annot. : fragment collé — vérifier cotes avant atelier</p>
             <span class="stamp stamp-ouvert" style="font-size:9px;padding:2px 6px">OUVERT</span>
           </article>`).join('');
@@ -689,7 +900,7 @@
       ${folio('70')}`;
     let right;
     if (!arr.length) {
-      right = emptyBox('fa-address-book', 'Aucun contact', 'Rencontrez des artisans via ox_target, carte ou craft.') + folio('71');
+      right = `<p class="hand-note">${emptyPhrase('artisan')}</p>` + folio('71');
     } else {
       right = arr.map((a) => {
         const note = (a.meta && a.meta.note) || '';
@@ -698,8 +909,8 @@
           <span class="paperclip"></span>
           <div class="photo-clip" title="Portrait manquant"></div>
           <h4>${esc(a.displayName)}${fav ? ' ★' : ''}</h4>
-          <div class="vc-meta">${esc(a.specialty || 'general')} · ${esc(TIER_LABEL[a.tier] || a.tier || 'Inconnu')}</div>
-          <div class="vc-meta">Dernière rencontre · ${fmtTime(a.metAt)} · ${esc(a.source || 'meet')}</div>
+          <div class="vc-meta">${esc(prettySkill(a.specialty || 'general'))} · ${esc(TIER_LABEL[a.tier] || prettySkill(a.tier) || 'Inconnu')}</div>
+          <div class="vc-meta">Dernière rencontre · ${esc(fmtTime(a.metAt) || emptyPhrase('date'))}</div>
           <div class="vc-note">${note ? esc(note) : 'Services : échange RP / craft — noter après rencontre'}</div>
           ${a.tier === 'master' || a.tier === 'seasoned' ? '<span class="stamp stamp-valide" style="font-size:9px;padding:2px 6px;margin-top:6px">VALIDÉ</span>' : ''}
         </article>`;
@@ -717,7 +928,7 @@
     const left = `
       <p class="book-stamp">Croquis de relations</p>
       <h2 class="book-page-title">Réseau</h2>
-      <p class="hand-note">Nœuds à l'encre — densités par spécialité, pas un graphe SaaS.</p>
+      <p class="hand-note">Nœuds à l'encre — densités par spécialité.</p>
       <hr class="ink-rule" />
       ${folio('72')}`;
     let right;
@@ -726,12 +937,12 @@
     } else {
       const nodes = keys.map((k) => {
         const list = net[k] || [];
-        return `<span class="net-node">${esc(k)}<span class="nn-count">${list.length} contact${list.length > 1 ? 's' : ''}</span></span>`;
+        return `<span class="net-node">${esc(prettySkill(k))}<span class="nn-count">${list.length} contact${list.length > 1 ? 's' : ''}</span></span>`;
       }).join('');
       const links = keys.map((k) => {
         const list = net[k] || [];
         const names = list.slice(0, 3).map((a) => a.displayName).join(', ');
-        return `${esc(k)} → ${esc(names) || '—'}${list.length > 3 ? '…' : ''}`;
+        return `${esc(prettySkill(k))} → ${esc(names) || emptyPhrase('artisan')}${list.length > 3 ? '…' : ''}`;
       }).join('<br/>');
       right = `<div class="net-sketch">${nodes}<div class="net-links">${links}</div></div>${folio('73')}`;
     }
@@ -820,7 +1031,7 @@
             <span class="fab-time">${q.finishAt ? fmtTime(q.finishAt) : 'en cours'}</span>
             <span class="fab-label">${esc(q.label)}</span>
             <span class="badge">x${q.batch || 1}</span>
-          </div>`).join('') : '<p class="empty">File vide</p>'}
+          </div>`).join('') : `<p class="hand-note">File vide pour l'instant.</p>`}
       </div>
       ${folio('90')}`;
     const right = `
@@ -830,8 +1041,8 @@
           <div class="fab-row">
             <span class="fab-time">${esc(p.status || 'open')}</span>
             <span class="fab-label">${esc(p.label)}</span>
-            <span class="badge">${p.isOwner ? 'owner' : 'contrib'}</span>
-          </div>`).join('') : '<p class="empty">Aucun chantier</p>'}
+            <span class="badge">${p.isOwner ? 'responsable' : 'aide'}</span>
+          </div>`).join('') : `<p class="hand-note">${emptyPhrase('project')}</p>`}
       </div>
       <div class="scrap-note rot-r" style="margin-top:16px">
         <span class="tape top-l"></span>
@@ -864,9 +1075,11 @@
         let source = '';
         try {
           const p = x.payload || {};
-          body = p.label || p.name || p.item || p.title || p.recipeId || JSON.stringify(p).slice(0, 80);
+          body = p.label || p.name || p.title || displayItem(p.item) || '';
+          if (!body || looksLikeId(String(body))) body = displayItem(body || p.item || '');
           source = p.source || p.from || x.source || '';
-        } catch (_) { body = '—'; }
+          if (source && looksLikeId(String(source))) source = prettySkill(source);
+        } catch (_) { body = emptyPhrase('discovery'); }
         if (isDisc) {
           const sketch = i % 4 === 0 ? '<span class="ink-sketch plant disc-sketch" aria-hidden="true"></span>'
             : (i % 4 === 2 ? '<span class="ink-sketch gear disc-sketch" aria-hidden="true"></span>' : '');
@@ -875,14 +1088,14 @@
             <div class="je-date">${fmtTime(x.ts || x.createdAt || x.at)}</div>
             <span class="stamp stamp-decouvert" style="font-size:9px;padding:2px 6px">DÉCOUVERT</span>
             <div class="je-body" style="margin-top:6px">${esc(body)}</div>
-            <div class="disc-annot">${esc(x.type || 'observation')} — noté sur le terrain</div>
-            <div class="disc-source">Source · ${esc(source || '—')}</div>
+            <div class="disc-annot">${esc(prettySkill(x.type || 'observation'))} — noté sur le terrain</div>
+            ${source ? `<div class="disc-source">Source · ${esc(source)}</div>` : ''}
           </article>`;
         }
         return `<article class="journal-entry">
           <div class="je-date">${fmtTime(x.ts || x.createdAt || x.at)}</div>
-          <div class="je-type">${esc(x.type || 'event')}</div>
-          <div class="je-body">${esc(body)}</div>
+          <div class="je-type">${esc(prettySkill(x.type || 'note'))}</div>
+          <div class="je-body">${esc(body || emptyPhrase())}</div>
         </article>`;
       }).join('')}</div>${folio('101')}`;
     }
@@ -903,7 +1116,7 @@
         <span class="paperclip"></span>
         <div class="dossier-mark">Épingle</div>
         <h4>${esc(p.label)}</h4>
-        <div class="dossier-meta"><span class="badge">${esc(p.category || '')}</span></div>
+        <div class="dossier-meta">${p.category ? `<span class="badge">${esc(prettySkill(p.category))}</span>` : ''}</div>
         <div class="row-actions">
           <button type="button" class="ghost small" data-rid="${esc(p.recipeId)}">Retirer</button>
         </div>
@@ -924,7 +1137,7 @@
     const r = await loadModule('canCraft');
     const arr = (r && r.data) || [];
     setPages(
-      pageHead('Faisable maintenant', 'Recettes prêtes avec inventaire & skills') + folio('120'),
+      pageHead('Faisable maintenant', 'Recettes prêtes avec ce que l\'on a sous la main') + folio('120'),
       `${arr.length ? arr.map((x) => `
         <article class="scrap-note flat"><span class="tape top-l"></span>
         <div class="dossier-mark">Prêt</div>
@@ -941,11 +1154,11 @@
       pageHead('Suggestions', 'Pistes de progression & crafts proches') + `
         <h3 class="section-title">Presque craftable</h3>
         <div class="unlock-list">${(d.almost || []).map((x) => `
-          <div class="unlock-row"><span>${esc(x.label)}</span><span class="badge warn">manque ${(x.missing || []).length}</span></div>`).join('') || '<p class="empty">—</p>'}
+          <div class="unlock-row"><span>${esc(x.label)}</span><span class="hand-note">${(x.missing || []).length ? 'Encore quelques pièces à réunir.' : ''}</span></div>`).join('') || `<p class="hand-note">${emptyPhrase()}</p>`}
         </div>${folio('130')}`,
       `<h3 class="section-title">À un niveau</h3>
         <div class="unlock-list">${(d.oneLevel || []).map((x) => `
-          <div class="unlock-row"><span>${esc(x.label)}</span><span class="badge">+1</span></div>`).join('') || '<p class="empty">—</p>'}
+          <div class="unlock-row"><span>${esc(x.label)}</span><span class="hand-note">Encore un cran</span></div>`).join('') || `<p class="hand-note">${emptyPhrase()}</p>`}
         </div>${folio('131')}`
     );
   }
@@ -955,7 +1168,7 @@
       pageHead('Courses intelligentes', 'Expansion récursive, sans double-compte') + `
         <div class="note-editor">
           <div class="row-actions" style="margin-top:0">
-            <input id="shop-rid" type="text" placeholder="recipeId (ex: ex_metal_plate)" style="flex:1;margin-top:0" value="${esc(state._shopPrefill || '')}" />
+            <input id="shop-rid" type="text" placeholder="Schéma à déplier…" style="flex:1;margin-top:0" value="${esc(state._shopPrefill || '')}" />
             <input id="shop-batch" type="number" min="1" value="1" style="width:70px;margin-top:0" />
             <button type="button" class="primary" id="shop-go">Calculer</button>
           </div>
@@ -981,10 +1194,10 @@
     if (!node) return '';
     indent = indent || '';
     if (node.type === 'raw') {
-      const lab = node.known === false ? 'Ressource inconnue' : (node.label || node.item);
+      const lab = displayItem(node);
       return `${indent}- ${lab} x${node.count || 1}\n`;
     }
-    let s = `${indent}* ${node.label || node.id}\n`;
+    let s = `${indent}* ${displayItem(node.label || node)}\n`;
     (node.children || []).forEach((c) => { s += treeText(c, indent + '  '); });
     return s;
   }
@@ -994,11 +1207,11 @@
       pageHead('Arbre de craft', 'Dépendances masquées pour les inconnues') + `
         <div class="note-editor">
           <div class="row-actions" style="margin-top:0">
-            <input id="tree-rid" type="text" placeholder="recipeId" style="flex:1;margin-top:0" value="${esc(state._treePrefill || '')}" />
+            <input id="tree-rid" type="text" placeholder="Schéma à déplier…" style="flex:1;margin-top:0" value="${esc(state._treePrefill || '')}" />
             <button type="button" class="primary" id="tree-go">Afficher</button>
           </div>
         </div>${folio('150')}`,
-      `<pre class="tree-pre" id="tree-out">—</pre>${folio('151')}`
+      `<pre class="tree-pre" id="tree-out">${emptyPhrase()}</pre>${folio('151')}`
     );
     state._treePrefill = '';
     const go = $('#tree-go');
@@ -1006,7 +1219,7 @@
       const recipeId = (($('#tree-rid') || {}).value || '').trim();
       const r = await loadModule('tree', { recipeId, depth: 3 });
       const out = $('#tree-out');
-      if (out) out.textContent = r && r.ok ? treeText(r.data) : (r && r.reason) || 'Erreur';
+      if (out) out.textContent = r && r.ok ? treeText(r.data) : 'Impossible de déplier ce schéma.';
     };
     if (go && ($('#tree-rid') || {}).value) go.click();
   }
@@ -1019,17 +1232,16 @@
         <div class="note-editor">
           <div class="row-actions" style="margin-top:0">
             <input id="ord-note" type="text" placeholder="Note commande" style="flex:1;margin-top:0" />
-            <input id="ord-rid" type="text" placeholder="recipeId optionnel" style="flex:1;margin-top:0" />
+            <input id="ord-rid" type="text" placeholder="Schéma (optionnel)" style="flex:1;margin-top:0" />
             <button type="button" class="primary" id="ord-add">Créer</button>
           </div>
         </div>${folio('160')}`,
       `<div class="dossier-grid">${arr.length ? arr.map((o) => `
         <article class="dossier-card">
           <div class="dossier-mark">Commande</div>
-          <h4>${esc((o.orderUid || '').slice(0, 8))}…</h4>
+          <h4>${esc(o.note || 'Commande')}</h4>
           <div class="dossier-meta">
-            <span class="badge">${esc(o.status)}</span>
-            ${o.note || o.recipeId ? `<span class="badge accent">${esc(o.note || o.recipeId)}</span>` : ''}
+            <span class="badge">${esc(o.status === 'open' ? 'ouverte' : (o.status || ''))}</span>
           </div>
         </article>`).join('') : emptyBox('fa-handshake', 'Aucune commande', 'Créez une demande d’échange RP.')}
       </div>${folio('161')}`
@@ -1052,11 +1264,11 @@
     const r = await loadModule('workshop');
     const arr = (r && r.data) || [];
     setPages(
-      pageHead('Mon atelier', 'Bancs connus — pas de GPS') + folio('170'),
+      pageHead('Mon atelier', 'Bancs connus, relevés de terrain') + folio('170'),
       `<div class="dossier-grid">${arr.length ? arr.map((s) => `
         <article class="dossier-card">
-          <div class="dossier-mark">${esc(s.kind || 'banc')}</div>
-          <h4>${esc(s.category)}</h4>
+          <div class="dossier-mark">${esc(s.kind === 'world' ? 'banc de zone' : 'banc')}</div>
+          <h4>${esc(prettySkill(s.category) || s.category || 'Atelier')}</h4>
           <div class="dossier-meta">
             <span class="badge">L${s.stationLevel || 1}</span>
             <span class="badge ${s.powered === false ? 'warn' : 'ok'}">${s.powered === false ? 'OFF' : 'OK'}</span>
@@ -1073,7 +1285,7 @@
       pageHead('Maintenance', 'Alertes outils & énergie') + folio('180'),
       `<div class="unlock-list">${arr.length ? arr.map((h) => `
         <div class="unlock-row">
-          <span>${esc(h.kind)} · ${esc(h.label || h.category || h.item || '')}</span>
+          <span>${esc(prettySkill(h.kind))} · ${esc(h.label || prettySkill(h.category) || displayItem(h.item) || '')}</span>
           <span class="badge warn">${esc(h.hint || '')}</span>
         </div>`).join('') : emptyBox('fa-wrench', 'Rien à signaler', 'Tout semble en ordre.')}
       </div>${folio('181')}`
@@ -1089,7 +1301,7 @@
       (keys.length ? keys.map((k, i) => `
         <div class="scrap-note ${i % 2 ? 'rot-r' : 'rot-l'}" style="margin:8px 2px">
           <span class="tape top-l"></span>
-          <div class="dossier-mark">${esc(k)}</div>
+          <div class="dossier-mark">${esc(prettySkill(k))}</div>
           <div class="widget-v">${esc(st[k])}</div>
         </div>`).join('') : emptyBox('fa-chart-simple', 'Pas de stats', '')) + folio('191')
     );
@@ -1105,7 +1317,7 @@
     setPages(
       pageHead('Recherche', `Résultats pour « ${q} »`) + folio('200'),
       `<div class="unlock-list">${hits.length ? hits.map((h) => `
-        <div class="unlock-row"><span>${esc(h.label)}</span><span class="badge">${esc(h.kind)}</span></div>`).join('') : emptyBox('fa-magnifying-glass', 'Aucun résultat', 'Élargissez les termes.')}
+        <div class="unlock-row"><span>${esc(h.label)}</span><span class="hand-note">${esc(kindDisplay(h.kind) || prettySkill(h.kind) || '')}</span></div>`).join('') : emptyBox('fa-magnifying-glass', 'Aucun résultat', 'Élargissez les termes.')}
       </div>${folio('201')}`
     );
   }
@@ -1128,15 +1340,15 @@
   function paintBootPages(title, subtitle) {
     const left = `
       <div class="accueil-hero">
-        <p class="book-stamp">Dossier personnel</p>
+        <p class="book-stamp">Carnet de terrain</p>
         <h2 class="accueil-title">${esc(String(title || 'Carnet de survie'))}</h2>
-        <p class="accueil-sub">${esc(subtitle || 'Journal technique de terrain')}</p>
+        <p class="accueil-sub">${esc(subtitle || 'Journal de terrain')}</p>
         <hr class="ink-rule" />
         <p class="hand-note">Ouverture du carnet…</p>
         <span class="stamp">Terrain</span>
       </div>
-      <h3 class="section-title">Compétences — manuscrit</h3>
-      <p class="empty">Chargement des lignes de compétences…</p>
+      <h3 class="section-title">Compétences</h3>
+      <p class="hand-note">Ouverture des lignes de competences…</p>
       ${folio('i')}`;
     const right = `
       <p class="book-stamp">Feuillet du jour</p>
