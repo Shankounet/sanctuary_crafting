@@ -400,41 +400,70 @@
   </main>
 </div>
 
-<!-- Survival Book — personal technical journal / field dossier (NOT craft atelier) -->
-<div id="book-app" class="hidden" data-identity="dossier">
-  <div class="book-chrome" aria-hidden="true">
-    <div class="book-spine"></div>
-    <div class="book-paper-grain"></div>
-  </div>
-  <header class="book-top">
-    <div class="book-brand">
-      <div class="book-mark" aria-hidden="true">
-        <i class="fa-solid fa-book-open"></i>
+<!-- Survival Book — physical open journal (Phase 1) -->
+<div id="book-app" class="hidden" data-identity="physical-book" aria-hidden="true">
+  <div class="book-stage" id="book-stage">
+    <div class="book-world-dim" aria-hidden="true"></div>
+
+    <div class="book-spread" id="book-spread" role="dialog" aria-modal="true" aria-labelledby="book-title">
+      <nav class="book-edge-tabs" id="book-tabs" aria-label="Signets du carnet"></nav>
+
+      <div class="book-covers" aria-hidden="true">
+        <div class="book-cover book-cover-left"></div>
+        <div class="book-cover book-cover-right"></div>
       </div>
-      <div class="book-brand-text">
-        <p class="book-stamp">Dossier personnel</p>
-        <h1 id="book-title">CARNET DE SURVIE</h1>
-        <p class="book-sub" id="book-sub">Journal technique de terrain</p>
+
+      <div class="book-page book-page-left" id="book-page-left">
+        <div class="book-page-edge" aria-hidden="true"></div>
+        <div class="book-page-inner" id="book-left"></div>
       </div>
-    </div>
-    <div class="book-actions">
-      <label class="book-search-wrap">
-        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-        <input id="book-search" type="search" placeholder="Rechercher dans le carnet…" autocomplete="off" />
-      </label>
-      <button type="button" id="book-btn-close" class="book-icon-btn" title="Fermer" aria-label="Fermer">
-        <i class="fa-solid fa-xmark"></i>
+
+      <div class="book-binding" aria-hidden="true">
+        <div class="book-binding-groove"></div>
+        <div class="book-binding-shadow"></div>
+        <div class="book-binding-stitch"></div>
+      </div>
+
+      <div class="book-page book-page-right" id="book-page-right">
+        <div class="book-page-edge" aria-hidden="true"></div>
+        <div class="book-page-inner" id="book-right"></div>
+      </div>
+
+      <button type="button" id="book-btn-close" class="book-close-ribbon" title="Fermer le carnet" aria-label="Fermer le carnet">
+        <span class="ribbon-fabric"></span>
+        <span class="ribbon-label">Fermer</span>
+      </button>
+
+      <button type="button" id="book-btn-index" class="book-index-tab" title="Index" aria-label="Ouvrir l’index">
+        Index
       </button>
     </div>
-  </header>
-  <div class="book-body">
-    <aside class="book-side">
-      <nav class="book-nav" id="book-nav" aria-label="Modules du carnet"></nav>
-    </aside>
-    <main class="book-main" id="book-main" tabindex="-1"></main>
-    <aside class="book-context hidden" id="book-context" aria-label="Contexte"></aside>
+
+    <div class="book-index-overlay hidden" id="book-index" role="dialog" aria-label="Index du carnet">
+      <div class="book-index-sheet">
+        <header class="book-index-head">
+          <div>
+            <p class="book-stamp">Table des matières</p>
+            <h2>Index</h2>
+            <p class="book-lede">Modules secondaires &amp; outils de terrain</p>
+          </div>
+          <button type="button" id="book-index-close" class="book-ink-btn" aria-label="Fermer l’index">Retour</button>
+        </header>
+        <label class="book-search-wrap">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <input id="book-search" type="search" placeholder="Rechercher dans le carnet…" autocomplete="off" />
+        </label>
+        <div class="book-index-grid" id="book-index-grid"></div>
+      </div>
+    </div>
   </div>
+  <div id="book-main" class="book-compat-main" hidden></div>
+  <div id="book-nav" class="book-compat-nav" hidden></div>
+  <div id="book-context" class="book-compat-context hidden" hidden></div>
+  <h1 id="book-title" class="visually-hidden">CARNET DE SURVIE</h1>
+  <p id="book-sub" class="visually-hidden">Journal technique de terrain</p>
 </div>
+
 <script src="app.js"></script>
 <script src="book.js"></script>
 </body>
