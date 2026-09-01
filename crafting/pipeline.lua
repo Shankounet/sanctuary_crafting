@@ -621,9 +621,44 @@ local function buildRecipeEntry(src, r)
             }
         end
     end
+
+    -- NUI display enrichment (additive; callbacks unchanged)
+    local ingsSrc = (checkIngs and #checkIngs > 0)
+        and (recipeHasSteps(r) and r.steps[1].ingredients or r.ingredients)
+        or (r.ingredients or {})
+    local ingsOut = {}
+    for i = 1, #ingsSrc do
+        local ing = ingsSrc[i]
+        local owned = 0
+        if GetResourceState('ox_inventory') == 'started' then
+            owned = exports.ox_inventory:GetItemCount(src, ing.item) or 0
+        end
+        ingsOut[i] = { item = ing.item, count = ing.count or 1, owned = owned }
+    end
+
+    local skillCategory = nil
+    local playerSkillLevel = nil
+    local hasSpecialization = nil
+    if CraftingSkills and CraftingSkills.LevelCategoryForRecipe then
+        skillCategory = CraftingSkills.LevelCategoryForRecipe(r)
+    elseif r.xp and r.xp.category then
+        skillCategory = r.xp.category
+    end
+    if CraftingSkills and CraftingSkills.IsAvailable and CraftingSkills.IsAvailable() then
+        if skillCategory and CraftingSkills.GetLevel then
+            playerSkillLevel = CraftingSkills.GetLevel(skillCategory, src)
+        end
+        if r.requireSkill and CraftingSkills.HasSkill then
+            hasSpecialization = CraftingSkills.HasSkill(skillCategory, r.requireSkill, src)
+        end
+    elseif lockReason == 'craft_level_required' and lockArgs and lockArgs[2] ~= nil then
+        playerSkillLevel = lockArgs[2]
+    end
+
     return {
         id = r.id, label = r.label, category = r.category, tags = r.tags or {},
-        ingredients = (checkIngs and #checkIngs > 0) and (recipeHasSteps(r) and r.steps[1].ingredients or r.ingredients) or (r.ingredients or {}),
+        description = r.description,
+        ingredients = ingsOut,
         result = r.result, duration = r.duration,
         xp = r.xp, requireLevel = r.requireLevel, requireSkill = r.requireSkill,
         requireBlueprint = r.requireBlueprint or r.blueprintId,
@@ -635,6 +670,9 @@ local function buildRecipeEntry(src, r)
         canCraft = canCraft and hasItems, locked = not canCraft,
         missingItems = not hasItems, lockReason = lockReason, lockArgs = lockArgs,
         mastery = mastery,
+        skillCategory = skillCategory,
+        playerSkillLevel = playerSkillLevel,
+        hasSpecialization = hasSpecialization,
     }
 end
 

@@ -22,6 +22,7 @@
     menuMeta: {},
     sounds: { Enabled: true, Volume: 0.35, Files: {} },
     audioCtx: null,
+    sideTab: 'queue',
   };
 
   function post(name, data = {}) {
@@ -128,6 +129,16 @@
     return humanize(cat);
   }
 
+  function recipeCode(r) {
+    if (!r) return '';
+    const cat = String(r.category || 'GEN').replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || 'GEN';
+    let n = 0;
+    const id = String(r.id || '');
+    for (let i = 0; i < id.length; i++) n = (n * 31 + id.charCodeAt(i)) >>> 0;
+    const num = String((n % 900) + 100);
+    return `${cat}-${num}`;
+  }
+
   function isFavorite(id) {
     return state.favorites.includes(id);
   }
@@ -185,20 +196,21 @@
   };
 
   function lockText(r) {
-    if (!r.locked && r.missingItems) return { text: 'Matériaux manquants', cls: 'bad' };
-    if (!r.locked) return { text: 'Disponible', cls: 'ok' };
+    if (!r.locked && r.missingItems) return { text: 'Matériaux manquants', cls: 'bad', tag: 'MANQUANT' };
+    if (!r.locked) return { text: 'Disponible', cls: 'ok', tag: 'OPÉRATIONNEL' };
     const fn = LOCK_LABELS[r.lockReason];
     const text = fn ? fn(r) : (r.lockReason ? humanize(r.lockReason) : 'Verrouillé');
-    return { text, cls: 'warn' };
+    return { text, cls: 'warn', tag: 'VERROUILLÉ' };
   }
 
-  function disableWhy(r) {
-    if (!r) return 'Sélectionnez une recette';
-    if (state.crafting) return 'Fabrication en cours…';
-    if (r.locked) return lockText(r).text;
-    if (r.missingItems) return 'Matériaux insuffisants pour fabriquer';
-    if (!r.canCraft) return 'Conditions non remplies';
-    return '';
+  function disableReasons(r) {
+    const reasons = [];
+    if (!r) return ['Sélectionnez une recette'];
+    if (state.crafting) reasons.push('Fabrication en cours…');
+    if (r.locked) reasons.push(lockText(r).text);
+    if (r.missingItems) reasons.push('Matériaux insuffisants pour fabriquer');
+    if (!r.canCraft && !r.locked && !r.missingItems) reasons.push('Conditions non remplies');
+    return reasons;
   }
 
   function durationLabel(ms) {
@@ -210,7 +222,7 @@
   }
 
   function qualityHint(r) {
-    if (!state.flags.quality) return '—';
+    if (!state.flags.quality) return null;
     if (r.quality === false) return 'Standard';
     const mastery = r.mastery || 0;
     if (mastery >= 50) return 'Élevée';
@@ -221,6 +233,10 @@
 
   function filteredRecipes() {
     return state.recipes.filter(matchesFilter);
+  }
+
+  function setEmpty(el, show) {
+    if (el) el.classList.toggle('hidden', !show);
   }
 
   function renderCategories() {
@@ -254,6 +270,22 @@
     });
   }
 
+  function ingOwnedRequired(ing, r) {
+    const need = ing.count || 1;
+    const owned = typeof ing.owned === 'number' ? ing.owned : null;
+    if (owned == null) {
+      if (r.canCraft) return { text: `${need}/${need}`, cls: 'ok', mark: '✓' };
+      if (r.missingItems && !r.locked) return { text: `?/${need}`, cls: 'bad', mark: '✕' };
+      return { text: `×${need}`, cls: '', mark: '·' };
+    }
+    const ok = owned >= need;
+    return {
+      text: `${owned}/${need}`,
+      cls: ok ? 'ok' : 'bad',
+      mark: ok ? '✓' : '✕',
+    };
+  }
+
   function renderList() {
     const grid = $('#recipe-grid');
     const empty = $('#recipe-empty');
@@ -262,7 +294,7 @@
     grid.innerHTML = '';
     const list = filteredRecipes();
     if (countEl) countEl.textContent = `${list.length} / ${state.recipes.length}`;
-    if (empty) empty.classList.toggle('hidden', list.length > 0);
+    setEmpty(empty, list.length === 0);
 
     list.forEach((r) => {
       const card = document.createElement('article');
@@ -277,7 +309,8 @@
       const ings = (r.ingredients || []).slice(0, 4);
       const more = (r.ingredients || []).length - ings.length;
       const availCls = r.canCraft ? 'ok' : (r.locked ? 'warn' : 'bad');
-      const availTxt = r.canCraft ? 'Faisable' : (r.locked ? 'Verrouillé' : 'Manquant');
+      const availTxt = r.canCraft ? 'OPÉRATIONNEL' : (r.locked ? 'VERROUILLÉ' : 'MANQUANT');
+      const code = recipeCode(r);
 
       card.innerHTML = `
         <button type="button" class="card-fav${favOn ? ' on' : ''}" data-fav="${escapeHtml(r.id)}" title="Favori" aria-label="Favori">
@@ -291,25 +324,22 @@
           <div class="card-title-wrap">
             <div class="card-title">${escapeHtml(r.label)}</div>
             <div class="card-cat">${escapeHtml(categoryLabel(r.category))}</div>
+            <div class="card-code">${escapeHtml(code)}</div>
           </div>
         </div>
         <div class="card-meta">
           <span class="pill ${availCls}">${availTxt}</span>
           ${r.requireLevel != null ? `<span class="pill">Niv. ${escapeHtml(r.requireLevel)}</span>` : ''}
           <span class="pill"><i class="fa-regular fa-clock"></i> ${escapeHtml(durationLabel(r.duration))}</span>
-          ${state.flags.quality ? `<span class="pill">${escapeHtml(qualityHint(r))}</span>` : ''}
         </div>
         <div class="card-ings">
           ${ings.map((ing) => {
-            const ok = r.canCraft;
-            const bad = r.missingItems && !r.locked;
-            const cls = ok ? 'ok' : (bad ? 'bad' : '');
-            const mark = ok ? '✓' : (bad || r.missingItems ? '✕' : '·');
-            return `<span class="ing-chip ${cls}">${mark} ${escapeHtml(ing.count)}× ${escapeHtml(ing.item)}</span>`;
+            const info = ingOwnedRequired(ing, r);
+            return `<span class="ing-chip ${info.cls}">${info.mark} ${escapeHtml(info.text)} ${escapeHtml(ing.item)}</span>`;
           }).join('')}
           ${more > 0 ? `<span class="ing-chip">+${more}</span>` : ''}
         </div>
-        ${r.locked || r.missingItems ? `<div class="card-lock">${escapeHtml(lock.text)}</div>` : ''}
+        ${(r.locked || r.missingItems) && lock.cls !== 'ok' ? `<div class="card-lock">${escapeHtml(lock.text)}</div>` : ''}
       `;
 
       const img = card.querySelector('.card-img img');
@@ -347,6 +377,11 @@
     return out;
   }
 
+  function toggleRow(el, show) {
+    if (!el) return;
+    el.classList.toggle('hidden', !show);
+  }
+
   function selectRecipe(r) {
     state.selected = r;
     playTick();
@@ -358,6 +393,9 @@
 
     $('#d-title').textContent = r.label;
     $('#d-category').textContent = categoryLabel(r.category);
+    const codeEl = $('#d-code');
+    if (codeEl) codeEl.textContent = recipeCode(r);
+
     const rarityEl = $('#d-rarity');
     if (r.rarity) {
       rarityEl.classList.remove('hidden');
@@ -367,50 +405,129 @@
       rarityEl.textContent = '';
     }
 
-    const desc = r.description || (r.tags && r.tags.length ? r.tags.map(humanize).join(' · ') : '');
-    $('#d-desc').textContent = desc || '';
-    $('#d-desc').style.display = desc ? '' : 'none';
+    const desc = r.description
+      || (r.tags && r.tags.length ? r.tags.map(humanize).join(' · ') : '');
+    const descEl = $('#d-desc');
+    descEl.textContent = desc || '';
+    descEl.style.display = desc ? '' : 'none';
 
     const lock = lockText(r);
     const locksEl = $('#d-locks');
-    locksEl.textContent = lock.text;
-    locksEl.className = `locks ${lock.cls === 'ok' ? 'ok' : (lock.cls === 'bad' ? 'bad' : '')}`;
+    locksEl.textContent = lock.tag || lock.text;
+    locksEl.title = lock.text;
+    locksEl.className = `locks status-tag ${lock.cls}`;
 
-    $('#d-quality').textContent = qualityHint(r);
+    const qh = qualityHint(r);
+    $('#d-quality').textContent = qh || '—';
     const resCount = (r.result && r.result.count) || 1;
     const resItem = (r.result && r.result.item) || '—';
     $('#d-result').textContent = `${resCount}× ${resItem}`;
     $('#d-duration').textContent = durationLabel(r.duration);
     $('#d-qty').textContent = `×${resCount}`;
 
-    // skills
-    const skill = r.xp && r.xp.category ? r.xp.category : (r.requireSkill || null);
-    $('#d-skill').textContent = skill ? humanize(skill) : '—';
-    let lvlTxt = '—';
-    if (r.requireLevel != null) {
-      const cur = r.lockArgs && r.lockReason === 'craft_level_required' ? r.lockArgs[1] : null;
-      lvlTxt = cur != null ? `${cur} / ${r.requireLevel}` : `requis ${r.requireLevel}`;
+    // —— Skill (ml_skills payload only) ——
+    const skillBlock = $('#block-skill');
+    const skillName = r.skillCategory || (r.xp && r.xp.category) || null;
+    const reqLvl = r.requireLevel;
+    let curLvl = typeof r.playerSkillLevel === 'number' ? r.playerSkillLevel : null;
+    if (curLvl == null && r.lockReason === 'craft_level_required' && r.lockArgs && r.lockArgs[1] != null) {
+      curLvl = r.lockArgs[1];
     }
-    $('#d-skill-level').textContent = lvlTxt;
-    $('#d-spec').textContent = r.requireSkill ? humanize(r.requireSkill) : '—';
+    const hasSkillInfo = !!(skillName || reqLvl != null || curLvl != null);
+    toggleRow(skillBlock, hasSkillInfo);
+    if (hasSkillInfo) {
+      $('#d-skill').textContent = skillName ? humanize(skillName) : 'Compétence';
+      if (reqLvl != null && curLvl != null) {
+        $('#d-skill-level').textContent = `${curLvl} / ${reqLvl}`;
+      } else if (reqLvl != null) {
+        $('#d-skill-level').textContent = `requis ${reqLvl}`;
+      } else if (curLvl != null) {
+        $('#d-skill-level').textContent = `niv. ${curLvl}`;
+      } else {
+        $('#d-skill-level').textContent = 'Aucun niveau requis';
+      }
+      const barWrap = $('#d-skill-bar-wrap');
+      const fill = $('#d-skill-fill');
+      const barLabel = $('#d-skill-bar-label');
+      if (reqLvl != null && curLvl != null) {
+        barWrap.classList.remove('hidden');
+        const pct = Math.max(0, Math.min(100, Math.round((curLvl / Math.max(1, reqLvl)) * 100)));
+        fill.style.width = `${pct}%`;
+        if (curLvl >= reqLvl) {
+          barLabel.textContent = 'Niveau requis atteint';
+        } else {
+          barLabel.textContent = `Progression vers niv. ${reqLvl}`;
+        }
+      } else if (curLvl != null) {
+        barWrap.classList.remove('hidden');
+        fill.style.width = `${Math.min(100, (curLvl % 10) * 10)}%`;
+        barLabel.textContent = `Niveau actuel ${curLvl}`;
+      } else {
+        barWrap.classList.add('hidden');
+      }
+    }
 
-    $('#d-station').textContent = r.station ? humanize(r.station) : (state.menuMeta.label || '—');
-    $('#d-station-lvl').textContent = r.stationLevel != null ? String(r.stationLevel) : '—';
+    // —— Specialization ——
+    const specBlock = $('#block-spec');
+    if (r.requireSkill) {
+      specBlock.classList.remove('hidden');
+      $('#d-spec-need').textContent = humanize(r.requireSkill);
+      const yours = $('#d-spec-yours');
+      const has = r.hasSpecialization;
+      if (has === true) {
+        yours.textContent = '✓ Vôtre';
+        yours.className = 'spec-yours ok';
+      } else if (has === false) {
+        yours.textContent = '✕ Manquante';
+        yours.className = 'spec-yours bad';
+      } else if (r.lockReason === 'craft_skill_required') {
+        yours.textContent = '✕ Manquante';
+        yours.className = 'spec-yours bad';
+      } else if (!r.locked) {
+        yours.textContent = '✓ Vôtre';
+        yours.className = 'spec-yours ok';
+      } else {
+        yours.textContent = '—';
+        yours.className = 'spec-yours';
+      }
+    } else {
+      specBlock.classList.add('hidden');
+    }
 
-    // ingredients
+    // —— Station ——
+    const stationBlock = $('#block-station');
+    const stationName = r.station ? humanize(r.station) : (state.menuMeta.label || null);
+    const stationLvl = r.stationLevel;
+    const showStation = !!(stationName || stationLvl != null);
+    toggleRow(stationBlock, showStation);
+    if (showStation) {
+      const rowS = $('#row-station');
+      const rowL = $('#row-station-lvl');
+      if (stationName) {
+        rowS.classList.remove('hidden');
+        $('#d-station').textContent = stationName;
+      } else {
+        rowS.classList.add('hidden');
+      }
+      if (stationLvl != null) {
+        rowL.classList.remove('hidden');
+        $('#d-station-lvl').textContent = String(stationLvl);
+      } else {
+        rowL.classList.add('hidden');
+      }
+    }
+
+    // —— Materials ——
     const ings = $('#d-ings');
     ings.innerHTML = '';
     (r.ingredients || []).forEach((ing) => {
       const li = document.createElement('li');
-      const ok = !!r.canCraft;
-      const bad = !!r.missingItems && !r.locked;
-      const markCls = ok ? 'ok' : (bad ? 'bad' : '');
-      const mark = ok ? '✓' : (r.missingItems ? '✕' : '·');
+      const info = ingOwnedRequired(ing, r);
       li.innerHTML = `
         <img class="ing-thumb" alt="" />
-        <span class="mark ${markCls}">${mark}</span>
-        <span class="iname">${escapeHtml(ing.item)}</span>
-        <span class="icount">×${escapeHtml(ing.count)}</span>
+        <span class="mark ${info.cls}">${info.mark}</span>
+        <span class="iname">${escapeHtml(humanize(ing.item))}</span>
+        <span class="icount ${info.cls}">${escapeHtml(info.text)}</span>
       `;
       bindItemImg(li.querySelector('img'), ing.item, null);
       ings.appendChild(li);
@@ -419,7 +536,7 @@
       ings.innerHTML = '<li><span class="iname muted">Aucun matériau</span></li>';
     }
 
-    // tools
+    // —— Tools ——
     const tools = toolList(r);
     const toolsBlock = $('#block-tools');
     const toolsUl = $('#d-tools');
@@ -433,19 +550,37 @@
         li.innerHTML = `
           <img class="ing-thumb" alt="" />
           <span class="mark">·</span>
-          <span class="iname">${escapeHtml(t.item)}</span>
+          <span class="iname">${escapeHtml(humanize(t.item))}</span>
           <span class="icount">×${escapeHtml(t.count || 1)}</span>
+          <span class="wear-bar" aria-hidden="true"><i></i></span>
         `;
         bindItemImg(li.querySelector('img'), t.item, null);
         toolsUl.appendChild(li);
       });
     }
 
+    // —— Power / noise ——
     const power = r.powerCost;
     const noise = r.noiseLevel;
-    $('#d-power').textContent = power != null ? String(power) : '—';
-    $('#d-noise').textContent = noise != null ? String(noise) : '—';
+    const pnBlock = $('#block-power-noise');
+    const hasPower = power != null;
+    const hasNoise = noise != null;
+    toggleRow(pnBlock, hasPower || hasNoise);
+    if (hasPower || hasNoise) {
+      toggleRow($('#power-wrap'), hasPower);
+      toggleRow($('#noise-wrap'), hasNoise);
+      if (hasPower) {
+        $('#d-power').textContent = String(power);
+        const bar = $('#d-power-bar');
+        if (bar) {
+          const pct = Math.max(8, Math.min(100, Number(power) * 10));
+          bar.style.width = `${pct}%`;
+        }
+      }
+      if (hasNoise) $('#d-noise').textContent = String(noise);
+    }
 
+    // —— Blueprint ——
     const bp = r.requireBlueprint;
     const bpBlock = $('#block-bp');
     if (bp) {
@@ -457,19 +592,41 @@
       bpBlock.classList.add('hidden');
     }
 
-    $('#d-xp').textContent = r.xp ? `+${r.xp.amount} (${humanize(r.xp.category)})` : '—';
-    $('#d-mastery').textContent = state.flags.mastery ? String(r.mastery || 0) : '—';
-    $('#block-xp').classList.toggle('hidden', !r.xp && !state.flags.mastery);
+    // —— XP / mastery ——
+    const xpBlock = $('#block-xp');
+    const hasXp = !!r.xp;
+    const hasMastery = !!state.flags.mastery;
+    toggleRow(xpBlock, hasXp || hasMastery);
+    if (hasXp || hasMastery) {
+      const rowXp = $('#row-xp');
+      const rowMa = $('#row-mastery');
+      if (hasXp) {
+        rowXp.classList.remove('hidden');
+        $('#d-xp').textContent = `+${r.xp.amount} (${humanize(r.xp.category)})`;
+      } else {
+        rowXp.classList.add('hidden');
+      }
+      if (hasMastery) {
+        rowMa.classList.remove('hidden');
+        $('#d-mastery').textContent = String(r.mastery || 0);
+      } else {
+        rowMa.classList.add('hidden');
+      }
+    }
 
+    // —— FABRIQUER ——
     const can = !!r.canCraft && !state.crafting;
-    $('#btn-craft').disabled = !can;
-    const why = disableWhy(r);
+    const craftBtn = $('#btn-craft');
+    craftBtn.disabled = !can;
+    const reasons = disableReasons(r);
     const whyEl = $('#craft-why');
-    if (!can && why) {
-      whyEl.textContent = why;
+    if (!can && reasons.length) {
+      whyEl.textContent = reasons[0];
       whyEl.classList.remove('hidden');
+      craftBtn.title = reasons.length > 1 ? reasons.join(' · ') : reasons[0];
     } else {
       whyEl.classList.add('hidden');
+      craftBtn.title = can ? 'Lancer la fabrication' : '';
     }
 
     $('#batch-wrap').classList.toggle('hidden', !state.flags.batch);
@@ -581,13 +738,23 @@
     $('#stat-level').textContent = String(lvl);
 
     const stateEl = $('#stat-state');
+    const gaugeState = $('#gauge-state');
+    let statePct = 72;
     if (data.condition != null || data.etat != null) {
-      stateEl.textContent = String(data.condition || data.etat);
+      const raw = data.condition != null ? data.condition : data.etat;
+      stateEl.textContent = String(raw);
       stateEl.className = 'stat-v';
+      const n = Number(raw);
+      if (!Number.isNaN(n)) {
+        statePct = Math.max(5, Math.min(100, n > 1 ? n : n * 100));
+        stateEl.className = `stat-v ${statePct >= 60 ? 'ok' : (statePct >= 30 ? 'warn' : 'bad')}`;
+      }
     } else {
       stateEl.textContent = powered ? 'Opérationnel' : 'Hors tension';
       stateEl.className = `stat-v ${powered ? 'ok' : 'bad'}`;
+      statePct = powered ? 88 : 12;
     }
+    if (gaugeState) gaugeState.style.width = `${statePct}%`;
 
     const mods = data.modules || {};
     const modCount = Array.isArray(mods) ? mods.length : Object.keys(mods).length;
@@ -595,13 +762,28 @@
     $('#stat-eff').textContent = typeof eff === 'number' ? `${eff}%` : String(eff);
 
     const energyWrap = $('#stat-energy-wrap');
+    const led = $('#led-power');
+    const gaugeEnergy = $('#gauge-energy');
     if (data.energy != null || data.power != null) {
       energyWrap.classList.remove('hidden');
-      $('#stat-energy').textContent = String(data.energy != null ? data.energy : data.power);
+      const val = data.energy != null ? data.energy : data.power;
+      $('#stat-energy').textContent = String(val);
+      const n = Number(val);
+      const pct = !Number.isNaN(n) ? Math.max(5, Math.min(100, n > 1 ? n : n * 100)) : (powered ? 80 : 10);
+      if (gaugeEnergy) gaugeEnergy.style.width = `${pct}%`;
+      if (led) {
+        led.classList.toggle('on', powered);
+        led.classList.toggle('off', !powered);
+      }
     } else if (data.powered != null) {
       energyWrap.classList.remove('hidden');
       $('#stat-energy').textContent = data.powered ? 'OK' : 'Off';
       $('#stat-energy').className = `stat-v ${data.powered ? 'ok' : 'bad'}`;
+      if (gaugeEnergy) gaugeEnergy.style.width = data.powered ? '90%' : '8%';
+      if (led) {
+        led.classList.toggle('on', !!data.powered);
+        led.classList.toggle('off', !data.powered);
+      }
     } else {
       energyWrap.classList.add('hidden');
     }
@@ -628,7 +810,7 @@
     if (!track) return;
     track.innerHTML = '';
     const has = state.queue && state.queue.length > 0;
-    if (empty) empty.classList.toggle('hidden', has);
+    setEmpty(empty, !has);
     (state.queue || []).forEach((e) => {
       const now = Math.floor(Date.now() / 1000);
       const finishAt = e.finishAt || 0;
@@ -665,13 +847,13 @@
     if (!ul) return;
     ul.innerHTML = '';
     const entries = Object.entries(state.shop || {});
-    if (empty) empty.classList.toggle('hidden', entries.length > 0);
+    setEmpty(empty, entries.length === 0);
     entries.forEach(([item, count]) => {
       const li = document.createElement('li');
       li.innerHTML = `
         <img class="ing-thumb" alt="" />
-        <span>${escapeHtml(item)}</span>
-        <span>×${escapeHtml(count)}</span>
+        <span>${escapeHtml(humanize(item))}</span>
+        <span class="icount">×${escapeHtml(count)}</span>
         <button type="button" class="pin" title="Épingler au carnet" data-pin-item="${escapeHtml(item)}">
           <i class="fa-solid fa-thumbtack"></i>
         </button>
@@ -680,7 +862,6 @@
       const pin = li.querySelector('[data-pin-item]');
       if (pin) {
         pin.addEventListener('click', () => {
-          // reuse existing book pin callback when a recipe is selected; otherwise notify
           if (state.selected) {
             post('bookPinRecipe', { recipeId: state.selected }).then((r) => {
               post('notify', { type: r && r.ok ? 'success' : 'error', reason: r && r.ok ? 'book_pinned' : (r && r.reason) || 'craft_failed' });
@@ -697,7 +878,7 @@
     if (!node) return '';
     if (node.type === 'raw') {
       return `<div class="tree-node raw" style="margin-left:${depth * 4}px">
-        <div class="t-label">${escapeHtml(node.item)} ×${escapeHtml(node.count)}</div>
+        <div class="t-label">${escapeHtml(humanize(node.item))} ×${escapeHtml(node.count)}</div>
         <div class="t-sub">Ressource brute</div>
       </div>`;
     }
@@ -706,7 +887,7 @@
     const result = node.result && node.result.item ? `${node.result.item}` : '';
     let html = `<div class="tree-node" data-tree-id="${escapeHtml(rid)}" style="margin-left:${depth * 4}px">
       <div class="t-label">${escapeHtml(label)}</div>
-      <div class="t-sub">${result ? '→ ' + escapeHtml(result) : 'Étape de craft'}</div>
+      <div class="t-sub">${result ? '→ ' + escapeHtml(humanize(result)) : 'Étape de craft'}</div>
     </div>`;
     const kids = node.children || [];
     if (kids.length) {
@@ -719,7 +900,7 @@
     const view = $('#tree-view');
     if (!view) return;
     if (!tree) {
-      view.innerHTML = `<div class="empty-state compact"><i class="fa-solid fa-diagram-project"></i><p>Arbre indisponible</p></div>`;
+      view.innerHTML = `<div class="empty-state compact"><i class="fa-solid fa-diagram-project"></i><p>Arbre indisponible</p><span class="empty-hint">Plan technique non disponible pour cette recette</span></div>`;
       return;
     }
     view.innerHTML = renderTreeNode(tree);
@@ -734,6 +915,8 @@
   }
 
   function openTab(name) {
+    state.sideTab = name;
+    if (app) app.dataset.side = name || '';
     $$('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
     ['queue', 'tree', 'shop'].forEach((t) => {
       const el = $(`#tab-${t}`);
@@ -827,6 +1010,7 @@
       app.classList.remove('hidden');
       applyMenu(msg.data || {});
       loadQueue();
+      openTab(state.sideTab || 'queue');
       if (msg.data && msg.data.ui && msg.data.ui.Accent) {
         document.documentElement.style.setProperty('--accent', msg.data.ui.Accent);
       }
