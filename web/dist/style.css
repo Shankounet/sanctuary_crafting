@@ -3806,3 +3806,256 @@ button, input { font: inherit; color: inherit; }
   border-color: #9a8866 !important;
   color: #9a8866 !important;
 }
+
+
+/* ============================================================
+   v2.2.24 — Rarity visual language (post-apo, desaturated, premium)
+   COMMON steel · UNCOMMON olive · RARE blue-steel · EPIC prune · LEGENDARY tarnished brass
+   ============================================================ */
+
+/* Neutralize old flat rarity-plate look */
+#app .rarity-plate,
+#app .badge.soft.rarity-plate {
+  filter: none !important;
+  opacity: 1 !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 6px;
+  font-size: 0.58rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 0;
+  clip-path: polygon(0 2px, 2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+#app .rarity-plate .rarity-ico {
+  font-size: 0.55rem;
+  opacity: 0.9;
+}
+#app .rarity-plate .rarity-txt { line-height: 1; }
+
+/* —— COMMON / COMMUN : warm steel —— */
+#app .rarity-plate.rarity-common {
+  color: #c4c0b6;
+  background:
+    linear-gradient(180deg, #2c2c2a 0%, #232320 100%);
+  border: 1px solid #4a4842;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 0 -1px 0 rgba(0,0,0,0.35);
+}
+#app .rarity-plate.rarity-common .rarity-ico { color: #9a968c; }
+
+/* —— UNCOMMON : olive / kaki —— */
+#app .rarity-plate.rarity-uncommon {
+  color: #b7c4a4;
+  background:
+    linear-gradient(180deg, #2a3026 0%, #22281f 100%);
+  border: 1px solid #4a5840;
+  box-shadow:
+    inset 0 1px 0 rgba(180,200,150,0.08),
+    inset 3px 0 0 #6a7658;
+}
+#app .rarity-plate.rarity-uncommon .rarity-ico { color: #7a8a62; }
+
+/* —— RARE : blue-steel —— */
+#app .rarity-plate.rarity-rare {
+  color: #a8b8c8;
+  background:
+    linear-gradient(180deg, #262c34 0%, #1e242c 100%);
+  border: 1px solid #3e4e5e;
+  box-shadow:
+    inset 0 1px 0 rgba(160,190,220,0.1),
+    inset 3px 0 0 #5a7088,
+    0 0 0 1px rgba(70,90,110,0.25);
+}
+#app .rarity-plate.rarity-rare .rarity-ico { color: #6a849c; }
+
+/* —— EPIC : prune / violet grisé —— */
+#app .rarity-plate.rarity-epic {
+  color: #c4b0c8;
+  background:
+    linear-gradient(180deg, #2c2630 0%, #241e28 55%, #1e1a22 100%);
+  border: 1px solid #5a4860;
+  box-shadow:
+    inset 0 1px 0 rgba(200,170,210,0.1),
+    inset 3px 0 0 #7a5a82,
+    inset 0 0 12px rgba(90,60,100,0.18);
+  letter-spacing: 0.12em;
+}
+#app .rarity-plate.rarity-epic .rarity-ico { color: #9a7aa0; }
+
+/* —— LEGENDARY : tarnished brass / amber —— */
+#app .rarity-plate.rarity-legendary {
+  color: #e0d0a8;
+  background:
+    linear-gradient(180deg, #3a3224 0%, #2a2418 45%, #221e14 100%);
+  border: 1px solid #9a8866;
+  box-shadow:
+    inset 0 1px 0 rgba(255,230,180,0.14),
+    inset 3px 0 0 #c4ae86,
+    inset 0 -1px 0 rgba(0,0,0,0.4),
+    0 1px 0 rgba(154,136,102,0.25);
+  letter-spacing: 0.14em;
+  font-weight: 800;
+}
+#app .rarity-plate.rarity-legendary .rarity-ico { color: #9a8866; }
+
+/* Card corner rarity mark (discrete) */
+#app .card-rarity-mark {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  z-index: 4;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  font-size: 0.48rem;
+  clip-path: polygon(0 2px, 2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px));
+  border: 1px solid transparent;
+  background: #242424;
+  color: #9a9a9a;
+  pointer-events: none;
+}
+#app .card-rarity-mark.rarity-common {
+  color: #b0aca2; border-color: #4a4842; background: #2a2a28;
+}
+#app .card-rarity-mark.rarity-uncommon {
+  color: #a8b890; border-color: #4a5840; background: #262c22;
+}
+#app .card-rarity-mark.rarity-rare {
+  color: #9ab0c4; border-color: #3e4e5e; background: #222830;
+}
+#app .card-rarity-mark.rarity-epic {
+  color: #b89ec0; border-color: #5a4860; background: #282430;
+}
+#app .card-rarity-mark.rarity-legendary {
+  color: #d4c090; border-color: #9a8866; background: #2e281c;
+  box-shadow: inset 0 0 0 1px rgba(154,136,102,0.25);
+}
+
+/* Card media / selected — subtle rarity presence (not full recolor) */
+#app .recipe-card.rarity-common .card-img-zone {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    inset 0 -10px 16px rgba(0,0,0,0.28),
+    inset 0 0 0 1px rgba(74,72,66,0.35);
+}
+#app .recipe-card.rarity-uncommon .card-img-zone {
+  box-shadow:
+    inset 0 1px 0 rgba(180,200,150,0.06),
+    inset 0 -10px 16px rgba(0,0,0,0.28),
+    inset 0 0 0 1px rgba(74,88,64,0.45);
+}
+#app .recipe-card.rarity-rare {
+  border-color: rgba(62,78,94,0.85);
+}
+#app .recipe-card.rarity-rare .card-img-zone {
+  box-shadow:
+    inset 0 1px 0 rgba(160,190,220,0.08),
+    inset 0 -10px 16px rgba(0,0,0,0.28),
+    inset 0 0 0 1px rgba(62,78,94,0.55);
+}
+#app .recipe-card.rarity-rare .card-img-zone::after {
+  content: "";
+  position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: #5a7088;
+  opacity: 0.75;
+  pointer-events: none;
+}
+#app .recipe-card.rarity-epic {
+  border-color: rgba(90,72,96,0.9);
+}
+#app .recipe-card.rarity-epic .card-img-zone {
+  box-shadow:
+    inset 0 1px 0 rgba(200,170,210,0.08),
+    inset 0 -10px 16px rgba(0,0,0,0.3),
+    inset 0 0 0 1px rgba(90,72,96,0.55);
+}
+#app .recipe-card.rarity-epic .card-img-zone::after {
+  content: "";
+  position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: linear-gradient(180deg, #9a7aa0, #5a4060);
+  opacity: 0.85;
+  pointer-events: none;
+}
+#app .recipe-card.rarity-legendary {
+  border-color: rgba(154,136,102,0.65);
+}
+#app .recipe-card.rarity-legendary .card-img-zone {
+  box-shadow:
+    inset 0 1px 0 rgba(255,230,180,0.1),
+    inset 0 -10px 16px rgba(0,0,0,0.28),
+    inset 0 0 0 1px rgba(154,136,102,0.45);
+}
+#app .recipe-card.rarity-legendary .card-img-zone::after {
+  content: "";
+  position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: linear-gradient(180deg, #c4ae86, #9a8866 55%, #6e6048);
+  opacity: 0.95;
+  pointer-events: none;
+}
+#app .recipe-card.rarity-legendary.selected {
+  box-shadow:
+    inset 0 1px 0 rgba(255,230,180,0.08),
+    0 0 0 1px rgba(154,136,102,0.35),
+    0 10px 22px rgba(0,0,0,0.4);
+}
+
+/* Fiche hero — subtle rarity tint on identity zone */
+#app .fiche-hero.rarity-common {
+  border-color: #4a4842;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 0 0 40px rgba(0,0,0,0.18),
+    inset 3px 0 0 #6a6860;
+}
+#app .fiche-hero.rarity-uncommon {
+  border-color: #4a5840;
+  background:
+    linear-gradient(145deg, #282c24 0%, #222222 50%, #1e1e1e 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(180,200,150,0.06),
+    inset 0 0 40px rgba(0,0,0,0.18),
+    inset 3px 0 0 #6a7658;
+}
+#app .fiche-hero.rarity-rare {
+  border-color: #3e4e5e;
+  background:
+    linear-gradient(145deg, #262c34 0%, #22262c 45%, #1e1e1e 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(160,190,220,0.08),
+    inset 0 0 40px rgba(0,0,0,0.18),
+    inset 3px 0 0 #5a7088;
+}
+#app .fiche-hero.rarity-rare::before {
+  background: linear-gradient(90deg, rgba(90,112,136,0.55), transparent 70%);
+}
+#app .fiche-hero.rarity-epic {
+  border-color: #5a4860;
+  background:
+    linear-gradient(145deg, #2c2630 0%, #242028 45%, #1e1a22 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(200,170,210,0.08),
+    inset 0 0 40px rgba(40,20,50,0.2),
+    inset 3px 0 0 #7a5a82;
+}
+#app .fiche-hero.rarity-epic::before {
+  background: linear-gradient(90deg, rgba(122,90,130,0.55), transparent 70%);
+}
+#app .fiche-hero.rarity-legendary {
+  border-color: #9a8866;
+  background:
+    linear-gradient(145deg, #322c22 0%, #262218 40%, #1e1c18 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,230,180,0.1),
+    inset 0 0 40px rgba(0,0,0,0.22),
+    inset 3px 0 0 #9a8866;
+}
+#app .fiche-hero.rarity-legendary::before {
+  background: linear-gradient(90deg, rgba(154,136,102,0.7), transparent 72%);
+  opacity: 0.9;
+}

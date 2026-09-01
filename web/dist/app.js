@@ -268,6 +268,42 @@
     img.alt = item || '';
   }
 
+
+  const RARITY_NORM = {
+    common: 'common', commun: 'common', normale: 'common', normal: 'common', standard: 'common',
+    uncommon: 'uncommon', 'peu-commun': 'uncommon', peucommun: 'uncommon', 'peu_commun': 'uncommon',
+    rare: 'rare',
+    epic: 'epic', epique: 'epic', épique: 'epic',
+    legendary: 'legendary', legendaire: 'legendary', légendaire: 'legendary', mythic: 'legendary', mythique: 'legendary',
+  };
+  const RARITY_LABEL = {
+    common: 'COMMUN',
+    uncommon: 'PEU COMMUN',
+    rare: 'RARE',
+    epic: 'ÉPIQUE',
+    legendary: 'LÉGENDAIRE',
+  };
+  const RARITY_ICON = {
+    common: 'fa-circle',
+    uncommon: 'fa-leaf',
+    rare: 'fa-gem',
+    epic: 'fa-crown',
+    legendary: 'fa-star',
+  };
+
+  function rarityKey(raw) {
+    if (!raw) return '';
+    const k = String(raw).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    if (RARITY_NORM[k]) return RARITY_NORM[k];
+    if (RARITY_NORM[k.replace(/-/g, '')]) return RARITY_NORM[k.replace(/-/g, '')];
+    return k;
+  }
+
+  function rarityLabel(raw) {
+    const k = rarityKey(raw);
+    return RARITY_LABEL[k] || String(humanize(raw) || raw).toUpperCase();
+  }
+
   function humanize(id) {
     if (!id) return '—';
     return String(id).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -498,8 +534,11 @@
       const status = cardStatus(r);
       card.classList.add(`state-${status.cls || 'bad'}`);
       if (r.rarity) {
-        const rk = String(r.rarity).toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        if (rk) card.classList.add(`rarity-${rk}`);
+        const rk = rarityKey(r.rarity);
+        if (rk) {
+          card.classList.add(`rarity-${rk}`);
+          card.dataset.rarity = rk;
+        }
       }
       if (r.category) {
         const ck = String(r.category).toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -529,6 +568,7 @@
           <span class="ph" aria-hidden="true"><i class="fa-solid fa-cube"></i></span>
           <img alt="" />
           ${nouveauHtml}
+          ${r.rarity ? `<span class="card-rarity-mark rarity-${rarityKey(r.rarity)}" title="${escapeHtml(rarityLabel(r.rarity))}"><i class="fa-solid ${RARITY_ICON[rarityKey(r.rarity)] || 'fa-circle'}" aria-hidden="true"></i></span>` : ''}
           <span class="card-state-badge ${status.cls}" title="${escapeHtml(tip)}">${status.text}</span>
         </div>
         <div class="card-body">
@@ -605,11 +645,33 @@
     if (codeEl) codeEl.textContent = recipeCode(r);
 
     const rarityEl = $('#d-rarity');
-    if (r.rarity) {
+    const fiche = $('#detail');
+    const hero = fiche && fiche.querySelector('.fiche-hero');
+    // clear previous rarity classes
+    if (rarityEl) {
+      rarityEl.className = 'badge soft rarity-plate hidden';
+    }
+    if (fiche) {
+      [...fiche.classList].filter((c) => c.startsWith('rarity-')).forEach((c) => fiche.classList.remove(c));
+      delete fiche.dataset.rarity;
+    }
+    if (hero) {
+      [...hero.classList].filter((c) => c.startsWith('rarity-')).forEach((c) => hero.classList.remove(c));
+    }
+    if (r.rarity && rarityEl) {
+      const rk = rarityKey(r.rarity);
       rarityEl.classList.remove('hidden');
-      rarityEl.textContent = humanize(r.rarity);
-    } else {
+      rarityEl.classList.add(`rarity-${rk}`);
+      rarityEl.dataset.rarity = rk;
+      rarityEl.innerHTML = `<i class="fa-solid ${RARITY_ICON[rk] || 'fa-circle'} rarity-ico" aria-hidden="true"></i><span class="rarity-txt">${escapeHtml(rarityLabel(r.rarity))}</span>`;
+      if (fiche) {
+        fiche.classList.add(`rarity-${rk}`);
+        fiche.dataset.rarity = rk;
+      }
+      if (hero) hero.classList.add(`rarity-${rk}`);
+    } else if (rarityEl) {
       rarityEl.classList.add('hidden');
+      rarityEl.innerHTML = '';
       rarityEl.textContent = '';
     }
 
