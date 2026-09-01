@@ -173,7 +173,10 @@ RegisterNUICallback('bookPinRecipe', function(data, cb)
 end)
 
 RegisterNUICallback('bookObjectiveRecipe', function(data, cb)
-    local r = lib.callback.await('sanctuary_crafting:book:action', false, 'addObjectiveRecipe', { recipeId = data.recipeId })
+    local r = lib.callback.await('sanctuary_crafting:book:action', false, 'addObjectiveRecipe', {
+        recipeId = data.recipeId,
+        withMissing = data.withMissing,
+    })
     cb(r or { ok = false })
 end)
 

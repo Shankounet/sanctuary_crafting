@@ -593,8 +593,353 @@ AddEventHandler('playerDropped', function()
     Validation.ClearPlayer(src)
 end)
 
+
 -- Menu / NUI data
-local function buildRecipeEntry(src, r)
+local function itemLabelOf(item)
+    if not item then return nil end
+    local ok, data = pcall(function()
+        return exports.ox_inventory:Items(item)
+    end)
+    if ok and type(data) == 'table' and data.label then
+        return data.label
+    end
+    return item
+end
+
+local BP_TIER_LABEL = {
+    military = 'PLAN MILITAIRE',
+    industriel = 'PLAN INDUSTRIEL',
+    industrial = 'PLAN INDUSTRIEL',
+    medical = 'PLAN MÉDICAL',
+    experimental = 'PLAN EXPÉRIMENTAL',
+    expérimental = 'PLAN EXPÉRIMENTAL',
+}
+
+local function blueprintMetaOf(r)
+    local meta = type(r.blueprintMeta) == 'table' and r.blueprintMeta or {}
+    local tier = meta.tier or meta.type or r.blueprintTier or r.blueprintType
+    if type(tier) == 'string' then
+        tier = tier:lower()
+    else
+        tier = nil
+    end
+    local label = meta.label or (tier and BP_TIER_LABEL[tier]) or nil
+    if not tier and not label and not next(meta) then
+        return nil
+    end
+    return {
+        tier = tier,
+        type = tier,
+        label = label,
+    }
+end
+
+local function resolveKnowledge(src, r, mastery, hasBp, lockReason)
+    local kn = Config.Knowledge
+    if not kn or kn.Enabled == false or kn.States == false then
+        return nil, nil
+    end
+    local threshold = (Config.Mastery and (Config.Mastery.MasteredThreshold or Config.Mastery.MaxMastery)) or 100
+    local bpId = r.requireBlueprint or r.blueprintId
+    local source = r.knowledgeSource
+    if type(source) ~= 'string' or source == '' then
+        if bpId and hasBp then
+            source = 'blueprint'
+        elseif r.trainerId or r.knowledgeFrom == 'trainer' then
+            source = 'trainer'
+        else
+            source = bpId and nil or 'default'
+        end
+    end
+
+    local state
+    if Config.Mastery and Config.Mastery.Enabled and mastery >= threshold then
+        state = 'mastered'
+    elseif r.partialKnowledge == true then
+        state = 'partial'
+    elseif type(r.maskedIngredients) == 'table' and #r.maskedIngredients > 0 then
+        state = 'partial'
+    elseif bpId and not hasBp then
+        state = 'unknown'
+    elseif bpId and hasBp and (mastery or 0) <= 0 then
+        state = 'blueprint'
+    elseif lockReason == 'craft_blueprint_required' then
+        state = 'unknown'
+    else
+        state = 'learned'
+    end
+
+    -- Book-masked ingredients → partial (only when Book resources enabled)
+    if state == 'learned' or state == 'blueprint' then
+        if SurvivalBook and SurvivalBook.HasDiscoveredResource and BookDB and BookDB.Mod
+            and (BookDB.Mod('Resources') or BookDB.Mod('Discoveries')) then
+            local ings = r.ingredients or {}
+            local anyKnown, anyUnknown = false, false
+            for i = 1, #ings do
+                local it = ings[i] and ings[i].item
+                if it then
+                    if SurvivalBook.HasDiscoveredResource(src, it) then
+                        anyKnown = true
+                    else
+                        anyUnknown = true
+                    end
+                end
+            end
+            -- Only treat as partial when discoveries exist for this player and some mats are veiled
+            if anyKnown and anyUnknown and (r.partialKnowledge == true or r.knowledgePartial == true) then
+                state = 'partial'
+            end
+        end
+    end
+
+    return state, source
+end
+
+local function findProducerRecipe(item)
+    if not item or not Config.RecipeById then return nil end
+    for id, rr in pairs(Config.RecipeById) do
+        if rr.result and rr.result.item == item and not rr.dismantle then
+            return rr
+        end
+    end
+    return nil
+end
+
+local function findDismantleSources(src, item)
+    if not item then return {} end
+    if not Config.Dismantling or not Config.Dismantling.Enabled then return {} end
+    local bookOn = SurvivalBook and SurvivalBook.HasDiscoveredResource
+        and BookDB and BookDB.Mod and (BookDB.Mod('Resources') or BookDB.Mod('Discoveries'))
+    local out = {}
+    for _, rr in pairs(Config.RecipeById or {}) do
+        if rr.dismantle == true then
+            local yields = rr.dismantleYields or rr.yields or rr.result
+            local list = {}
+            if type(yields) == 'table' then
+                if yields.item then
+                    list[1] = yields
+                else
+                    for i = 1, #yields do list[#list + 1] = yields[i] end
+                    if #list == 0 then
+                        for _, v in pairs(yields) do
+                            if type(v) == 'table' and v.item then list[#list + 1] = v end
+                        end
+                    end
+                end
+            end
+            -- also: dismantle recipes often consume an item and yield ingredients;
+            -- reverse map: recipes that list this item as a yield/byproduct
+            local hit = false
+            for i = 1, #list do
+                if list[i].item == item then hit = true break end
+            end
+            if not hit and rr.result and rr.result.item == item then hit = true end
+            if hit then
+                local sourceItem = (rr.ingredients and rr.ingredients[1] and rr.ingredients[1].item) or rr.id
+                if bookOn then
+                    if SurvivalBook.HasDiscoveredResource(src, sourceItem)
+                        or SurvivalBook.HasDiscoveredResource(src, item) then
+                        out[#out + 1] = { recipeId = rr.id, label = rr.label, item = sourceItem }
+                    end
+                end
+            end
+        end
+    end
+    -- Reverse: normal recipes whose ingredients include item and that have dismantleYields pointing back
+    for _, rr in pairs(Config.RecipeById or {}) do
+        local dy = rr.dismantleYields
+        if type(dy) == 'table' then
+            for i = 1, #dy do
+                if dy[i] and dy[i].item == item then
+                    local srcItem = rr.result and rr.result.item
+                    if srcItem and bookOn and SurvivalBook.HasDiscoveredResource(src, srcItem) then
+                        out[#out + 1] = { recipeId = rr.id, label = rr.label, item = srcItem }
+                    end
+                end
+            end
+        end
+    end
+    return out
+end
+
+local function buildPathHints(src, r, entry, artisans)
+    local ux = (Config.UI and Config.UI.Ux) or {}
+    if ux.PathHints == false then return {}, false end
+    local hints = {}
+    local more = false
+
+    local function push(h)
+        if #hints >= 3 then
+            more = true
+            return false
+        end
+        hints[#hints + 1] = h
+        return true
+    end
+
+    -- missing materials
+    local ings = entry.ingredients or {}
+    for i = 1, #ings do
+        local ing = ings[i]
+        local need = ing.count or 1
+        local owned = ing.owned or 0
+        if owned < need then
+            local deficit = need - owned
+            if not push({
+                kind = 'missing',
+                title = 'MATÉRIAU MANQUANT',
+                detail = string.format('%s · %d manquant(s) (%d/%d)', ing.label or ing.item, deficit, owned, need),
+                priority = 10 + i,
+            }) then break end
+            -- craftable component
+            local prod = findProducerRecipe(ing.item)
+            if prod then
+                -- only if player would "know" it: no missing bp, or has bp
+                local prodBp = prod.requireBlueprint or prod.blueprintId
+                local known = true
+                if prodBp and Config.Blueprints and Config.Blueprints.Enabled and Blueprints then
+                    known = Blueprints.Has(src, prodBp)
+                end
+                if known then
+                    if not push({
+                        kind = 'craft',
+                        title = 'FABRIQUER LE COMPOSANT',
+                        detail = prod.label or prod.id,
+                        recipeId = prod.id,
+                        priority = 20,
+                    }) then break end
+                end
+            end
+            -- dismantle recovery (discovered only)
+            local sources = findDismantleSources(src, ing.item)
+            if sources[1] then
+                if not push({
+                    kind = 'dismantle',
+                    title = 'RÉCUPÉRATION CONNUE',
+                    detail = string.format('Via %s', sources[1].label or sources[1].item),
+                    recipeId = sources[1].recipeId,
+                    priority = 25,
+                }) then break end
+            end
+        end
+    end
+
+    -- skill progression
+    if entry.lockReason == 'craft_level_required' and entry.levelGap and entry.levelGap > 0 then
+        push({
+            kind = 'skill',
+            title = 'PROGRESSION',
+            detail = string.format('%d niveau(x) restant(s)', entry.levelGap),
+            priority = 30,
+        })
+    end
+
+    -- blueprint missing
+    local bpId = entry.requireBlueprint or r.blueprintId
+    if bpId and entry.lockReason == 'craft_blueprint_required' then
+        local detail = 'Plan technique requis'
+        -- discovered hint only if book knows the blueprint item/resource
+        if SurvivalBook and SurvivalBook.HasDiscoveredResource and SurvivalBook.HasDiscoveredResource(src, bpId) then
+            detail = string.format('Plan requis · indice connu : %s', itemLabelOf(bpId) or bpId)
+        end
+        push({
+            kind = 'blueprint',
+            title = 'PLAN REQUIS',
+            detail = detail,
+            priority = 5,
+        })
+    end
+
+    -- artisan potential (specialty match) — do not claim they know the recipe
+    if artisans and #artisans > 0 then
+        local spec = r.requireSkill or r.requireSkillCategory or r.category or r.station
+        if spec then
+            local specL = tostring(spec):lower()
+            for i = 1, #artisans do
+                local a = artisans[i]
+                local as = a.specialty and tostring(a.specialty):lower() or ''
+                if as ~= '' and (as == specL or specL:find(as, 1, true) or as:find(specL, 1, true)) then
+                    push({
+                        kind = 'artisan',
+                        title = 'CONTACT POTENTIEL',
+                        detail = a.displayName or a.name or a.contactId,
+                        artisanId = a.contactId or a.id,
+                        priority = 40,
+                    })
+                    break
+                end
+            end
+        end
+    end
+
+    table.sort(hints, function(a, b) return (a.priority or 99) < (b.priority or 99) end)
+    while #hints > 3 do
+        more = true
+        hints[#hints] = nil
+    end
+    return hints, more
+end
+
+local function buildArtisanHints(src, r, artisans, orders)
+    local ux = (Config.UI and Config.UI.Ux) or {}
+    if ux.ArtisanHints == false then
+        return { potential = {}, confirmed = {} }
+    end
+    if not artisans then artisans = {} end
+    local potential, confirmed = {}, {}
+    local spec = r.requireSkill or r.requireSkillCategory or r.category or r.station
+    local specL = spec and tostring(spec):lower() or nil
+    local recipeId = r.id
+
+    -- confirmed: orders linking artisan contact to this recipe, or artisan meta.services
+    orders = orders or {}
+    local confirmedIds = {}
+    for i = 1, #orders do
+        local o = orders[i]
+        if o.recipeId == recipeId and o.targetContact then
+            confirmedIds[o.targetContact] = o.note or 'Commande liée'
+        end
+    end
+
+    for i = 1, #artisans do
+        local a = artisans[i]
+        local id = a.contactId or a.id
+        local name = a.displayName or a.name or id
+        local specialty = a.specialty
+        local meta = a.meta or {}
+        -- explicit service/knowledge link only
+        local serviceLabel = nil
+        if confirmedIds[id] then
+            serviceLabel = confirmedIds[id]
+        elseif type(meta.services) == 'table' then
+            for _, svc in ipairs(meta.services) do
+                if type(svc) == 'table' and (svc.recipeId == recipeId or svc.recipe == recipeId) then
+                    serviceLabel = svc.label or svc.serviceLabel or 'Service lié'
+                    break
+                elseif svc == recipeId then
+                    serviceLabel = 'Service lié'
+                    break
+                end
+            end
+        elseif meta.recipeId == recipeId or meta.knownRecipe == recipeId then
+            serviceLabel = meta.serviceLabel or 'Connaissance notée'
+        end
+        if serviceLabel then
+            confirmed[#confirmed + 1] = {
+                id = id, name = name, specialty = specialty, serviceLabel = serviceLabel,
+            }
+        elseif specL and specialty then
+            local as = tostring(specialty):lower()
+            if as == specL or specL:find(as, 1, true) or as:find(specL, 1, true) then
+                potential[#potential + 1] = { id = id, name = name, specialty = specialty }
+            end
+        end
+    end
+    return { potential = potential, confirmed = confirmed }
+end
+
+local function buildRecipeEntry(src, r, ctx)
+
     local canCraft, lockReason, lockArgs = true, nil, nil
     if CraftingSkills and CraftingSkills.CheckRecipeGates then
         local okSkill, skillReason, skillArgs = CraftingSkills.CheckRecipeGates(src, r)
@@ -633,7 +978,8 @@ local function buildRecipeEntry(src, r)
         if GetResourceState('ox_inventory') == 'started' then
             owned = exports.ox_inventory:GetItemCount(src, ing.item) or 0
         end
-        ingsOut[i] = { item = ing.item, count = ing.count or 1, owned = owned }
+        local lab = ing.label or itemLabelOf(ing.item)
+        ingsOut[i] = { item = ing.item, count = ing.count or 1, owned = owned, label = lab }
     end
 
     local skillCategory = nil
@@ -726,13 +1072,35 @@ local function buildRecipeEntry(src, r)
         end
     end
 
-    return {
+    local bpId = r.requireBlueprint or r.blueprintId
+    local hasBp = true
+    if bpId and Config.Blueprints and Config.Blueprints.Enabled and Blueprints then
+        hasBp = Blueprints.Has(src, bpId) == true
+    elseif not bpId then
+        hasBp = true
+    end
+
+    local threshold = (Config.Mastery and (Config.Mastery.MasteredThreshold or Config.Mastery.MaxMastery)) or 100
+    local mastered = (Config.Mastery and Config.Mastery.Enabled and mastery >= threshold) or false
+    local knowledge, knowledgeSource = resolveKnowledge(src, r, mastery, hasBp, lockReason)
+    local bpMeta = blueprintMetaOf(r)
+
+    local resultOut = r.result
+    if type(resultOut) == 'table' and resultOut.item and not resultOut.label then
+        resultOut = {
+            item = resultOut.item,
+            count = resultOut.count or 1,
+            label = itemLabelOf(resultOut.item),
+        }
+    end
+
+    local entry = {
         id = r.id, label = r.label, category = r.category, tags = tags,
         description = r.description,
         ingredients = ingsOut,
-        result = r.result, duration = r.duration,
+        result = resultOut, duration = r.duration,
         xp = r.xp, requireLevel = r.requireLevel, requireSkill = r.requireSkill,
-        requireBlueprint = r.requireBlueprint or r.blueprintId,
+        requireBlueprint = bpId,
         requireTool = r.requireTool, tools = r.tools, station = r.station, rarity = r.rarity,
         hideIfSkillLocked = r.hideIfSkillLocked, quality = r.quality, byproducts = r.byproducts,
         queueable = r.queueable, batchMax = r.batchMax, dismantle = r.dismantle,
@@ -741,6 +1109,11 @@ local function buildRecipeEntry(src, r)
         canCraft = canCraft and hasItems, locked = not canCraft,
         missingItems = not hasItems, lockReason = lockReason, lockArgs = lockArgs,
         mastery = mastery,
+        mastered = mastered,
+        knowledge = knowledge,
+        knowledgeSource = knowledgeSource,
+        blueprintId = bpId,
+        blueprintMeta = bpMeta,
         skillCategory = skillCategory,
         playerSkillLevel = playerSkillLevel,
         hasSpecialization = hasSpecialization,
@@ -754,6 +1127,44 @@ local function buildRecipeEntry(src, r)
         compareWith = r.compareWith,
         relatedRecipeId = r.relatedRecipeId,
     }
+
+    local artisans = ctx and ctx.artisans or nil
+    local includeHeavy = not ctx or ctx.includeHints ~= false
+    if includeHeavy then
+        local pathHints, moreAvailable = buildPathHints(src, r, entry, artisans)
+        entry.pathHints = pathHints
+        entry.pathHintsMore = moreAvailable and true or false
+        entry.artisanHints = buildArtisanHints(src, r, artisans, ctx and ctx.orders)
+    end
+
+    return entry
+end
+
+--- Public helper for NUI pathHints callback
+function CraftingPipeline.BuildPathHints(src, recipeId)
+    local r = Config.RecipeById and Config.RecipeById[recipeId]
+    if not r then return nil, 'craft_invalid' end
+    local artisans = {}
+    if SurvivalBook and SurvivalBook.ListArtisans and BookDB and BookDB.Mod and BookDB.Mod('Artisans') then
+        artisans = SurvivalBook.ListArtisans(src) or {}
+    end
+    local orders = {}
+    if SurvivalBook and SurvivalBook.ListOrders and BookDB and BookDB.Mod and BookDB.Mod('Orders') then
+        orders = SurvivalBook.ListOrders(src) or {}
+    end
+    local entry = buildRecipeEntry(src, r, { artisans = artisans, orders = orders, includeHints = true })
+    return {
+        ok = true,
+        recipeId = recipeId,
+        pathHints = entry.pathHints or {},
+        moreAvailable = entry.pathHintsMore == true,
+        artisanHints = entry.artisanHints or { potential = {}, confirmed = {} },
+        knowledge = entry.knowledge,
+        knowledgeSource = entry.knowledgeSource,
+        mastered = entry.mastered,
+        mastery = entry.mastery,
+        blueprintMeta = entry.blueprintMeta,
+    }
 end
 
 lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
@@ -766,9 +1177,18 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
     if not okPerm then return { ok = false, reason = 'craft_denied' } end
 
     local recipes = GetRecipesForCategory(bench.category)
+    local artisans = {}
+    if SurvivalBook and SurvivalBook.ListArtisans and BookDB and BookDB.Mod and BookDB.Mod('Artisans') then
+        artisans = SurvivalBook.ListArtisans(src) or {}
+    end
+    local orders = {}
+    if SurvivalBook and SurvivalBook.ListOrders and BookDB and BookDB.Mod and BookDB.Mod('Orders') then
+        orders = SurvivalBook.ListOrders(src) or {}
+    end
+    local ctx = { artisans = artisans, orders = orders, includeHints = true }
     local out = {}
     for i = 1, #recipes do
-        out[#out + 1] = buildRecipeEntry(src, recipes[i])
+        out[#out + 1] = buildRecipeEntry(src, recipes[i], ctx)
     end
 
     local favorites = {}
@@ -826,7 +1246,26 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
             pinFollow = ux.PinFollow ~= false,
             fabReadyConsole = ux.FabReadyConsole ~= false,
             microToasts = ux.MicroToasts ~= false,
+            smartSearch = ux.SmartSearch ~= false,
+            masteredBadge = ux.MasteredBadge ~= false,
+            knowledgeMarks = ux.KnowledgeMarks ~= false,
+            pathHints = ux.PathHints ~= false,
+            artisanHints = ux.ArtisanHints ~= false,
+            knowledge = Config.Knowledge and Config.Knowledge.Enabled ~= false,
             compare = compareCfg.Enabled == true,
         },
+        knowledge = Config.Knowledge,
+        masteryCfg = Config.Mastery and {
+            enabled = Config.Mastery.Enabled,
+            max = Config.Mastery.MaxMastery,
+            threshold = Config.Mastery.MasteredThreshold or Config.Mastery.MaxMastery,
+        } or nil,
     }
+end)
+
+lib.callback.register('sanctuary_crafting:pathHints', function(src, recipeId)
+    if type(recipeId) ~= 'string' then return { ok = false, reason = 'craft_invalid' } end
+    local data, err = CraftingPipeline.BuildPathHints(src, recipeId)
+    if not data then return { ok = false, reason = err or 'craft_invalid' } end
+    return data
 end)

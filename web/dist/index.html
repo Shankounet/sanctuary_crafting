@@ -328,6 +328,42 @@
           <div class="kv-row" id="row-mastery"><span>Maîtrise</span><span id="d-mastery">—</span></div>
         </div>
 
+        <div class="block block-knowledge-source hidden" id="block-knowledge-source">
+          <h3 class="t-l3"><i class="fa-solid fa-drafting-compass"></i> Source de connaissance</h3>
+          <p id="d-knowledge-source" class="block-text knowledge-source-text">—</p>
+          <p id="d-blueprint-tier" class="t-l6 knowledge-tier hidden"></p>
+        </div>
+
+        <details class="block block-path intel-accordion hidden" id="block-path">
+          <summary class="intel-summary">
+            <span><i class="fa-solid fa-route"></i> Chemin recommandé</span>
+            <span class="intel-count" id="path-count"></span>
+          </summary>
+          <ul id="d-path-hints" class="path-hint-list"></ul>
+          <div class="path-actions">
+            <button type="button" id="btn-path-objective" class="ghost compact" title="Ajouter aux objectifs">
+              <i class="fa-solid fa-bullseye"></i> Ajouter aux objectifs
+            </button>
+            <button type="button" id="btn-path-follow" class="ghost compact" title="Suivre dans le Carnet">
+              <i class="fa-solid fa-book-open"></i> Suivre dans le carnet
+            </button>
+            <button type="button" id="btn-path-more" class="ghost compact hidden" title="Voir plus">
+              Voir plus
+            </button>
+          </div>
+        </details>
+
+        <details class="block block-artisans intel-accordion hidden" id="block-artisans">
+          <summary class="intel-summary">
+            <span><i class="fa-solid fa-handshake"></i> Artisans connus</span>
+            <span class="intel-count" id="artisan-count"></span>
+          </summary>
+          <div id="d-artisans" class="artisan-hint-list"></div>
+          <button type="button" id="btn-artisans-book" class="ghost compact" title="Ouvrir le carnet — artisans">
+            <i class="fa-solid fa-address-book"></i> Ouvrir le carnet
+          </button>
+        </details>
+
         <!-- PANEL ACTION — module fabrication (ready / active / done) -->
         <div class="panel-action actions" id="fab-module" data-fab-state="ready">
           <div id="fab-ready" class="fab-panel fab-ready">

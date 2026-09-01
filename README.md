@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.1.3
+# sanctuary_crafting v2.3.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,16 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.3.0 — Craft intelligence (mastery / knowledge / search / path / artisans)
+Enrichissement **additif** du catalogue craft (serveur autoritaire) :
+
+- `Config.Mastery.MasteredThreshold`, `Config.Knowledge`, `Config.UI.Ux.SmartSearch` / `MasteredBadge` / `KnowledgeMarks` / `PathHints` / `ArtisanHints`
+- Menu recipe fields : `mastered`, `knowledge`, `knowledgeSource`, `blueprintId`, `blueprintMeta`, `pathHints`, `pathHintsMore`, `artisanHints` (+ labels ingredients)
+- NUI : pastille MAITRISE, marques knowledge, recherche indexee client, modules CHEMIN RECOMMANDE / ARTISANS CONNUS (fiche droite)
+- Callback `pathHints` (NUI -> `sanctuary_crafting:pathHints`) ; objectifs carnet peuvent creer des sous-objectifs manquants
+- **ml_skills** reste la seule source XP globale ; maitrise = par recette uniquement
+- Carnet shell (`book.css` / `book.js`) non redesigné
 
 ### v2.1.3 — Craft UI polish
 Polish UX / art direction de l’**atelier craft** (`web/dist/style.css`, `app.js`, `index.html`) sans redesign architecture (3 colonnes, cartes, détail droit, File/Arbre/Courses).
@@ -171,6 +181,11 @@ Tous les modules sont **implémentés**. Les flags activent/désactivent le comp
 | `Config.Projects.Enabled` | projets multi-contributeurs |
 | `Config.Dismantling.Enabled` | démontage + yield ml_skills |
 | `Config.Mastery.Enabled` | maîtrise par recette |
+| `Config.Mastery.MasteredThreshold` | seuil « maîtrisé » (défaut = MaxMastery) |
+| `Config.Knowledge.Enabled` / `States` | états unknown/partial/blueprint/learned/mastered |
+| `Config.UI.Ux.SmartSearch` | index recherche client multi-champs |
+| `Config.UI.Ux.MasteredBadge` / `KnowledgeMarks` | pastilles carte |
+| `Config.UI.Ux.PathHints` / `ArtisanHints` | modules fiche droite |
 | `Config.Tags` + `Substitution` | tags + substituts d’ingrédients |
 | `Config.ReverseEngineering` | analyse item → blueprint |
 | `Config.ShoppingList` | liste courses serveur |

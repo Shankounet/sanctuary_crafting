@@ -4059,3 +4059,198 @@ button, input { font: inherit; color: inherit; }
   background: linear-gradient(90deg, rgba(154,136,102,0.7), transparent 72%);
   opacity: 0.9;
 }
+
+
+/* —— Craft intel v2.3.0 : knowledge / path / artisans (compact) —— */
+#app .card-mastered-badge {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 6;
+  padding: 2px 5px;
+  font-size: 0.42rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(200, 188, 156, 0.9);
+  background: rgba(18, 18, 18, 0.78);
+  border: 1px solid rgba(154, 136, 102, 0.4);
+  pointer-events: none;
+  line-height: 1.15;
+}
+#app .card-knowledge-mark {
+  position: absolute;
+  bottom: 7px;
+  left: 7px;
+  z-index: 5;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  color: rgba(180, 170, 145, 0.85);
+  background: rgba(12, 12, 12, 0.72);
+  border: 1px solid rgba(100, 92, 72, 0.45);
+  pointer-events: none;
+}
+#app .card-knowledge-mark.kn-blueprint { color: rgba(170, 190, 210, 0.9); }
+#app .card-knowledge-mark.kn-mastered { color: rgba(200, 188, 156, 0.95); }
+#app .card-knowledge-mark.kn-partial { color: rgba(160, 150, 120, 0.8); }
+#app .card-knowledge-mark.kn-unknown { color: rgba(140, 140, 140, 0.85); }
+#app .card-img-zone.is-unknown img { opacity: 0; }
+#app .card-img-zone.is-unknown .ph {
+  display: flex !important;
+  opacity: 0.55;
+  filter: blur(0.2px);
+}
+#app .card-img-zone.is-veiled img {
+  filter: brightness(0.55) saturate(0.4) contrast(0.9);
+  opacity: 0.72;
+}
+#app .card-img-zone.is-veiled::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, rgba(20,18,14,0.35), rgba(10,10,10,0.55));
+  pointer-events: none;
+}
+#app .recipe-card.knowledge-unknown .card-title {
+  letter-spacing: 0.18em;
+  color: rgba(150, 145, 135, 0.75);
+}
+
+#app .fiche-hero.from-blueprint {
+  position: relative;
+}
+#app .fiche-hero.from-blueprint::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 56px;
+  height: 56px;
+  pointer-events: none;
+  opacity: 0.22;
+  background:
+    linear-gradient(135deg, transparent 48%, rgba(154,136,102,0.55) 50%, transparent 52%),
+    repeating-linear-gradient(0deg, transparent, transparent 5px, rgba(154,136,102,0.18) 5px, rgba(154,136,102,0.18) 6px),
+    repeating-linear-gradient(90deg, transparent, transparent 5px, rgba(154,136,102,0.18) 5px, rgba(154,136,102,0.18) 6px);
+  border-left: 1px solid rgba(154,136,102,0.2);
+  border-bottom: 1px solid rgba(154,136,102,0.2);
+}
+#app #detail.has-blueprint-cue {
+  box-shadow: inset 0 0 0 1px rgba(154, 136, 102, 0.08);
+}
+#app .knowledge-source-text {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: rgba(190, 178, 150, 0.88);
+}
+#app .knowledge-tier {
+  margin-top: 4px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(154, 136, 102, 0.85);
+}
+
+#app .intel-accordion {
+  padding: 8px 10px;
+}
+#app .intel-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(190, 180, 155, 0.9);
+  user-select: none;
+}
+#app .intel-summary::-webkit-details-marker { display: none; }
+#app .intel-summary i { margin-right: 6px; opacity: 0.8; }
+#app .intel-count {
+  font-size: 0.62rem;
+  color: rgba(140, 130, 110, 0.85);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+#app .path-hint-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#app .path-hint {
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(70, 64, 52, 0.75);
+}
+#app .path-hint-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+#app .path-kind {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(180, 168, 140, 0.92);
+}
+#app .path-detail {
+  margin: 4px 0 0;
+  font-size: 0.7rem;
+  color: rgba(160, 152, 136, 0.88);
+  line-height: 1.35;
+}
+#app .path-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+#app .ghost.compact {
+  padding: 4px 8px;
+  font-size: 0.65rem;
+}
+#app .artisan-hint-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#app .artisan-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(70, 64, 52, 0.7);
+}
+#app .artisan-tag {
+  grid-column: 1 / -1;
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: rgba(154, 136, 102, 0.85);
+}
+#app .artisan-row.confirmed .artisan-tag { color: rgba(140, 170, 140, 0.9); }
+#app .artisan-name {
+  font-size: 0.75rem;
+  color: rgba(210, 200, 180, 0.92);
+}
+#app .artisan-spec {
+  font-size: 0.65rem;
+  justify-self: end;
+}
+#app #btn-artisans-book {
+  margin-top: 8px;
+}

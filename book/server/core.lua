@@ -175,10 +175,45 @@ function SurvivalBook.AddObjective(src, title, kind, payload)
     return { id = insertId, title = title, kind = kind, done = false, payload = payload or {} }
 end
 
-function SurvivalBook.AddObjectiveFromRecipe(src, recipeId)
+function SurvivalBook.AddObjectiveFromRecipe(src, recipeId, opts)
     local recipe = Config.RecipeById and Config.RecipeById[recipeId]
     if not recipe then return nil, 'craft_invalid' end
-    return SurvivalBook.AddObjective(src, recipe.label or recipeId, 'recipe', { recipeId = recipeId })
+    opts = type(opts) == 'table' and opts or {}
+    local obj, err = SurvivalBook.AddObjective(src, recipe.label or recipeId, 'recipe', { recipeId = recipeId })
+    if not obj then return nil, err end
+
+    -- Optional sub-objectives for missing materials (server-owned counts only)
+    local subs = {}
+    if opts.withMissing ~= false then
+        local ings = recipe.ingredients or {}
+        for i = 1, #ings do
+            local ing = ings[i]
+            if ing and ing.item then
+                local need = ing.count or 1
+                local owned = 0
+                if GetResourceState('ox_inventory') == 'started' then
+                    owned = exports.ox_inventory:GetItemCount(src, ing.item) or 0
+                end
+                if owned < need then
+                    local deficit = need - owned
+                    local title = string.format('Récupérer %s ×%d', ing.item, deficit)
+                    local sub, serr = SurvivalBook.AddObjective(src, title, 'gather', {
+                        recipeId = recipeId,
+                        item = ing.item,
+                        count = deficit,
+                        parentObjectiveId = obj.id,
+                    })
+                    if sub then
+                        subs[#subs + 1] = sub
+                    elseif serr == 'book_objectives_full' then
+                        break
+                    end
+                end
+            end
+        end
+    end
+    obj.subObjectives = subs
+    return obj
 end
 
 function SurvivalBook.ListObjectives(src)
