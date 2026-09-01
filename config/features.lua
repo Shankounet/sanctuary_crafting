@@ -104,6 +104,24 @@ Config.UI = {
             blueprint = '../sounds/blueprint.ogg',
         },
     },
+    -- Micro-UX craft catalogue (v2.2.22) — chaque flag est opt-in côté NUI
+    Ux = {
+        AlmostCraftable = true,   -- badge PRESQUE (sinon binaire FAISABLE / NON FAISABLE)
+        BadgeTooltips = true,     -- tooltip raison courte sur le badge
+        NouveauIndicator = true,  -- pastille NOUVEAU (tags/isNew ; localStorage seen)
+        SelectionTransition = true, -- micro-transition sélection CSS
+        MasteryDots = true,       -- 3 segments maîtrise sur la carte
+        PinFollow = true,         -- titre « Suivre dans le Carnet » + état pin
+        FabReadyConsole = true,   -- lignes idle STATION READY / File / Dernier craft
+        MicroToasts = true,       -- toasts discrets dans le shell craft
+    },
+}
+
+-- Comparaison légère entre recettes liées (bouton optionnel, pas de layout forcé)
+Config.Compare = {
+    Enabled = false,
+    -- Map optionnelle recipeId -> relatedRecipeId (sinon recipe.compareWith / relatedRecipeId)
+    Map = {},
 }
 
 -- Power : conserver ExternalBridge / FallbackModules ; Enabled reste celui de config.lua

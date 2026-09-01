@@ -331,6 +331,12 @@
         <!-- PANEL ACTION — module fabrication (ready / active / done) -->
         <div class="panel-action actions" id="fab-module" data-fab-state="ready">
           <div id="fab-ready" class="fab-panel fab-ready">
+            <div id="fab-idle-console" class="fab-idle-console" aria-label="Console atelier">
+              <div class="fab-idle-line fab-idle-ready"><span class="fab-idle-k">STATION READY</span></div>
+              <div class="fab-idle-line"><span class="fab-idle-k">File</span> <span class="fab-idle-v" id="fab-idle-queue">0/5</span></div>
+              <div class="fab-idle-line"><span class="fab-idle-k">Dernier craft</span> <span class="fab-idle-v" id="fab-idle-last">—</span></div>
+              <div class="fab-idle-line fab-idle-sleep"><span class="fab-idle-k">État veille</span></div>
+            </div>
             <div class="fab-readouts" aria-label="Résumé fabrication">
               <div class="fab-chip" id="fab-chip-lot">
                 <span class="fab-chip-k">Lot</span>
@@ -375,8 +381,11 @@
               <button type="button" id="btn-tree" class="ghost action-tool" title="Ouvrir le schéma de dépendances" aria-label="Schéma de dépendances">
                 <i class="fa-solid fa-diagram-project" aria-hidden="true"></i><span class="tool-label">Arbre</span>
               </button>
-              <button type="button" id="btn-pin" class="ghost action-tool" title="Épingler la recette au carnet" aria-label="Épingler au carnet">
-                <i class="fa-solid fa-thumbtack" aria-hidden="true"></i><span class="tool-label">Pin</span>
+              <button type="button" id="btn-compare" class="ghost action-tool hidden" title="Comparer la recette liée" aria-label="Comparer">
+                <i class="fa-solid fa-code-compare" aria-hidden="true"></i><span class="tool-label">Comparer</span>
+              </button>
+              <button type="button" id="btn-pin" class="ghost action-tool" title="Suivre dans le Carnet" aria-label="Suivre dans le Carnet">
+                <i class="fa-solid fa-thumbtack" aria-hidden="true"></i><span class="tool-label">Suivre</span>
               </button>
               <details class="action-more">
                 <summary class="ghost icon-only" title="Plus d’actions" aria-label="Plus d’actions">
@@ -440,6 +449,7 @@
       </div>
     </section>
   </main>
+  <div id="craft-toasts" class="craft-toasts" aria-live="polite"></div>
 </div>
 
 <!-- Survival Book — physical open journal (Phase 1) -->

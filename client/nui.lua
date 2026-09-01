@@ -83,6 +83,12 @@ RegisterNUICallback('tree', function(data, cb)
     cb(r or { ok = false })
 end)
 
+
+RegisterNUICallback('bookUnpinRecipe', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:book:action', false, 'unpin', { recipeId = data.recipeId })
+    cb(r or { ok = false })
+end)
+
 RegisterNUICallback('notify', function(data, cb)
     local desc = data.reason or 'craft_failed'
     if data.reason == 'craft_success' and data.label then
