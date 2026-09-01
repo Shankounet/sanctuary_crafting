@@ -24,25 +24,74 @@ function CloseSurvivalBook()
     SendNUIMessage({ action = 'bookClose' })
 end
 
+local function bookFallbackMeta()
+    local modules = {}
+    local names = {
+        'Dashboard', 'Progression', 'NextUnlocks', 'Objectives', 'Pins', 'Shopping', 'CraftTree',
+        'Resources', 'Discoveries', 'Blueprints', 'Artisans', 'Network', 'Orders', 'Projects',
+        'Notes', 'Search', 'Suggestions', 'CanCraft', 'Workshop', 'Maintenance', 'Productions',
+        'Notifications', 'History', 'Stats',
+    }
+    for i = 1, #names do
+        local key = names[i]
+        local m = Config.Book and Config.Book[key]
+        if m == nil then
+            modules[key] = true
+        elseif type(m) == 'table' then
+            modules[key] = m.Enabled ~= false
+        else
+            modules[key] = true
+        end
+    end
+    return {
+        accent = (Config.Book and Config.Book.Accent) or '#9a8866',
+        theme = (Config.Book and Config.Book.Theme) or 'field_manual',
+        modules = modules,
+        locale = Config.Locale or 'fr',
+        title = _('book_title'),
+        subtitle = _('book_subtitle'),
+    }
+end
+
 function OpenSurvivalBook(page)
     if not bookEnabled() then
         lib.notify({ type = 'error', description = _('book_disabled') })
         return false
     end
-    -- Close craft UI if open
+    -- Close craft UI if open (clears craft focus)
     if CloseCraftNui then CloseCraftNui() end
+
+    local pageName = page or 'dashboard'
+    local lazy = Config.Book.LazyLoad ~= false
+
+    -- Show NUI FIRST, then focus — never leave mouse up with a blank page if shell awaits/errors
     bookOpen = true
-    SetNuiFocus(true, true)
-    local shell = lib.callback.await('sanctuary_crafting:book:shell', false)
     SendNUIMessage({
         action = 'bookOpen',
-        page = page or 'dashboard',
-        meta = shell and shell.meta or {},
-        lazy = Config.Book.LazyLoad ~= false,
+        page = pageName,
+        meta = bookFallbackMeta(),
+        lazy = lazy,
     })
-    -- Refresh pins for HUD
-    local pinRes = lib.callback.await('sanctuary_crafting:book:module', false, 'pins', {})
-    if pinRes and pinRes.ok then
+    SetNuiFocus(true, true)
+
+    local okShell, shell = pcall(function()
+        return lib.callback.await('sanctuary_crafting:book:shell', false)
+    end)
+    if okShell and type(shell) == 'table' and shell.meta then
+        SendNUIMessage({
+            action = 'bookOpen',
+            page = pageName,
+            meta = shell.meta,
+            lazy = lazy,
+        })
+    elseif not okShell then
+        print(('[^3sanctuary_crafting^0] book:shell failed: %s'):format(tostring(shell)))
+    end
+
+    local okPins, pinRes = pcall(function()
+        return lib.callback.await('sanctuary_crafting:book:module', false, 'pins', {})
+    end)
+    if okPins and type(pinRes) == 'table' and pinRes.ok then
         pins = pinRes.data or {}
         SendNUIMessage({ action = 'bookPins', pins = pins })
     end
@@ -116,10 +165,11 @@ RegisterNUICallback('bookObjectiveRecipe', function(data, cb)
 end)
 
 RegisterNUICallback('bookOpenFromCraft', function(data, cb)
+    -- Acknowledge NUI callback before re-opening focus (avoids stalled CEF callback)
+    cb({ ok = true })
     CloseCraftNui()
     Wait(50)
-    OpenSurvivalBook(data.page or 'dashboard')
-    cb({ ok = true })
+    OpenSurvivalBook(data and data.page or 'dashboard')
 end)
 
 -- Mini HUD draw

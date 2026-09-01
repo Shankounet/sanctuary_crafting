@@ -1026,6 +1026,7 @@
   });
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') post('close', {});
+    // Only close craft when craft shell is visible — never steal Escape from the Survival Book
+    if (e.key === 'Escape' && app && !app.classList.contains('hidden')) post('close', {});
   });
 })();
