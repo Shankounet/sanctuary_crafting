@@ -209,14 +209,9 @@
   }
 
   function cardStatus(r) {
+    /* Catalogue cards: binary glanceable state only. Details stay in right panel. */
     if (r.canCraft) return { text: 'FAISABLE', cls: 'ok' };
-    if (r.lockReason === 'craft_blueprint_required') return { text: 'PLAN REQUIS', cls: 'warn' };
-    if (r.lockReason === 'craft_level_required' || r.lockReason === 'craft_station_level') {
-      return { text: 'NIVEAU REQUIS', cls: 'warn' };
-    }
-    if (r.locked) return { text: 'VERROUILLÉ', cls: 'warn' };
-    if (r.missingItems) return { text: 'MANQUANT', cls: 'bad' };
-    return { text: 'MANQUANT', cls: 'bad' };
+    return { text: 'NON FAISABLE', cls: 'bad' };
   }
 
   function disableReasons(r) {
@@ -334,10 +329,6 @@
         }
       }
       const resultItem = (r.result && r.result.item) || r.id;
-      const allIngs = r.ingredients || [];
-      const maxNeeds = allIngs.length > 3 ? 2 : Math.min(3, allIngs.length);
-      const ings = allIngs.slice(0, maxNeeds);
-      const more = allIngs.length - ings.length;
       const code = recipeCode(r);
 
       card.innerHTML = `
@@ -358,14 +349,6 @@
           </div>
           <div class="card-status-row">
             <span class="status-plate status-pill ${status.cls}">${status.text}</span>
-          </div>
-          <div class="card-ings">
-            ${ings.map((ing) => {
-              const info = ingOwnedRequired(ing, r);
-              const short = humanize(ing.item);
-              return `<div class="need-row ${info.cls}" title="${escapeHtml(short)}"><span class="need-name">${escapeHtml(short)}</span><span class="need-qty">${escapeHtml(info.text)}</span></div>`;
-            }).join('')}
-            ${more > 0 ? `<div class="need-more">+${more} autres</div>` : ''}
           </div>
         </div>
       `;
