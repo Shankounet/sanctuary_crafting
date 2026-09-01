@@ -5,7 +5,7 @@ lua54 'yes'
 name 'sanctuary_crafting'
 author 'Shankounet / Sanctuary'
 description 'Plateforme de craft post-apo + Carnet de survie — ESX, ox_*, ml_skills, NUI industrielle'
-version '2.2.24'
+version '2.2.25'
 
 ui_page 'web/dist/index.html'
 
@@ -45,31 +45,31 @@ client_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     -- integrations
-    'integrations/ml_skills.lua',
-    'integrations/permissions.lua',
-    'integrations/power.lua',
+    'server/integrations/ml_skills.lua',
+    'server/integrations/permissions.lua',
+    'server/integrations/power.lua',
     -- core
-    'core/registry.lua',
-    'core/boot.lua',
+    'server/core/registry.lua',
+    'server/core/boot.lua',
     -- security + recipes
-    'security/validation.lua',
-    'recipes/registry.lua',
+    'server/security/validation.lua',
+    'server/recipes/registry.lua',
     -- stations
-    'stations/benches.lua',
+    'server/stations/benches.lua',
     -- systems
-    'blueprints/blueprints.lua',
-    'tools/tools.lua',
-    'quality/quality.lua',
-    'mastery/mastery.lua',
-    'queue/queue.lua',
-    'projects/projects.lua',
-    'reverse/reverse.lua',
-    'favorites/favorites.lua',
-    'shopping/shopping.lua',
-    'tree/craft_tree.lua',
-    'dismantle/dismantle.lua',
+    'server/systems/blueprints.lua',
+    'server/systems/tools.lua',
+    'server/systems/quality.lua',
+    'server/systems/mastery.lua',
+    'server/systems/queue.lua',
+    'server/systems/projects.lua',
+    'server/systems/reverse.lua',
+    'server/systems/favorites.lua',
+    'server/systems/shopping.lua',
+    'server/systems/craft_tree.lua',
+    'server/systems/dismantle.lua',
     -- crafting pipeline last (depends on above)
-    'crafting/pipeline.lua',
+    'server/crafting/pipeline.lua',
     -- survival book (after crafting systems)
     'book/server/db.lua',
     'book/server/core.lua',
@@ -77,7 +77,7 @@ server_scripts {
     'book/server/api.lua',
     'book/server/bridge.lua',
     'book/server/main.lua',
-    'hooks/exports.lua',
+    'server/hooks/exports.lua',
 }
 
 dependencies {
