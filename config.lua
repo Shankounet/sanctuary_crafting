@@ -106,8 +106,19 @@ Config.WorldBenchCommand = 'placeworldbench'
 Config.Skills = {
     enabled = true,
     resource = 'ml_skills',
-    craftingCategory = 'crafting',
-    survivalCategory = 'survival',
+    -- Catégories ml_skills du pack Alex (requiredLevelCategory exactes)
+    -- ingenieurs→ingenieur, survie, agriculture, medecin, forgeron, mechanic, armurier
+    craftingCategory = 'ingenieur', -- défaut bonus durée (fallback)
+    survivalCategory = 'survie',
+    categories = {
+        'ingenieur',
+        'survie',
+        'agriculture',
+        'medecin',
+        'forgeron',
+        'mechanic',
+        'armurier',
+    },
     craftTimeBonus = true,
     maxCraftTimeReduction = 0.40,
 
@@ -141,6 +152,24 @@ Config.BenchLabels = {
     weapons  = 'bench_weapons',
     survival = 'bench_survival',
     mechanic = 'bench_mechanic',
+    -- stations import (fallback si pas de bench.label)
+    ingenieur = 'bench_ingenieur',
+    tailleur = 'bench_tailleur',
+    boucherie = 'bench_boucherie',
+    forgeron = 'bench_forgeron',
+    manche_forgeron = 'bench_manche_forgeron',
+    agriculture = 'bench_agriculture',
+    mecano = 'bench_mecano',
+    schema = 'bench_schema',
+    accessoires = 'bench_accessoires',
+    fonderie_forgeron = 'bench_fonderie_forgeron',
+    decoration = 'bench_decoration',
+    munition = 'bench_munition',
+    cuisine = 'bench_cuisine',
+    reparation_forgeron = 'bench_reparation_forgeron',
+    construction = 'bench_construction',
+    survie = 'bench_survie',
+    armurier = 'bench_armurier',
 }
 
 --------------------------------------------------------------------------------
@@ -163,38 +192,9 @@ Config.Place = {
 }
 
 --------------------------------------------------------------------------------
--- Bancs monde (fixes)
+-- Bancs monde (fixes) — remplacés par config/world_benches.lua (import DevHub)
 --------------------------------------------------------------------------------
-Config.WorldBenches = {
-    {
-        id = 'world_scrap_01',
-        category = 'scrap',
-        coords = vec3(2330.0, 2570.0, 46.7),
-        heading = 90.0,
-        model = Config.BenchModels.scrap,
-    },
-    {
-        id = 'world_medical_01',
-        category = 'medical',
-        coords = vec3(1839.0, 3672.0, 34.3),
-        heading = 210.0,
-        model = Config.BenchModels.medical,
-    },
-    {
-        id = 'world_weapons_01',
-        category = 'weapons',
-        coords = vec3(16.0, -1110.0, 29.8),
-        heading = 160.0,
-        model = Config.BenchModels.weapons,
-    },
-    {
-        id = 'world_survival_01',
-        category = 'survival',
-        coords = vec3(1960.0, 3740.0, 32.3),
-        heading = 300.0,
-        model = Config.BenchModels.survival,
-    },
-}
+Config.WorldBenches = {}
 
 --------------------------------------------------------------------------------
 -- Recettes — à remplir par le serveur (ne PAS inventer un gros pack)

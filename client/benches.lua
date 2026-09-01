@@ -1,15 +1,20 @@
 --[[
     Spawn / sync bancs monde + placeables, ox_target
+    type = "coords" / spawnProp = false → zone ox_target (pas de prop)
 ]]
 
-local spawned = {}       -- [key] = { entity, data }
+local spawned = {}       -- [key] = { entity|nil, zoneId|nil, data }
 local targetIds = {}     -- [key] = true
 
 local function removeBench(key)
     local entry = spawned[key]
-    if entry and entry.entity and DoesEntityExist(entry.entity) then
+    if not entry then return end
+    if entry.entity and DoesEntityExist(entry.entity) then
         exports.ox_target:removeLocalEntity(entry.entity)
         DeleteEntity(entry.entity)
+    end
+    if entry.zoneId then
+        exports.ox_target:removeZone(entry.zoneId)
     end
     spawned[key] = nil
     targetIds[key] = nil
@@ -43,9 +48,39 @@ local function addTarget(entity, data)
     exports.ox_target:addLocalEntity(entity, options)
 end
 
+local function addZoneTarget(data)
+    local c = data.coords
+    local radius = Config.InteractDistance or 2.5
+    local zoneId = exports.ox_target:addSphereZone({
+        coords = vec3(c.x, c.y, c.z),
+        radius = radius,
+        debug = Config.Debug or false,
+        options = {
+            {
+                name = 'sanctuary_craft_open_' .. data.key,
+                icon = 'fa-solid fa-hammer',
+                label = data.label or _('open_craft'),
+                distance = radius,
+                onSelect = function()
+                    OpenCraftMenu(data.key)
+                end,
+            },
+        },
+    })
+    return zoneId
+end
+
 local function spawnBench(data)
     if spawned[data.key] then
         removeBench(data.key)
+    end
+
+    local useZone = (data.spawnProp == false) or (data.type == 'coords') or (data.model == nil and data.kind == 'world')
+    if useZone and data.kind == 'world' then
+        local zoneId = addZoneTarget(data)
+        spawned[data.key] = { entity = nil, zoneId = zoneId, data = data }
+        targetIds[data.key] = true
+        return
     end
 
     local model = data.model
@@ -103,6 +138,24 @@ end)
 CreateThread(function()
     Wait(500)
     TriggerServerEvent('sanctuary_crafting:server:requestSync')
+end)
+
+-- Blips monde (si Config.WorldBenches[].blip)
+CreateThread(function()
+    Wait(1000)
+    for i = 1, #(Config.WorldBenches or {}) do
+        local w = Config.WorldBenches[i]
+        if w.blip and w.coords then
+            local blip = AddBlipForCoord(w.coords.x, w.coords.y, w.coords.z)
+            SetBlipSprite(blip, w.blip.sprite or 566)
+            SetBlipScale(blip, w.blip.size or 0.8)
+            SetBlipColour(blip, w.blip.color or 5)
+            SetBlipAsShortRange(blip, true)
+            BeginTextCommandSetBlipName('STRING')
+            AddTextComponentSubstringPlayerName(w.blip.name or w.label or 'Craft')
+            EndTextCommandSetBlipName(blip)
+        end
+    end
 end)
 
 AddEventHandler('onResourceStop', function(res)
