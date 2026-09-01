@@ -4,8 +4,6 @@
    Accent #9a8866 = ink / stamp / bookmark only. Scope: #book-app only.
    ============================================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Caveat:wght@500;600&display=swap');
-
 :root {
   --book-accent: #9a8866;
   --book-ink: #2c2418;
@@ -22,16 +20,16 @@
   --book-ribbon-2: #a84848;
   --book-trans: 140ms ease;
   --book-turn: 180ms ease;
-  --book-serif: "Libre Baskerville", "Cormorant Garamond", Georgia, serif;
-  --book-display: "Cormorant Garamond", "Libre Baskerville", Georgia, serif;
-  --book-hand: "Caveat", "Segoe Script", cursive;
+  --book-serif: Georgia, "Times New Roman", Times, serif;
+  --book-display: Georgia, "Palatino Linotype", "Book Antiqua", serif;
+  --book-hand: "Segoe Script", "Comic Sans MS", cursive;
   --book-ui: "Segoe UI", system-ui, sans-serif;
 }
 
 #book-app {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 10000;
   font-family: var(--book-serif);
   color: var(--book-ink);
   background: transparent;
@@ -42,17 +40,18 @@
 
 #book-app.hidden {
   display: none !important;
-  opacity: 0;
-  visibility: hidden;
-  animation: none;
-  pointer-events: none;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  animation: none !important;
+  pointer-events: none !important;
 }
 
-#book-app:not(.hidden) {
+#book-app:not(.hidden),
+#book-app.is-open {
   display: block !important;
   opacity: 1 !important;
   visibility: visible !important;
-  pointer-events: auto;
+  pointer-events: auto !important;
 }
 
 #book-app.is-opening .book-spread {
@@ -101,7 +100,18 @@
   display: grid;
   grid-template-columns: 1fr 28px 1fr;
   grid-template-rows: 1fr;
-  filter: drop-shadow(0 28px 48px rgba(0, 0, 0, 0.55));
+  grid-template-areas: "left bind right";
+  box-shadow: 0 28px 48px rgba(0, 0, 0, 0.55);
+  background: transparent;
+}
+#book-app .book-page-left { grid-area: left; }
+#book-app .book-binding { grid-area: bind; }
+#book-app .book-page-right { grid-area: right; }
+#book-app .book-edge-tabs,
+#book-app .book-covers,
+#book-app .book-close-ribbon,
+#book-app .book-index-tab {
+  /* out of grid flow */
 }
 
 /* Leather covers peeking under pages */
@@ -129,6 +139,9 @@
 #book-app .book-page {
   position: relative;
   z-index: 2;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
   background:
     linear-gradient(180deg, #f7f0de 0%, var(--book-paper) 42%, var(--book-paper-2) 100%);
   overflow: hidden;
@@ -154,7 +167,6 @@
   background-image:
     url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   opacity: 0.045;
-  mix-blend-mode: multiply;
 }
 
 #book-app .book-page-inner {
@@ -240,7 +252,7 @@
   flex-direction: column;
   gap: 6px;
   width: 38px;
-  pointer-events: none;
+  pointer-events: auto;
 }
 #book-app .book-edge-tabs button {
   pointer-events: auto;
