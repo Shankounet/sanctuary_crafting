@@ -1,7 +1,5 @@
 Locales = Locales or {}
-
 Locales['fr'] = {
-    -- Général
     ['craft_menu_title'] = 'Atelier — %s',
     ['craft_progress'] = 'Fabrication : %s',
     ['craft_success'] = 'Vous avez fabriqué %sx %s',
@@ -13,15 +11,21 @@ Locales['fr'] = {
     ['craft_rate_limited'] = 'Ralentissez…',
     ['craft_level_required'] = 'Niveau %s requis (actuel : %s)',
     ['craft_skill_required'] = 'Compétence requise : %s',
+    ['craft_blueprint_required'] = 'Schéma requis : %s',
+    ['craft_skills_unavailable'] = 'Système de compétences indisponible — craft refusé',
     ['craft_invalid'] = 'Recette invalide',
     ['craft_wrong_bench'] = 'Cette recette ne convient pas à cet atelier',
     ['craft_inventory_full'] = 'Inventaire plein',
-
-    -- Bancs
+    ['craft_denied'] = 'Accès refusé à cet atelier',
+    ['craft_no_power'] = 'Atelier hors tension',
+    ['craft_station_level'] = 'Niveau d\'atelier insuffisant',
+    ['craft_tool_required'] = 'Outil requis manquant ou cassé',
+    ['craft_batch_max'] = 'Quantité de lot trop élevée',
     ['bench_scrap'] = 'Établi de ferraille',
     ['bench_medical'] = 'Table médicale de fortune',
     ['bench_weapons'] = 'Banc d\'armement',
     ['bench_survival'] = 'Atelier de survie',
+    ['bench_mechanic'] = 'Atelier mécanique',
     ['open_craft'] = 'Ouvrir l\'atelier',
     ['pickup_bench'] = 'Récupérer l\'atelier',
     ['place_bench'] = 'Placer l\'atelier',
@@ -30,21 +34,40 @@ Locales['fr'] = {
     ['pickup_success'] = 'Atelier récupéré',
     ['pickup_denied'] = 'Vous ne pouvez pas récupérer cet atelier',
     ['no_space'] = 'Pas assez d\'espace ici',
-
-    -- Admin
-    ['admin_place_usage'] = 'Usage : /placeworldbench [scrap|medical|weapons|survival]',
+    ['admin_place_usage'] = 'Usage : /placeworldbench [scrap|medical|weapons|survival|mechanic]',
     ['admin_place_ok'] = 'Banc monde placé (catégorie : %s) — ajoutez les coords dans config.lua',
     ['admin_denied'] = 'Permission refusée',
-
-    -- Catégories recettes
     ['cat_scrap'] = 'Ferraille',
     ['cat_medical'] = 'Médical',
     ['cat_weapons'] = 'Armement',
     ['cat_survival'] = 'Survie',
-
+    ['cat_mechanic'] = 'Mécanique',
     ['ingredients'] = 'Ingrédients',
     ['duration'] = 'Durée : %ss',
     ['xp_reward'] = '+%s XP (%s)',
     ['req_level'] = 'Niveau min. : %s',
     ['req_skill'] = 'Skill : %s',
+    ['blueprint_learned'] = 'Schéma appris : %s',
+    ['blueprint_invalid'] = 'Schéma invalide',
+    ['blueprints_disabled'] = 'Blueprints désactivés',
+    ['forget_disabled'] = 'Oubli de schéma désactivé',
+    ['tool_broken'] = 'Outil cassé : %s',
+    ['upgrade_disabled'] = 'Améliorations d\'atelier désactivées',
+    ['upgrade_max'] = 'Niveau d\'atelier maximum atteint',
+    ['module_exists'] = 'Module déjà installé',
+    ['queue_disabled'] = 'File d\'attente désactivée',
+    ['queue_full'] = 'File d\'attente pleine',
+    ['queue_not_allowed'] = 'Cette recette ne peut pas être mise en file',
+    ['queue_not_ready'] = 'Craft pas encore prêt',
+    ['projects_disabled'] = 'Projets désactivés',
+    ['project_invalid'] = 'Projet invalide',
+    ['project_full'] = 'Projet : trop de contributeurs',
+    ['project_item_full'] = 'Objectif déjà atteint pour cet item',
+    ['project_incomplete'] = 'Projet incomplet',
+    ['dismantle_disabled'] = 'Démontage désactivé',
+    ['reverse_disabled'] = 'Rétro-ingénierie désactivée',
+    ['reverse_unknown'] = 'Impossible d\'analyser cet objet',
+    ['reverse_fail'] = 'Analyse échouée',
+    ['reverse_success'] = 'Analyse réussie : %s',
+    ['shopping_disabled'] = 'Liste de courses désactivée',
 }

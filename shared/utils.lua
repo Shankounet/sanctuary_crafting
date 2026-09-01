@@ -1,6 +1,5 @@
 Locales = Locales or {}
 
---- Traduction simple
 ---@param key string
 ---@param ... any
 ---@return string
@@ -12,27 +11,6 @@ function _(key, ...)
         return str:format(...)
     end
     return str
-end
-
---- Index des recettes par id
-CreateThread(function()
-    for i = 1, #Config.Recipes do
-        local r = Config.Recipes[i]
-        Config.RecipeById[r.id] = r
-    end
-end)
-
----@param category string
----@return table[]
-function GetRecipesForCategory(category)
-    local list = {}
-    for i = 1, #Config.Recipes do
-        local r = Config.Recipes[i]
-        if r.category == category then
-            list[#list + 1] = r
-        end
-    end
-    return list
 end
 
 ---@param coords vector3|vector4|table
@@ -49,4 +27,24 @@ function DebugPrint(...)
     if Config.Debug then
         print('[sanctuary_crafting]', ...)
     end
+end
+
+--- UUID v4 (craftId anti-replay)
+---@return string
+function GenerateCraftId()
+    local template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+    return (string.gsub(template, '[xy]', function(c)
+        local v = (c == 'x') and math.random(0, 0xf) or math.random(8, 0xb)
+        return string.format('%x', v)
+    end))
+end
+
+---@param src number
+---@return string|nil
+function GetPlayerIdentifierSafe(src)
+    local xPlayer = ESX and ESX.GetPlayerFromId and ESX.GetPlayerFromId(src)
+    if xPlayer and xPlayer.identifier then
+        return xPlayer.identifier
+    end
+    return GetPlayerIdentifierByType(src, 'license') or GetPlayerIdentifierByType(src, 'license2')
 end
