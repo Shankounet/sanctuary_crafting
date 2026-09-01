@@ -81,14 +81,48 @@ Fichier : `integrations/ml_skills.lua`.
 |---------|------------|
 | `CraftingSkills.AddXP` | `AddXp(categoryUid, amount, source)` |
 | `CraftingSkills.GetLevel` | `GetPlayerLevel(categoryUid?, source)` |
-| `CraftingSkills.HasRequiredLevel` | level ≥ requis |
-| `CraftingSkills.HasSkill` | `HasUnlockedSkill(categoryUid?, skillUid, source)` |
+| `CraftingSkills.HasRequiredLevel` | level ≥ requis (ou bypass test) |
+| `CraftingSkills.HasSkill` | `HasUnlockedSkill(...)` (ou bypass test) |
 | `CraftingSkills.GetCategoryBonus` | `GetTotalCategoryBonus(categoryUid, source)` |
+| `CraftingSkills.ShouldBypassRequirements` | mode test (voir ci-dessous) |
 
 Soft-fail : `pcall` + `GetResourceState`.  
-**Si la recette a `requireLevel` / `requireSkill` et ml_skills est down → craft refusé** (`craft_skills_unavailable`). Pas de bypass silencieux.
+**Si la recette a `requireLevel` / `requireSkill` et ml_skills est down → craft refusé** (`craft_skills_unavailable`), **sauf** mode test (bypass).
 
 La **maîtrise de recette** (`Config.Mastery`) est locale (SQL) et **n’est pas** un XP global : ml_skills reste la seule source d’XP de compétences.
+
+### Mode test sans skills
+
+> **NE JAMAIS activer `BypassRequirements` sur un serveur public / production.**  
+> Réservé au debug, aux labs et aux tests de recettes / carnet.
+
+```lua
+Config.Skills = {
+  -- ...
+  BypassRequirements = false,                          -- OFF par défaut (prod)
+  BypassAce = 'sanctuary.crafting.bypassskills',       -- optionnel
+  BypassAlsoSkipXP = false,                            -- false = tenter AddXp si ml_skills up
+  BypassNotify = false,                                -- ou Config.Debug → notify ox_lib 1×
+}
+```
+
+Comportement :
+
+| Condition | Effet |
+|-----------|--------|
+| `BypassRequirements = true` | **Tous** les joueurs sautent `requireLevel` / `requireSkill` (pipeline + book « can craft ») |
+| `BypassRequirements = false` + ACE `BypassAce` (ou `Config.AdminGroups` / `AdminAce` via `Validation.IsAdmin`) | Ces joueurs seulement sautent les gates |
+| Bonus durée craft | Soft-fail inchangé (pas de bonus si ml_skills down) |
+| XP | Toujours via `CraftingSkills.AddXP` → ml_skills ; pas d’XP parallèle. Si `BypassAlsoSkipXP = true`, n’appelle pas AddXp sous bypass |
+| Sécurité | Ingrédients, station, distance, rate-limit, `craftId` : **inchangés** |
+
+Notify (une fois / session) au **démarrage d’un craft** (pipeline ou file) si `Config.Debug` ou `Config.Skills.BypassNotify`.
+
+server.cfg (exemple ACE per-admin) :
+
+```cfg
+add_ace group.admin sanctuary.crafting.bypassskills allow
+```
 
 ---
 

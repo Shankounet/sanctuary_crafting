@@ -303,6 +303,10 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
     local ctx, reason, args = validateStart(src, recipeId, benchKey, batch)
     if not ctx then return { ok = false, reason = reason, args = args } end
 
+    if CraftingSkills and CraftingSkills.NotifyBypassIfNeeded then
+        CraftingSkills.NotifyBypassIfNeeded(src)
+    end
+
     local recipe, bench = ctx.recipe, ctx.bench
     local removed = false
     if Config.Crafting and Config.Crafting.RemoveIngredientsOnStart ~= false then

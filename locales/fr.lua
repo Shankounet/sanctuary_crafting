@@ -13,6 +13,7 @@ Locales['fr'] = {
     ['craft_skill_required'] = 'Compétence requise : %s',
     ['craft_blueprint_required'] = 'Schéma requis : %s',
     ['craft_skills_unavailable'] = 'Système de compétences indisponible — craft refusé',
+    ['craft_skills_bypass_active'] = '[TEST] Bypass compétences actif — gates level/skill ignorées',
     ['craft_invalid'] = 'Recette invalide',
     ['craft_wrong_bench'] = 'Cette recette ne convient pas à cet atelier',
     ['craft_inventory_full'] = 'Inventaire plein',
