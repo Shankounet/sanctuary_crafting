@@ -1,5 +1,5 @@
 /* =============================================================================
-   Survival Book v2.4.0 — diegetic field journal
+   Survival Book v2.5.0 — diegetic field journal
    Ivory paper, leather binding, edge tabs. Scope: #book-app only.
    CEF-safe: system fonts, no @import, no feTurbulence, no mix-blend,
    no opacity-open animations stuck at 0.
@@ -10,9 +10,11 @@
   --book-ink: #2c2418;
   --book-ink-soft: #5a4e3c;
   --book-muted: #7a6e5a;
-  --book-paper: #f3ead6;
-  --book-paper-2: #ebe0c8;
-  --book-paper-deep: #e2d4b6;
+  --book-paper: #f2e6c8;
+  --book-paper-2: #ead9b4;
+  --book-paper-deep: #e0cc9e;
+  --book-paper-warm: #f4e4b8;
+  --book-paper-cool: #efe6d0;
   --book-rule: rgba(90, 78, 60, 0.22);
   --book-leather: #3d2a1c;
   --book-leather-2: #5a3d28;
@@ -34,6 +36,7 @@
   --tab-beige: #8a7a5e;
   --tab-cardboard: #7a6548;
   --tab-cloth: #6a4e3c;
+  --tab-bordeaux: #6a3a3e;
 }
 
 #book-app {
@@ -278,8 +281,10 @@
 }
 #book-app .book-edge-tabs button {
   pointer-events: auto;
+  /* upright vertical labels — readable top→bottom, no rotate(180deg) head-tilt */
   writing-mode: vertical-rl;
-  transform: rotate(180deg);
+  text-orientation: mixed;
+  transform: none;
   border: 1px solid rgba(50, 35, 20, 0.4);
   border-right: none;
   border-radius: 0 5px 5px 0;
@@ -310,7 +315,7 @@
   pointer-events: none;
 }
 #book-app .book-edge-tabs button:hover {
-  transform: rotate(180deg) translateY(-2px);
+  transform: translateX(3px);
 }
 #book-app .book-edge-tabs button.active {
   color: #2a2014;
@@ -370,8 +375,10 @@
   left: -34px;
   top: 48px;
   z-index: 5;
+  /* upright vertical — same as right tabs, no rotate(180deg) */
   writing-mode: vertical-rl;
-  transform: rotate(180deg);
+  text-orientation: mixed;
+  transform: none;
   border: 1px solid rgba(60, 40, 20, 0.4);
   border-left: none;
   border-radius: 6px 0 0 6px;
@@ -385,6 +392,15 @@
   background: linear-gradient(270deg, #4a3428, var(--tab-cloth));
   cursor: pointer;
   box-shadow: -2px 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform var(--book-trans);
+}
+#book-app .book-index-tab:hover {
+  transform: translateX(-3px);
+}
+#book-app .book-index-tab.active {
+  transform: translateX(-2px);
+  color: #2a2014;
+  background: linear-gradient(270deg, #a89068, #d0bc96);
 }
 
 /* Close ribbon */
@@ -419,7 +435,8 @@
   position: absolute;
   top: 14px;
   writing-mode: vertical-rl;
-  transform: rotate(180deg);
+  text-orientation: mixed;
+  transform: none;
   font-family: var(--book-ui);
   font-size: 9px;
   font-weight: 700;
@@ -1582,7 +1599,7 @@
 #book-app:not(.hidden) .book-page {
   opacity: 1 !important;
   visibility: visible !important;
-  background: #f3ead6 !important;
+  background: #f2e6c8 !important;
   color: #2c2418 !important;
   min-height: 200px !important;
 }
@@ -1597,3 +1614,664 @@
   opacity: 1 !important;
   transform: none !important;
 }
+
+/* === v2.5.0 — field notebook material pass ===
+   Warmer lived-in ivory, page L/R variance, binding volume,
+   physical tabs, stamps, scraps, wear traces, ink sketches.
+   CEF-safe: gradients only, no @import / feTurbulence / mix-blend /
+   opacity-open stick. Overrides use #book-app specificity (+ !important
+   where the CEF hard-fix flattened paper).
+   ================================================================== */
+
+:root {
+  --tab-bordeaux: #6a3a3e;
+}
+
+/* —— P0 Paper: warmer yellowed ivory, fibers, stains, edge wear —— */
+#book-app .book-page {
+  background:
+    /* fiber streaks */
+    repeating-linear-gradient(
+      92deg,
+      transparent 0 11px,
+      rgba(120, 95, 55, 0.028) 11px 12px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 13px,
+      rgba(100, 80, 45, 0.018) 13px 14px
+    ),
+    /* warm ivory body */
+    linear-gradient(168deg, #f6ebc8 0%, #f0e0b6 38%, #e8d4a8 72%, #e2cc9a 100%) !important;
+  box-shadow:
+    inset 0 0 48px rgba(110, 80, 35, 0.1),
+    inset 0 -20px 36px rgba(90, 60, 25, 0.06);
+}
+
+/* Left page slightly warmer + different marks */
+#book-app .book-page-left {
+  background:
+    radial-gradient(ellipse 90px 70px at 18% 82%, rgba(140, 100, 50, 0.09) 0%, transparent 70%),
+    radial-gradient(ellipse 50px 40px at 72% 18%, rgba(120, 85, 40, 0.06) 0%, transparent 65%),
+    repeating-linear-gradient(88deg, transparent 0 14px, rgba(130, 100, 55, 0.03) 14px 15px),
+    linear-gradient(175deg, #f5e6b8 0%, #efd9a6 45%, #e6cb96 100%) !important;
+  box-shadow:
+    inset -22px 0 36px rgba(70, 45, 15, 0.14),
+    inset 0 0 0 1px rgba(90, 70, 40, 0.14),
+    inset 8px 0 18px rgba(60, 40, 15, 0.04) !important;
+  border-radius: 3px 0 0 4px;
+}
+
+/* Right page cooler ivory + different stain map */
+#book-app .book-page-right {
+  background:
+    radial-gradient(ellipse 80px 60px at 78% 70%, rgba(110, 90, 55, 0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 40px 55px at 22% 12%, rgba(100, 75, 40, 0.05) 0%, transparent 60%),
+    repeating-linear-gradient(95deg, transparent 0 16px, rgba(100, 85, 50, 0.022) 16px 17px),
+    linear-gradient(185deg, #f3e9cc 0%, #ebe0c0 48%, #e4d4ae 100%) !important;
+  box-shadow:
+    inset 22px 0 36px rgba(70, 45, 15, 0.14),
+    inset 0 0 0 1px rgba(90, 70, 40, 0.14),
+    inset -8px 0 18px rgba(60, 40, 15, 0.04) !important;
+  border-radius: 0 3px 4px 0;
+}
+
+/* Edge wear, darkened corners, handling marks */
+#book-app .book-page-edge {
+  background:
+    /* top/bottom edge darkening */
+    linear-gradient(180deg, rgba(90, 65, 30, 0.1) 0%, transparent 14px, transparent calc(100% - 16px), rgba(80, 55, 25, 0.12) 100%),
+    /* outer side soft wear */
+    linear-gradient(90deg, rgba(70, 50, 20, 0.04), transparent 8%, transparent 92%, rgba(70, 50, 20, 0.05)),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(90, 70, 40, 0.02) 2px,
+      rgba(90, 70, 40, 0.02) 3px
+    );
+  opacity: 0.85;
+}
+#book-app .book-page-edge::after {
+  content: "";
+  position: absolute;
+  right: 10%;
+  bottom: 14%;
+  width: 88px;
+  height: 62px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(130, 95, 45, 0.1) 0%, transparent 72%);
+  pointer-events: none;
+}
+/* Left page coffee ring + pencil friction (wear traces) */
+#book-app .book-page-left .book-page-edge::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 32px;
+  background:
+    linear-gradient(90deg, rgba(70, 45, 15, 0.1), transparent),
+    /* faint pencil scratch near gutter */
+    repeating-linear-gradient(12deg, transparent 0 18px, rgba(60, 45, 25, 0.04) 18px 19px);
+  pointer-events: none;
+  z-index: 0;
+}
+#book-app .book-page-left .book-page-edge::after {
+  left: 22%;
+  right: auto;
+  top: 28%;
+  bottom: auto;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 2px rgba(120, 90, 50, 0.08),
+    inset 0 0 0 5px rgba(120, 90, 50, 0.03);
+  background: radial-gradient(circle, transparent 55%, rgba(130, 95, 50, 0.07) 62%, transparent 70%);
+}
+/* Right page aged tape + corner darkening */
+#book-app .book-page-right .book-page-edge::before {
+  content: "";
+  position: absolute;
+  top: 8%;
+  right: 12%;
+  width: 46px;
+  height: 12px;
+  background: rgba(190, 170, 120, 0.28);
+  border: 1px solid rgba(150, 130, 80, 0.18);
+  transform: rotate(7deg);
+  box-shadow: 0 1px 0 rgba(255, 255, 240, 0.2) inset;
+  pointer-events: none;
+}
+#book-app .book-page-right::after {
+  content: "";
+  position: absolute;
+  right: 0; bottom: 0;
+  width: 70px; height: 70px;
+  background: radial-gradient(ellipse at 100% 100%, rgba(70, 50, 25, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+#book-app .book-page-left::after {
+  content: "";
+  position: absolute;
+  left: 0; top: 0;
+  width: 60px; height: 60px;
+  background: radial-gradient(ellipse at 0% 0%, rgba(80, 55, 25, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Corner fold (subtle asymmetry) */
+#book-app .book-page-right .book-page-inner::before {
+  content: "";
+  position: absolute;
+  top: 0; right: 0;
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 0 18px 18px 0;
+  border-color: transparent #dcc89a transparent transparent;
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* —— P0 Binding volume —— */
+#book-app .book-binding {
+  background:
+    linear-gradient(90deg,
+      #1a100a 0%,
+      #2e1c12 12%,
+      #4a3020 28%,
+      #6a4a30 48%,
+      #4a3020 70%,
+      #2e1c12 88%,
+      #1a100a 100%) !important;
+  box-shadow:
+    inset 0 0 12px rgba(0, 0, 0, 0.7),
+    -10px 0 22px rgba(0, 0, 0, 0.35),
+    10px 0 22px rgba(0, 0, 0, 0.35),
+    0 0 24px rgba(0, 0, 0, 0.4) !important;
+}
+#book-app .book-binding-groove {
+  inset: 6% 32% 6% 32%;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.22) 50%, rgba(0,0,0,0.5));
+  box-shadow:
+    inset 0 0 6px rgba(0,0,0,0.65),
+    0 0 2px rgba(210, 180, 120, 0.15);
+}
+#book-app .book-binding-shadow {
+  background:
+    linear-gradient(90deg,
+      rgba(0,0,0,0.42) 0%,
+      rgba(0,0,0,0.12) 35%,
+      transparent 48%,
+      transparent 52%,
+      rgba(0,0,0,0.12) 65%,
+      rgba(0,0,0,0.42) 100%);
+}
+#book-app .book-binding-stitch {
+  width: 2px;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(210, 180, 120, 0.55) 0 5px,
+    transparent 5px 12px
+  );
+  opacity: 0.85;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.4);
+}
+#book-app .book-cover {
+  background:
+    linear-gradient(148deg, #8a6240 0%, var(--book-leather-hi) 22%, var(--book-leather-2) 55%, #2a1a10 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 170, 0.14),
+    inset 0 -10px 22px rgba(0, 0, 0, 0.42),
+    inset 0 0 30px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* —— P0 Physical tabs: materials, size variance, wear, cast shadow —— */
+#book-app .book-edge-tabs {
+  right: -42px;
+  width: 42px;
+  gap: 6px;
+  filter: none;
+}
+#book-app .book-edge-tabs button {
+  border-radius: 0 6px 7px 0;
+  /* cast shadow onto page */
+  box-shadow:
+    -3px 2px 6px rgba(0, 0, 0, 0.22),
+    2px 3px 5px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 240, 210, 0.1),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.15) !important;
+}
+#book-app .book-edge-tabs button::after {
+  /* worn top corner nick */
+  content: "";
+  position: absolute;
+  top: -1px; right: 2px;
+  width: 8px; height: 6px;
+  background: linear-gradient(135deg, rgba(0,0,0,0.18), transparent 60%);
+  border-radius: 0 4px 0 0;
+  pointer-events: none;
+}
+#book-app .book-edge-tabs button:hover {
+  transform: translateX(3px) !important;
+}
+#book-app .book-edge-tabs button.active {
+  transform: translateX(2px);
+  padding-right: 9px;
+}
+
+/* Size / padding variance + light folds */
+#book-app .book-edge-tabs button:nth-child(1) {
+  max-height: 86px; padding: 10px 5px 10px 4px;
+}
+#book-app .book-edge-tabs button:nth-child(2) {
+  max-height: 98px; padding: 13px 6px 12px 5px;
+}
+#book-app .book-edge-tabs button:nth-child(3) {
+  max-height: 78px; padding: 9px 4px;
+}
+#book-app .book-edge-tabs button:nth-child(4) {
+  max-height: 104px; padding: 14px 6px;
+}
+#book-app .book-edge-tabs button:nth-child(5) {
+  max-height: 90px; padding: 11px 5px 10px 4px;
+}
+#book-app .book-edge-tabs button:nth-child(6) {
+  max-height: 82px; padding: 10px 5px;
+}
+#book-app .book-edge-tabs button:nth-child(7) {
+  max-height: 96px; padding: 12px 6px 11px 5px;
+}
+#book-app .book-edge-tabs button:nth-child(8) {
+  max-height: 88px; padding: 11px 5px;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.05) 3px, rgba(0,0,0,0.05) 4px),
+    linear-gradient(90deg, #3a2218 0%, var(--tab-bordeaux) 55%, #8a5a58 100%) !important;
+}
+
+/* Soften active to aged paper, not bright modern */
+#book-app .book-edge-tabs button.active:nth-child(odd),
+#book-app .book-edge-tabs button.active:nth-child(even) {
+  background: linear-gradient(90deg, #5a4830 0%, #9a8260 48%, #c4ae86 100%) !important;
+  color: #2a2014 !important;
+}
+
+#book-app .book-index-tab {
+  box-shadow:
+    3px 2px 6px rgba(0, 0, 0, 0.22),
+    -2px 3px 5px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 240, 210, 0.1) !important;
+  border-radius: 7px 0 0 8px;
+}
+#book-app .book-index-tab:hover {
+  transform: translateX(-3px) !important;
+}
+
+/* —— P1 Stamps: irregular rubber-ink feel —— */
+#book-app .book-stamp {
+  font-family: var(--book-ui);
+  letter-spacing: 0.14em;
+  color: rgba(120, 85, 50, 0.72);
+}
+#book-app .stamp,
+#book-app .ink-stamp,
+#book-app .book-stamp.rubber {
+  position: relative;
+  display: inline-block;
+  margin: 6px 4px 6px 0;
+  padding: 5px 10px;
+  border: 2px solid rgba(140, 70, 45, 0.52);
+  color: rgba(130, 65, 40, 0.78);
+  font-family: var(--book-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transform: rotate(-3.5deg);
+  border-radius: 3px 2px 4px 2px;
+  line-height: 1.15;
+  background:
+    radial-gradient(ellipse at 20% 30%, rgba(160, 80, 50, 0.06), transparent 60%),
+    radial-gradient(ellipse at 80% 70%, rgba(140, 60, 40, 0.05), transparent 55%);
+  box-shadow:
+    inset 0 0 0 1px rgba(160, 90, 55, 0.12),
+    1px 1px 0 rgba(255, 250, 240, 0.15);
+}
+#book-app .stamp::before,
+#book-app .ink-stamp::before {
+  /* imperfect outer outline gap */
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 1px dashed rgba(140, 70, 45, 0.22);
+  border-radius: 4px;
+  pointer-events: none;
+  transform: rotate(0.8deg);
+}
+#book-app .stamp.ok,
+#book-app .stamp-valide,
+#book-app .ink-stamp.ok {
+  border-color: rgba(60, 100, 65, 0.55);
+  color: rgba(45, 85, 50, 0.8);
+  transform: rotate(2.5deg);
+}
+#book-app .stamp-ouvert { transform: rotate(-5deg); border-color: rgba(70, 100, 120, 0.5); color: rgba(50, 80, 100, 0.75); }
+#book-app .stamp-decouvert { transform: rotate(4deg); border-color: rgba(130, 90, 40, 0.55); color: rgba(110, 70, 30, 0.78); }
+#book-app .stamp-maitrise { transform: rotate(-2deg); border-color: rgba(100, 60, 90, 0.5); color: rgba(90, 45, 80, 0.78); }
+#book-app .stamp-specialisation { transform: rotate(-6deg); }
+#book-app .stamp.seal {
+  border-radius: 50%;
+  width: 58px; height: 58px;
+  box-shadow: inset 0 0 0 3px rgba(140, 70, 45, 0.15);
+}
+
+/* Handwriting only for notes — system titles stay Georgia */
+#book-app .book-page-title,
+#book-app .section-title,
+#book-app .accueil-title,
+#book-app .scrap-note .scrap-title {
+  font-family: var(--book-display);
+}
+#book-app .hand-note,
+#book-app .scrap-note .scrap-foot,
+#book-app .vc-note,
+#book-app .day-note,
+#book-app .tp-annot,
+#book-app .check-annot,
+#book-app .disc-annot {
+  font-family: var(--book-hand);
+}
+
+/* —— P1 Collaged scraps —— */
+#book-app .scrap-note {
+  background:
+    linear-gradient(175deg, #f7efd4 0%, #efe4c4 100%);
+  border: 1px solid rgba(110, 90, 55, 0.32);
+  box-shadow:
+    2px 3px 5px rgba(50, 35, 15, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 245, 0.25);
+  border-radius: 1px 2px 1px 3px;
+  /* torn-ish bottom via jagged gradient mask substitute */
+  clip-path: polygon(
+    0% 0%, 100% 0%, 100% 96%, 97% 100%, 94% 97%, 90% 100%,
+    85% 97%, 80% 100%, 70% 98%, 60% 100%, 50% 97%, 40% 100%,
+    30% 98%, 20% 100%, 10% 97%, 0% 100%
+  );
+}
+#book-app .scrap-note.tint-warm { background: linear-gradient(175deg, #f4e4bc 0%, #ebd4a4 100%); }
+#book-app .scrap-note.tint-cool { background: linear-gradient(175deg, #eef0de 0%, #e2e4cc 100%); }
+#book-app .scrap-note.tint-rose { background: linear-gradient(175deg, #f4e6d8 0%, #ebd6c4 100%); }
+#book-app .tape {
+  background: rgba(200, 175, 115, 0.5);
+  border: 1px solid rgba(150, 125, 75, 0.28);
+}
+
+/* —— P1 Checklist annotations —— */
+#book-app .checklist li.done .check-annot,
+#book-app .check-annot {
+  font-family: var(--book-hand);
+  font-size: 13px;
+  color: rgba(70, 100, 60, 0.85);
+  margin-left: 6px;
+  transform: rotate(-2deg);
+  display: inline-block;
+}
+#book-app .checklist .box {
+  border-radius: 50%;
+  border-width: 1.5px;
+  border-color: rgba(80, 60, 35, 0.6);
+}
+#book-app .checklist li.done .box::after,
+#book-app .checklist .box.checked::after {
+  content: "✓";
+  left: 1px; top: -2px;
+  font-size: 11px;
+  color: rgba(55, 90, 50, 0.9);
+}
+
+/* —— P1 / P2 Artisans business-card —— */
+#book-app .visit-card.business-card {
+  background:
+    linear-gradient(180deg, #f8f2e2 0%, #efe4cc 100%);
+  border: 1px solid rgba(100, 80, 50, 0.35);
+  box-shadow:
+    2px 3px 6px rgba(50, 35, 15, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 245, 0.3);
+}
+#book-app .visit-card .photo-clip {
+  background:
+    repeating-linear-gradient(45deg, #e4d8bc, #e4d8bc 3px, #d9ccae 3px, #d9ccae 6px);
+  box-shadow: 1px 2px 2px rgba(60, 40, 20, 0.12);
+}
+
+/* —— P2 Blueprint technical paper —— */
+#book-app .blueprint-sheet {
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(60, 95, 125, 0.1) 18px, rgba(60, 95, 125, 0.1) 19px),
+    repeating-linear-gradient(90deg, transparent, transparent 18px, rgba(60, 95, 125, 0.07) 18px, rgba(60, 95, 125, 0.07) 19px),
+    linear-gradient(160deg, #e4ecf2 0%, #d5e2ea 100%) !important;
+  border: 1px solid rgba(60, 95, 125, 0.32);
+  box-shadow:
+    2px 3px 5px rgba(30, 50, 70, 0.12),
+    inset 0 0 20px rgba(80, 120, 150, 0.06);
+  position: relative;
+}
+#book-app .blueprint-sheet.folded {
+  clip-path: polygon(0 0, 96% 0, 100% 4%, 100% 100%, 0 100%);
+}
+#book-app .blueprint-sheet.folded::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 0;
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 0 16px 16px 0;
+  border-color: transparent #b8c8d4 transparent transparent;
+  opacity: 0.8;
+}
+#book-app .blueprint-sheet .bp-annot {
+  font-family: var(--book-hand);
+  font-size: 13px;
+  color: rgba(40, 70, 100, 0.75);
+  margin-top: 6px;
+  transform: rotate(-1deg);
+}
+
+/* —— P2 Progression pencil / drawn gauge —— */
+#book-app .ms-line {
+  position: relative;
+  border-bottom: 1px dashed rgba(90, 70, 40, 0.2);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+#book-app .ms-gauge .tick {
+  border-radius: 50%;
+  border: 1.5px solid rgba(90, 70, 40, 0.45);
+  background: transparent;
+  width: 10px; height: 10px;
+}
+#book-app .ms-gauge .tick.on {
+  background: rgba(90, 70, 40, 0.55);
+  box-shadow: inset 0 0 0 2px rgba(242, 230, 200, 0.5);
+}
+#book-app .ms-gauge .ms-bar {
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(90, 70, 40, 0.08) 0 4px,
+    transparent 4px 8px
+  );
+  border: 1px solid rgba(90, 70, 40, 0.25);
+  height: 8px;
+  border-radius: 1px;
+}
+#book-app .ms-gauge .ms-bar > span {
+  background: linear-gradient(90deg, rgba(120, 90, 50, 0.45), rgba(90, 70, 40, 0.65));
+  border-radius: 1px;
+}
+#book-app .lvl-stamp {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border: 1.5px solid rgba(140, 70, 45, 0.5);
+  color: rgba(130, 65, 40, 0.75);
+  font-family: var(--book-ui);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transform: rotate(-4deg);
+  vertical-align: middle;
+}
+
+/* —— P2 Discoveries —— */
+#book-app .discovery-card {
+  position: relative;
+  margin: 10px 2px 14px;
+  padding: 10px 12px 12px;
+  background: linear-gradient(175deg, #f5ecd4 0%, #ebe0c4 100%);
+  border: 1px solid rgba(110, 90, 55, 0.28);
+  box-shadow: 1px 2px 4px rgba(50, 35, 15, 0.1);
+  transform: rotate(-0.5deg);
+}
+#book-app .discovery-card:nth-child(even) { transform: rotate(0.7deg); }
+#book-app .discovery-card .disc-sketch {
+  float: right;
+  margin: 0 0 6px 8px;
+}
+#book-app .disc-annot {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--book-ink-soft);
+}
+#book-app .disc-source {
+  font-family: var(--book-ui);
+  font-size: 10px;
+  color: var(--book-muted);
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+}
+
+/* —— Accueil personal notebook fields —— */
+#book-app .field-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 4px 10px;
+  margin: 4px 0;
+  font-size: 13px;
+  border-bottom: 1px dotted rgba(90, 78, 60, 0.2);
+  padding: 4px 0;
+}
+#book-app .field-row .fk {
+  font-family: var(--book-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--book-accent);
+  padding-top: 2px;
+}
+#book-app .field-row .fv {
+  font-family: var(--book-serif);
+  color: var(--book-ink);
+}
+#book-app .field-row .fv.is-empty {
+  font-family: var(--book-hand);
+  color: var(--book-muted);
+  font-style: italic;
+}
+
+/* —— P2 Micro ink sketches (pure CSS, sparse) —— */
+#book-app .ink-sketch {
+  display: inline-block;
+  position: relative;
+  width: 36px;
+  height: 36px;
+  margin: 4px 6px;
+  opacity: 0.55;
+  vertical-align: middle;
+  pointer-events: none;
+}
+#book-app .ink-sketch.gear {
+  border: 2px solid rgba(60, 45, 30, 0.55);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 6px transparent;
+}
+#book-app .ink-sketch.gear::before {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border: 2px solid rgba(60, 45, 30, 0.5);
+  border-radius: 50%;
+}
+#book-app .ink-sketch.gear::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: -3px;
+  width: 6px; height: 6px;
+  margin-left: -3px;
+  background: rgba(60, 45, 30, 0.45);
+  box-shadow:
+    0 33px 0 rgba(60, 45, 30, 0.45),
+    14px 6px 0 rgba(60, 45, 30, 0.4),
+    -14px 6px 0 rgba(60, 45, 30, 0.4),
+    14px 26px 0 rgba(60, 45, 30, 0.35),
+    -14px 26px 0 rgba(60, 45, 30, 0.35);
+}
+#book-app .ink-sketch.tool {
+  width: 8px;
+  height: 30px;
+  border-radius: 2px;
+  background: rgba(60, 45, 30, 0.45);
+  transform: rotate(-25deg);
+  margin: 4px 14px;
+}
+#book-app .ink-sketch.tool::before {
+  content: "";
+  position: absolute;
+  top: -6px; left: -4px;
+  width: 16px; height: 10px;
+  border: 2px solid rgba(60, 45, 30, 0.5);
+  border-radius: 2px 2px 1px 1px;
+  background: rgba(60, 45, 30, 0.15);
+}
+#book-app .ink-sketch.plant {
+  width: 4px;
+  height: 22px;
+  background: rgba(55, 75, 40, 0.5);
+  margin: 8px 16px 4px;
+  border-radius: 2px;
+}
+#book-app .ink-sketch.plant::before,
+#book-app .ink-sketch.plant::after {
+  content: "";
+  position: absolute;
+  width: 12px; height: 8px;
+  border: 2px solid rgba(55, 75, 40, 0.45);
+  border-radius: 50% 0;
+  background: transparent;
+}
+#book-app .ink-sketch.plant::before {
+  left: -10px; top: 4px;
+  transform: rotate(-20deg);
+}
+#book-app .ink-sketch.plant::after {
+  left: 2px; top: 10px;
+  transform: rotate(110deg);
+  border-radius: 0 50%;
+}
+
+/* Sticky / objective done strikethrough reinforcement */
+#book-app .sticky-note.done .st-title {
+  text-decoration: line-through;
+  color: var(--book-muted);
+}
+#book-app .sticky-note .check-annot {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+}
+

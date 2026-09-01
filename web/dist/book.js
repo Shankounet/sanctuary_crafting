@@ -141,13 +141,26 @@
       const ticks = Array.from({ length: 5 }).map((_, i) =>
         `<span class="tick ${level > i * 2 ? 'on' : ''}"></span>`
       ).join('');
+      const stampCls = level >= 8 ? 'stamp-maitrise' : (level >= 4 ? 'stamp-valide' : '');
+      const stampLab = level >= 8 ? 'MAÎTRISÉ' : (level >= 4 ? 'VALIDÉ' : (level > 0 ? 'OUVERT' : ''));
       return `<div class="ms-line">
         <span class="ms-name">${esc(skillLabel(k))}</span>
-        <span class="ms-lvl">Niv. ${esc(level)}</span>
+        <span class="ms-lvl">Niv. ${esc(level)}${stampLab ? `<span class="lvl-stamp ${stampCls}">${stampLab}</span>` : ''}</span>
         <div class="ms-gauge">${ticks}<div class="ms-bar"><span style="width:${pct}%"></span></div></div>
         <div class="widget-foot" style="grid-column:1/-1">Bonus ${esc(lv.bonus || 0)}% · lecture ml_skills</div>
       </div>`;
     }).join('')}</div>`;
+  }
+
+
+  function metaOrDash(v) {
+    if (v == null || v === '') return { text: '—', empty: true };
+    return { text: String(v), empty: false };
+  }
+
+  function fieldRow(label, value) {
+    const m = metaOrDash(value);
+    return `<div class="field-row"><span class="fk">${esc(label)}</span><span class="fv${m.empty ? ' is-empty' : ''}">${esc(m.text)}</span></div>`;
   }
 
   function dayNoteFromStats(st, objs) {
@@ -315,20 +328,32 @@
       ? `${st.artisans} contact${st.artisans > 1 ? 's' : ''} recensés`
       : 'Aucun artisan noté';
 
+    const place = (state.meta && (state.meta.place || state.meta.location)) || null;
+    const dateStr = (state.meta && (state.meta.date || state.meta.openedAt || state.meta.day)) || null;
+    const daily = (state.meta && (state.meta.dailyNote || state.meta.noteDuJour)) || dayNoteFromStats(st, objs);
+    const mainObj = (state.meta && (state.meta.mainObjective || state.meta.objectif)) || (objs[0] && objs[0].title) || null;
+    const lastArtisan = (state.meta && state.meta.lastArtisan) || ((st.artisans || 0) > 0 ? artisanHint : null);
+    const lastDisc = (state.meta && state.meta.lastDiscovery) || (discovery && discovery.label) || null;
+
     const left = `
       <div class="accueil-hero">
         <p class="book-stamp">Dossier personnel</p>
         <h2 class="accueil-title">${esc(String(title))}</h2>
         ${charName ? `<p class="accueil-char">Propriétaire : ${esc(charName)}</p>` : `<p class="accueil-char">${esc(subtitle)}</p>`}
         <div class="accueil-seal-row">
-          ${spec ? `<span class="stamp">Spécialisation · ${esc(spec)}</span>` : `<span class="stamp">Terrain</span>`}
+          ${spec ? `<span class="stamp stamp-specialisation">SPÉCIALISATION · ${esc(spec)}</span>` : `<span class="stamp">Terrain</span>`}
           <span class="stamp seal">SC<br/>OK</span>
+          <span class="ink-sketch gear" aria-hidden="true" title=""></span>
         </div>
         <hr class="ink-rule" />
+        ${fieldRow('Nom', charName)}
+        ${fieldRow('Spécialisation', spec)}
+        ${fieldRow('Date', dateStr)}
+        ${fieldRow('Lieu', place)}
       </div>
       <h3 class="section-title">Compétences — manuscrit</h3>
       ${msSkillLines(levels)}
-      <div class="day-note">${esc(dayNoteFromStats(st, objs))}</div>
+      <div class="day-note">${esc(daily)}</div>
       ${folio('i')}`;
 
     const right = `
@@ -336,30 +361,36 @@
       <h2 class="book-page-title">Situation</h2>
       <hr class="ink-rule" />
 
-      <div class="scrap-note rot-l">
+      ${fieldRow('Objectif principal', mainObj || (projects[0] && projects[0].label))}
+      ${fieldRow('Dernier artisan', lastArtisan)}
+      ${fieldRow('Dernière découverte', lastDisc)}
+
+      <div class="scrap-note rot-l tint-warm">
         <span class="tape top-l"></span>
         <span class="tape top-r"></span>
+        <span class="paperclip"></span>
         <div class="scrap-title">Projet principal</div>
         ${projects[0]
           ? `<div class="scrap-body"><strong>${esc(projects[0].label)}</strong></div>
              <div class="scrap-foot">${projects[0].isOwner ? 'Propriétaire' : 'Contributeur'} · ${esc(projects[0].status || 'open')}</div>`
-          : `<div class="scrap-body empty">Aucun chantier ouvert</div>`}
+          : `<div class="scrap-body empty">—</div>`}
       </div>
 
       <h3 class="section-title">Objectifs</h3>
       <ul class="checklist">
         ${(objs.slice(0, 4).map((o) =>
-          `<li class="${o.done ? 'done' : ''}"><span class="box ${o.done ? 'checked' : ''}"></span><span>${esc(o.title)}${o.kind ? ` <em>(${esc(o.kind)})</em>` : ''}</span></li>`
-        ).join('')) || '<li><span class="box"></span><span class="empty">Aucun objectif ouvert</span></li>'}
+          `<li class="${o.done ? 'done' : ''}"><span class="box ${o.done ? 'checked' : ''}"></span><span>${esc(o.title)}${o.kind ? ` <em>(${esc(o.kind)})</em>` : ''}</span>${o.done ? '<span class="check-annot">ok ✓</span>' : ''}</li>`
+        ).join('')) || '<li><span class="box"></span><span class="empty">—</span></li>'}
       </ul>
 
-      <div class="scrap-note rot-r flat" style="margin-top:14px">
+      <div class="scrap-note rot-r tint-cool" style="margin-top:14px">
         <span class="tape top-l"></span>
         <div class="scrap-title">Dernière découverte</div>
         ${discovery
           ? `<div class="scrap-body"><strong>${esc(discovery.label)}</strong></div>
-             <div class="scrap-foot">${almost[0] ? `Presque craftable · manque ${(almost[0].missing || []).length}` : 'Faisable maintenant'}</div>`
-          : `<div class="scrap-body empty">Pas de piste récente</div>`}
+             <div class="scrap-foot">${almost[0] ? `Presque craftable · manque ${(almost[0].missing || []).length}` : 'Faisable maintenant'}</div>
+             <span class="stamp stamp-decouvert" style="font-size:9px;padding:2px 6px">DÉCOUVERT</span>`
+          : `<div class="scrap-body empty">—</div>`}
       </div>
 
       <div class="dossier-sheet">
@@ -367,7 +398,7 @@
         ${next
           ? `<h4>${esc(next.label)}</h4>
              <p class="hand-note" style="font-size:14px;margin:4px 0">${next.requireSkill ? `Skill : ${esc(next.requireSkill)}` : `Niv. ${esc(next.requireLevel)} (Δ ${esc(next.delta || '?')})`}</p>`
-          : `<p class="empty">Rien de proche</p>`}
+          : `<p class="empty">—</p>`}
       </div>
 
       <p class="hand-note" style="margin-top:10px">Artisan récent — ${esc(artisanHint)}. ${pins.length ? `Épingles : ${pins.length}.` : ''}</p>
@@ -399,7 +430,8 @@
       <h2 class="book-page-title">Compétences</h2>
       <p class="hand-note">Lignes de manuscrit — ml_skills en lecture seule.</p>
       <hr class="ink-rule" />
-      ${spec ? `<span class="stamp">Niveau · ${esc(spec)}</span>` : ''}
+      ${spec ? `<span class="stamp stamp-specialisation">SPÉCIALISATION · ${esc(spec)}</span>` : ''}
+      <span class="ink-sketch tool" aria-hidden="true"></span>
       ${msSkillLines(levels)}
       ${folio('12')}`;
     const right = `
@@ -460,9 +492,10 @@
         const rid = o.payload && o.payload.recipeId;
         const pinned = rid && pinIds.has(rid);
         return `<article class="sticky-note ${o.done ? 'done' : ''}" data-id="${o.id}">
-          <div class="st-title">${o.done ? '✓ ' : '☐ '}${esc(o.title)}</div>
+          <div class="st-title">${o.done ? '☑ ' : '☐ '}${esc(o.title)}</div>
+          ${o.done ? '<span class="check-annot">fait — rayé</span>' : ''}
           <ul class="checklist">
-            <li class="${o.done ? 'done' : ''}"><span class="box ${o.done ? 'checked' : ''}"></span><span>${esc(o.kind || 'manual')}${pinned ? ' · épinglé' : ''}${rid ? ` · ${esc(rid)}` : ''}</span></li>
+            <li class="${o.done ? 'done' : ''}"><span class="box ${o.done ? 'checked' : ''}"></span><span>${esc(o.kind || 'manual')}${pinned ? ' · épinglé' : ''}${rid ? ` · ${esc(rid)}` : ''}</span>${o.done ? '<span class="check-annot">✓</span>' : ''}</li>
           </ul>
           <div class="st-actions obj-actions">
             ${!o.done ? `<button type="button" class="primary small" data-act="done">Terminer</button>` : ''}
@@ -566,6 +599,7 @@
       <p class="hand-note">Silhouettes jusqu'à découverte — jamais de wiki omniscient.</p>
       <hr class="ink-rule" />
       <p class="hand-note">Marquer « Non identifié » tant que MaskItem / known = false.</p>
+      <span class="ink-sketch plant" aria-hidden="true"></span>
       ${folio('50')}`;
     let right;
     if (!arr.length) {
@@ -614,13 +648,15 @@
       if (!list.length) {
         gridHtml = emptyBox('fa-scroll', 'Aucun plan connu', 'Apprenez des blueprints via le craft pour les archiver ici.');
       } else {
-        gridHtml = list.map((x) => `
-          <article class="blueprint-sheet">
+        gridHtml = list.map((x, i) => `
+          <article class="blueprint-sheet folded">
             <span class="tape top-l"></span>
+            ${i % 3 === 0 ? '<span class="paperclip"></span>' : ''}
             <div class="bp-mark">Plan technique · connu</div>
             <h4>${esc(x.label || x.id)}</h4>
             <div class="bp-id">${esc(x.id)}</div>
-            <p class="hand-note" style="font-size:13px;margin-top:6px;color:#3a5060">Archivé dans le carnet</p>
+            <p class="bp-annot">annot. : fragment collé — vérifier cotes avant atelier</p>
+            <span class="stamp stamp-ouvert" style="font-size:9px;padding:2px 6px">OUVERT</span>
           </article>`).join('');
       }
     } else {
@@ -658,13 +694,14 @@
       right = arr.map((a) => {
         const note = (a.meta && a.meta.note) || '';
         const fav = !!(a.meta && a.meta.favorite);
-        return `<article class="visit-card">
+        return `<article class="visit-card business-card">
           <span class="paperclip"></span>
           <div class="photo-clip" title="Portrait manquant"></div>
           <h4>${esc(a.displayName)}${fav ? ' ★' : ''}</h4>
           <div class="vc-meta">${esc(a.specialty || 'general')} · ${esc(TIER_LABEL[a.tier] || a.tier || 'Inconnu')}</div>
           <div class="vc-meta">Dernière rencontre · ${fmtTime(a.metAt)} · ${esc(a.source || 'meet')}</div>
-          <div class="vc-note">${note ? esc(note) : 'Services : échange RP / craft'}</div>
+          <div class="vc-note">${note ? esc(note) : 'Services : échange RP / craft — noter après rencontre'}</div>
+          ${a.tier === 'master' || a.tier === 'seasoned' ? '<span class="stamp stamp-valide" style="font-size:9px;padding:2px 6px;margin-top:6px">VALIDÉ</span>' : ''}
         </article>`;
       }).join('') + folio('71');
     }
@@ -821,12 +858,27 @@
     if (!arr.length) {
       right = emptyBox('fa-clock-rotate-left', 'Journal vide', 'Découvertes, objectifs et rencontres s\'empilent ici.') + folio('101');
     } else {
-      right = `<div class="journal-log">${arr.map((x) => {
+      const isDisc = page === 'discoveries';
+      right = `<div class="journal-log">${arr.map((x, i) => {
         let body = '';
+        let source = '';
         try {
           const p = x.payload || {};
           body = p.label || p.name || p.item || p.title || p.recipeId || JSON.stringify(p).slice(0, 80);
+          source = p.source || p.from || x.source || '';
         } catch (_) { body = '—'; }
+        if (isDisc) {
+          const sketch = i % 4 === 0 ? '<span class="ink-sketch plant disc-sketch" aria-hidden="true"></span>'
+            : (i % 4 === 2 ? '<span class="ink-sketch gear disc-sketch" aria-hidden="true"></span>' : '');
+          return `<article class="discovery-card">
+            ${sketch}
+            <div class="je-date">${fmtTime(x.ts || x.createdAt || x.at)}</div>
+            <span class="stamp stamp-decouvert" style="font-size:9px;padding:2px 6px">DÉCOUVERT</span>
+            <div class="je-body" style="margin-top:6px">${esc(body)}</div>
+            <div class="disc-annot">${esc(x.type || 'observation')} — noté sur le terrain</div>
+            <div class="disc-source">Source · ${esc(source || '—')}</div>
+          </article>`;
+        }
         return `<article class="journal-entry">
           <div class="je-date">${fmtTime(x.ts || x.createdAt || x.at)}</div>
           <div class="je-type">${esc(x.type || 'event')}</div>
