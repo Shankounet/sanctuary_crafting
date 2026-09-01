@@ -1,5 +1,5 @@
 /* sanctuary_crafting — Craft atelier design system (#app only). Book uses book.css. */
-/* v2.2.14 — fabrication module (ready / active / done) */
+/* v2.2.15 — neutralize warm/brass veils; charcoal surfaces, accent-only #9a8866 */
 
 :root {
   /* —— Color tokens (canonical) — neutral charcoal hierarchy —— */
@@ -8,11 +8,11 @@
   --color-panel-raised: #232323;
   --color-panel-technical: #202020;
   --color-border: #3a3a3a;
-  --border-nav: #333333;
-  --border-recipe: #3a3a3a;
-  --border-tech: #3a3a3a;
-  --border-action: rgba(90, 78, 58, 0.95);
-  --color-border-hard: rgba(74, 68, 58, 0.95);
+  --border-nav: #3a332b;
+  --border-recipe: #3a332b;
+  --border-tech: #3a332b;
+  --border-action: #3a332b;
+  --color-border-hard: #3a332b;
   --color-accent: #9a8866;
   --color-accent-dim: #7a6c52;
   --color-accent-bright: #b09a72;
@@ -23,7 +23,7 @@
   --color-muted: #9a9a9a;
 
   /* Soft fills */
-  --accent-soft: rgba(154, 136, 102, 0.11);
+  --accent-soft: rgba(154, 136, 102, 0.06);
   --accent-line: rgba(154, 136, 102, 0.28);
   --ok-soft: rgba(106, 118, 88, 0.10);
   --bad-soft: rgba(122, 85, 76, 0.10);
@@ -609,7 +609,7 @@ button, input { font: inherit; color: inherit; }
 }
 #app .recipe-card.selected {
   border-color: var(--color-accent);
-  background: #272722;
+  background: #252525;
   box-shadow:
     0 0 0 1px rgba(154,136,102,0.42),
     0 10px 20px rgba(0,0,0,0.34),
@@ -651,7 +651,7 @@ button, input { font: inherit; color: inherit; }
     inset 0 0 22px rgba(0,0,0,0.18);
 }
 #app .recipe-card.selected .card-img-zone {
-  background: #2c2c28;
+  background: #2a2a2a;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.06),
     inset 0 -10px 16px rgba(0,0,0,0.24),
@@ -720,7 +720,7 @@ button, input { font: inherit; color: inherit; }
   box-shadow: inset 0 1px 0 rgba(0,0,0,0.35);
 }
 #app .recipe-card.selected .card-body {
-  background: #22221e;
+  background: #222222;
 }
 #app .card-identity { min-width: 0; }
 #app .card-title {
@@ -1603,18 +1603,16 @@ button, input { font: inherit; color: inherit; }
 #app .panel-tech,
 #app .family-tech,
 #app .col-detail {
-  border-top: 3px solid #7a6c52 !important;
-  background:
-    linear-gradient(180deg, #242420 0%, #1f1f1f 18%, #1e1e1e 100%) !important;
+  border-top: 3px solid #3a332b !important;
+  background: #1f1f1f !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.05),
     0 4px 14px rgba(0,0,0,0.28) !important;
 }
 #app .panel-action,
 #app .actions {
-  background:
-    linear-gradient(180deg, #2a2a26 0%, #222220 40%, #1c1c1c 100%) !important;
-  border-top: 3px solid #9a8866 !important;
+  background: #202020 !important;
+  border-top: 3px solid #3a332b !important;
   box-shadow:
     0 -12px 26px rgba(0,0,0,0.45),
     inset 0 1px 0 rgba(255,255,255,0.05) !important;
@@ -1760,7 +1758,7 @@ button, input { font: inherit; color: inherit; }
 }
 #app .recipe-card.selected {
   border-color: #9a8866;
-  background: #2a2a24;
+  background: #282828;
   box-shadow:
     0 0 0 1px rgba(154,136,102,0.5),
     0 12px 22px rgba(0,0,0,0.38),
@@ -1834,7 +1832,7 @@ button, input { font: inherit; color: inherit; }
   position: relative;
   padding: 16px;
   background:
-    linear-gradient(145deg, #282824 0%, #222220 45%, #1e1e1c 100%);
+    linear-gradient(145deg, #282824 0%, #222222 45%, #1e1e1e 100%);
   border: 1px solid #3a3a3a;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.06),
@@ -1866,7 +1864,7 @@ button, input { font: inherit; color: inherit; }
   width: 152px !important;
   height: 152px !important;
   background:
-    radial-gradient(ellipse at 50% 45%, #2e2e2a 0%, #242422 50%, #1c1c1a 100%) !important;
+    radial-gradient(ellipse at 50% 45%, #2e2e2a 0%, #242424 50%, #1c1c1c 100%) !important;
   border: 1px solid rgba(154,136,102,0.28);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.06),
@@ -2179,7 +2177,7 @@ button, input { font: inherit; color: inherit; }
 /* 3) Selected card */
 #app .recipe-card.selected {
   border-color: #9a8866;
-  background: #2a2822;
+  background: #262626;
   box-shadow:
     0 0 0 1px rgba(154,136,102,0.45),
     0 12px 22px rgba(0,0,0,0.36),
@@ -2394,7 +2392,7 @@ button, input { font: inherit; color: inherit; }
   align-items: stretch;
   min-height: 92px;
   background:
-    linear-gradient(180deg, #262624 0%, #1f1f1d 48%, #1c1c1a 100%);
+    linear-gradient(180deg, #262626 0%, #1f1f1f 48%, #1c1c1c 100%);
   border-bottom: 2px solid #333;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.05),
@@ -2430,7 +2428,7 @@ button, input { font: inherit; color: inherit; }
   border-right: 1px solid rgba(58,58,58,0.9);
   background:
     linear-gradient(105deg, rgba(154,136,102,0.06), transparent 42%),
-    linear-gradient(180deg, #242422, #1e1e1c);
+    linear-gradient(180deg, #242424, #1e1e1e);
   position: relative;
 }
 #app .ctrl-identity::after {
@@ -2522,7 +2520,7 @@ button, input { font: inherit; color: inherit; }
 #app .instr-plate {
   border: 1px solid #333;
   border-left: 1px solid #333;
-  background: linear-gradient(180deg, #262624, #1a1a18);
+  background: linear-gradient(180deg, #262626, #1a1a18);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), inset 0 -1px 0 rgba(0,0,0,0.3);
   padding: 7px 10px 8px;
   min-width: 72px;
@@ -2534,7 +2532,7 @@ button, input { font: inherit; color: inherit; }
   min-width: 78px;
   max-width: 110px;
   opacity: 0.92;
-  background: linear-gradient(180deg, #222220, #181816);
+  background: linear-gradient(180deg, #222222, #181816);
 }
 #app .instr-secondary .t-l4 {
   font-size: 0.5rem;
@@ -2550,7 +2548,7 @@ button, input { font: inherit; color: inherit; }
   flex: 1;
   min-width: 100px;
   background:
-    linear-gradient(180deg, #2a2a26 0%, #1c1c1a 100%);
+    linear-gradient(180deg, #2a2a2a 0%, #1c1c1c 100%);
   border-color: #3a3a36;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.05),
@@ -2608,7 +2606,7 @@ button, input { font: inherit; color: inherit; }
   padding: 10px 12px;
   border-left: 1px solid #333;
   background:
-    linear-gradient(180deg, #222220, #1a1a18);
+    linear-gradient(180deg, #222222, #1a1a18);
   min-width: 56px;
 }
 #app .ctrl-actions-label {
@@ -2621,7 +2619,7 @@ button, input { font: inherit; color: inherit; }
   width: 30px;
   height: 30px;
   border: 1px solid #3a3a3a;
-  background: linear-gradient(180deg, #2c2c2a, #1e1e1c);
+  background: linear-gradient(180deg, #2c2c2a, #1e1e1e);
   color: rgba(180,180,180,0.7);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 4px rgba(0,0,0,0.25);
 }
@@ -2661,7 +2659,7 @@ button, input { font: inherit; color: inherit; }
   padding: 12px;
   position: relative;
   background:
-    linear-gradient(180deg, #2c2c28 0%, #222220 42%, #1a1a1a 100%) !important;
+    linear-gradient(180deg, #2c2c28 0%, #222222 42%, #1a1a1a 100%) !important;
   border: 1px solid #4a4438 !important;
   border-top: 3px solid #9a8866 !important;
   box-shadow:
@@ -2768,7 +2766,7 @@ button, input { font: inherit; color: inherit; }
   align-items: center;
   justify-content: center;
   background:
-    linear-gradient(180deg, #2a2a26, #1c1c1c);
+    linear-gradient(180deg, #2a2a2a, #1c1c1c);
   border: 1px solid #4a4438;
   box-shadow: inset 0 0 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
   clip-path: polygon(0 4px, 4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px));
@@ -2947,4 +2945,149 @@ button, input { font: inherit; color: inherit; }
   #app .fab-readouts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+
+/* ============================================================
+   v2.2.15 — NEUTRAL CHARCOAL SURFACES (accent-only brass)
+   Kill warm/yellow veils on large panels & cards.
+   ============================================================ */
+#app,
+#app .panel,
+#app .panel-list,
+#app .panel-primary,
+#app .panel-tech,
+#app .family-nav,
+#app .family-recipe,
+#app .family-tech,
+#app .col-nav,
+#app .col-grid,
+#app .col-detail {
+  background-image: none !important;
+}
+#app .panel-list,
+#app .family-nav,
+#app .col-nav {
+  background: #1f1f1f !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), inset 4px 0 14px rgba(0,0,0,0.2) !important;
+  border-left-color: #3a332b !important;
+}
+#app .panel-primary,
+#app .family-recipe,
+#app .col-grid {
+  background: #1f1f1f !important;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.4), 0 4px 14px rgba(0,0,0,0.28) !important;
+}
+#app .panel-tech,
+#app .family-tech,
+#app .col-detail {
+  background: #1f1f1f !important;
+  border-top-color: #3a332b !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 14px rgba(0,0,0,0.28) !important;
+}
+#app .panel-action,
+#app .actions,
+#app #fab-module.panel-action,
+#app #fab-module.actions {
+  background: #202020 !important;
+  border-top-color: #3a332b !important;
+  box-shadow: 0 -10px 22px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+#app #fab-module::before {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent) !important;
+  opacity: 0.5;
+}
+#app .ctrl-console {
+  background: linear-gradient(180deg, #232323 0%, #1f1f1f 55%, #1a1a1a 100%) !important;
+}
+#app .ctrl-identity {
+  background: #1f1f1f !important;
+}
+#app .ctrl-instruments {
+  background: rgba(0,0,0,0.2) !important;
+}
+#app .ctrl-actions {
+  background: #1a1a1a !important;
+}
+#app .instr-plate,
+#app .instr-primary,
+#app .instr-secondary {
+  background: linear-gradient(180deg, #232323, #1a1a1a) !important;
+  border-color: #3a332b !important;
+}
+#app .recipe-card {
+  background: #202020 !important;
+}
+#app .recipe-card:hover {
+  background: #242424 !important;
+  border-color: rgba(154,136,102,0.45);
+}
+#app .recipe-card.selected {
+  background: #252525 !important;
+  border-color: #9a8866;
+}
+#app .card-body,
+#app .recipe-card.selected .card-body {
+  background: #1e1e1e !important;
+}
+#app .card-img-zone,
+#app .recipe-card.selected .card-img-zone,
+#app .recipe-card[class*="cat-"] .card-img-zone {
+  background: #232323 !important;
+  background-image: none !important;
+}
+#app .fiche-hero {
+  background: #232323 !important;
+  background-image: none !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+#app .fiche-hero::before {
+  background: linear-gradient(90deg, rgba(154,136,102,0.35), transparent 70%) !important;
+  opacity: 0.55;
+}
+#app .fiche-img,
+#app .detail-img-wrap,
+#app .fiche-img.tech-frame,
+#app .detail-img-wrap.tech-frame {
+  background: #232323 !important;
+  background-image: none !important;
+  border-color: #3a332b !important;
+}
+#app .cat-item.active {
+  background: rgba(255,255,255,0.04) !important;
+  background-image: none !important;
+}
+#app .empty-prod {
+  background: rgba(0,0,0,0.3) !important;
+  background-image: none !important;
+  border-color: #3a332b !important;
+  border-top-color: rgba(154,136,102,0.28) !important;
+}
+#app .side-console,
+#app .side-tabs-wrap {
+  background: rgba(0,0,0,0.28) !important;
+  border-color: #3a332b !important;
+  border-top-color: #3a332b !important;
+}
+#app .badge {
+  background: rgba(154,136,102,0.08) !important;
+}
+#app .chip.active,
+#app .tab.active,
+#app .cat-item.active {
+  background-color: rgba(255,255,255,0.04);
+}
+#app .tab.active {
+  background: linear-gradient(180deg, #2e2e2e 0%, #232323 100%) !important;
+}
+/* Keep brass where it belongs: plate mark, primary button, selection border, accents */
+#app .ctrl-plate-mark {
+  background: linear-gradient(180deg, #b09a72 0%, #9a8866 45%, #6a5c42 100%) !important;
+}
+#app .recipe-card.selected {
+  box-shadow:
+    0 0 0 1px rgba(154,136,102,0.4),
+    0 10px 20px rgba(0,0,0,0.34),
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 3px 0 0 #9a8866 !important;
 }
