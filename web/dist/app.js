@@ -326,6 +326,13 @@
         const rk = String(r.rarity).toLowerCase().replace(/[^a-z0-9]+/g, '-');
         if (rk) card.classList.add(`rarity-${rk}`);
       }
+      if (r.category) {
+        const ck = String(r.category).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        if (ck) {
+          card.classList.add(`cat-${ck}`);
+          card.dataset.cat = ck;
+        }
+      }
       const resultItem = (r.result && r.result.item) || r.id;
       const allIngs = r.ingredients || [];
       const maxNeeds = allIngs.length > 3 ? 2 : Math.min(3, allIngs.length);
