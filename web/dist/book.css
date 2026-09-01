@@ -39,10 +39,22 @@
     inset 0 0 0 1px rgba(255, 255, 255, 0.02);
   overflow: hidden;
   opacity: 1;
-  animation: book-in var(--book-trans-slow) ease;
-  animation-fill-mode: both;
+  visibility: visible;
 }
-#book-app.hidden { display: none !important; }
+#book-app.is-opening {
+  animation: book-in var(--book-trans-slow) ease;
+}
+#book-app.hidden {
+  display: none !important;
+  opacity: 0;
+  visibility: hidden;
+  animation: none;
+}
+#book-app:not(.hidden) {
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
 
 @keyframes book-in {
   from { opacity: 0; transform: translateY(6px) scale(0.992); }

@@ -888,9 +888,17 @@
       document.documentElement.style.setProperty('--accent', state.meta.accent);
     }
     const title = state.meta.title || 'CARNET DE SURVIE';
-    $('#book-title').textContent = String(title).toUpperCase();
-    $('#book-sub').textContent = state.meta.subtitle || 'Journal technique de terrain';
+    const titleEl = $('#book-title');
+    const subEl = $('#book-sub');
+    if (titleEl) titleEl.textContent = String(title).toUpperCase();
+    if (subEl) subEl.textContent = state.meta.subtitle || 'Journal technique de terrain';
     book.classList.remove('hidden');
+    book.classList.remove('is-opening');
+    void book.offsetWidth;
+    book.classList.add('is-opening');
+    book.style.opacity = '1';
+    book.style.visibility = 'visible';
+    book.style.display = 'flex';
     renderNav();
     navigate(msg.page || 'dashboard');
   }
