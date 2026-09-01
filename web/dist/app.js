@@ -17,6 +17,9 @@
     compact: false,
     crafting: false,
     craftId: null,
+    session: null,
+    progressGen: 0,
+    craftDurationMs: null,
     queue: [],
     shop: {},
     flags: {},
@@ -1232,7 +1235,7 @@
     return 'Finalisation';
   }
 
-  function fillFabActive(recipe, batch) {
+  function fillFabActive(recipe, batch, remainingMs, durationMs) {
     if (!recipe) return;
     const qty = Math.max(1, batch || 1);
     const resCount = ((recipe.result && recipe.result.count) || 1) * qty;
@@ -1240,12 +1243,17 @@
     const qtyEl = $('#fab-active-qty');
     if (nameEl) nameEl.textContent = recipe.label || recipe.id || '—';
     if (qtyEl) qtyEl.textContent = `×${resCount}`;
+    const orig = Number(durationMs != null ? durationMs : recipe.duration) || 0;
+    const rem = remainingMs != null ? Math.max(0, Number(remainingMs) || 0) : orig;
+    const p = orig > 0 ? Math.min(1, Math.max(0, 1 - rem / orig)) : 0;
     const phaseEl = $('#fab-active-phase');
-    if (phaseEl) phaseEl.textContent = craftPhaseFor(recipe, 0);
+    if (phaseEl) phaseEl.textContent = craftPhaseFor(recipe, p);
     const timeEl = $('#fab-active-time');
-    if (timeEl) timeEl.textContent = durationLabel(recipe.duration);
+    if (timeEl) timeEl.textContent = durationLabel(rem);
     const pctEl = $('#fab-active-pct');
-    if (pctEl) pctEl.textContent = '0%';
+    if (pctEl) pctEl.textContent = `${Math.round(p * 100)}%`;
+    const fill = $('#progress-fill');
+    if (fill) fill.style.width = `${p * 100}%`;
     const resultItem = (recipe.result && recipe.result.item) || recipe.id;
     bindItemImg($('#fab-active-img'), resultItem, $('#fab-active-img-fallback'));
   }
@@ -1382,28 +1390,102 @@
   }
 
   function runProgress(duration, onDone) {
+    state.progressGen = (state.progressGen || 0) + 1;
+    const gen = state.progressGen;
     const craftBtn = $('#btn-craft');
     if (craftBtn) craftBtn.disabled = true;
+    const remaining = Math.max(0, Number(duration) || 0);
+    const original = Number(state.craftDurationMs) || remaining || 5000;
+    const elapsed = Math.max(0, original - remaining);
+    const start = performance.now() - elapsed;
+    const recipe = state.progressRecipe || state.selected;
     const fill = $('#progress-fill');
-    if (fill) fill.style.width = '0%';
-    const start = performance.now();
-    const dur = duration || 5000;
-    const recipe = state.selected;
-    const tick = (now) => {
-      if (!state.crafting) return;
-      const p = Math.min(1, (now - start) / dur);
+    const paint = (now) => {
+      const p = original > 0 ? Math.min(1, Math.max(0, (now - start) / original)) : 1;
       if (fill) fill.style.width = `${p * 100}%`;
       const pctEl = $('#fab-active-pct');
       if (pctEl) pctEl.textContent = `${Math.round(p * 100)}%`;
-      const leftMs = Math.max(0, dur - (now - start));
+      const leftMs = Math.max(0, original - (now - start));
       const timeEl = $('#fab-active-time');
       if (timeEl) timeEl.textContent = durationLabel(leftMs);
       const phaseEl = $('#fab-active-phase');
       if (phaseEl) phaseEl.textContent = craftPhaseFor(recipe, p);
+      return p;
+    };
+    paint(performance.now());
+    const tick = (now) => {
+      if (gen !== state.progressGen) return;
+      if (!state.crafting) return;
+      const p = paint(now);
       if (p < 1) requestAnimationFrame(tick);
-      else onDone();
+      else if (typeof onDone === 'function') onDone();
     };
     requestAnimationFrame(tick);
+  }
+
+  function recipeFromSession(active) {
+    if (!active) return null;
+    const found = (state.recipes || []).find((r) => r.id === active.recipeId);
+    if (found) return found;
+    return {
+      id: active.recipeId,
+      label: active.label || active.stepLabel || active.recipeId,
+      result: { item: active.resultItem, count: active.resultCount || 1 },
+      duration: active.durationMs || active.duration,
+      category: active.category,
+    };
+  }
+
+  function hydrateSession(session) {
+    if (!session || typeof session !== 'object') return;
+    state.session = session;
+    const stationId = session.stationId || state.benchKey;
+    const scoped = (list) => (list || []).filter((e) => {
+      if (!stationId || !e || !e.benchKey) return true;
+      return e.benchKey === stationId;
+    });
+    const activeList = scoped(session.active);
+    state.queue = scoped(session.queued);
+    renderQueue();
+    updateFabIdleConsole();
+
+    const active = activeList[0];
+    if (active) {
+      const recipe = recipeFromSession(active);
+      const batch = active.batch || active.quantity || 1;
+      const remaining = Math.max(0, Number(
+        active.remainingMs != null ? active.remainingMs : active.duration
+      ) || 0);
+      const orig = Number(active.durationMs) || remaining;
+      state.crafting = true;
+      state.craftId = active.craftId;
+      state.craftDurationMs = orig;
+      state.progressRecipe = recipe;
+      fillFabActive(recipe, batch, remaining, orig);
+      setFabState('active');
+      const whyEl = $('#craft-why');
+      if (whyEl) whyEl.classList.add('hidden');
+      const craftBtn = $('#btn-craft');
+      if (craftBtn) craftBtn.disabled = true;
+      if (remaining <= 0) {
+        finishCraft();
+      } else {
+        runProgress(remaining, finishCraft);
+      }
+      return;
+    }
+
+    // Session wins: no active at this station → clear leftover crafting UI
+    state.progressGen = (state.progressGen || 0) + 1;
+    state.crafting = false;
+    state.craftId = null;
+    state.craftDurationMs = null;
+    state.progressRecipe = null;
+    const fill = $('#progress-fill');
+    if (fill) fill.style.width = '0%';
+    const mod = $('#fab-module');
+    const cur = mod && mod.getAttribute('data-fab-state');
+    if (!(cur === 'done' && fabDoneTimer)) setFabState('ready');
   }
 
   async function startCraft() {
@@ -1419,7 +1501,9 @@
     }
     state.crafting = true;
     state.craftId = data.craftId;
-    fillFabActive(state.selected, batch);
+    state.craftDurationMs = data.duration;
+    state.progressRecipe = state.selected;
+    fillFabActive(state.selected, batch, data.duration, data.duration);
     setFabState('active');
     const whyEl = $('#craft-why');
     if (whyEl) whyEl.classList.add('hidden');
@@ -1427,6 +1511,8 @@
   }
 
   async function finishCraft() {
+    if (state.finishLock) return;
+    state.finishLock = true;
     const data = await post('complete', { craftId: state.craftId });
     if (data && data.ok && data.advanced) {
       beep('click');
@@ -1438,18 +1524,24 @@
       });
       const phaseEl = $('#fab-active-phase');
       if (phaseEl && data.stepLabel) phaseEl.textContent = data.stepLabel;
+      state.craftDurationMs = data.duration;
+      state.finishLock = false;
       runProgress(data.duration, finishCraft);
       return;
     }
+    state.progressGen = (state.progressGen || 0) + 1;
     state.crafting = false;
     state.craftId = null;
+    state.craftDurationMs = null;
     const fill = $('#progress-fill');
     if (fill) fill.style.width = '0%';
-    if (data && data.ok) {
+    const alreadyDone = !!(data && !data.ok && data.reason === 'craft_invalid');
+    const success = !!(data && data.ok) || alreadyDone;
+    if (success) {
       beep('success');
-      if (data.chainNext) beep('blueprint');
+      if (data && data.chainNext) beep('blueprint');
       const doneLabel = $('#fab-done-label');
-      const craftName = data.label
+      const craftName = (data && data.label)
           || (state.selected && state.selected.label)
           || 'Objet fabriqué';
       if (doneLabel) {
@@ -1459,40 +1551,38 @@
       try { localStorage.setItem(LAST_CRAFT_KEY, craftName); } catch (_) { /* ignore */ }
       updateFabIdleConsole();
       setFabState('done');
-    } else {
-      // Tracker may have completed first (craft_invalid) — soft ignore
-      if (data && data.reason === 'craft_invalid') {
-        setFabState('done');
-      } else {
-        beep('error');
-        setFabState('ready');
-      }
-    }
-    if (!(data && !data.ok && data.reason === 'craft_invalid')) {
-    await post('notify', {
-      type: data.ok ? 'success' : 'error',
-      reason: data.ok ? 'craft_success' : (data.reason || 'craft_failed'),
-      label: data.label,
-    });
-    }
-    await refresh();
-    if (data && data.ok) {
+      // Arm linger BEFORE refresh so hydrateSession (session wins / no active) keeps 'done'
       if (fabDoneTimer) clearTimeout(fabDoneTimer);
       fabDoneTimer = setTimeout(() => {
         fabDoneTimer = null;
         setFabState('ready');
         if (state.selected) updateActionBar(state.selected);
       }, 1600);
-    } else if (state.selected) {
+    } else {
+      beep('error');
+      setFabState('ready');
+    }
+    if (!alreadyDone) {
+      await post('notify', {
+        type: success ? 'success' : 'error',
+        reason: success ? 'craft_success' : ((data && data.reason) || 'craft_failed'),
+        label: data && data.label,
+      });
+    }
+    await refresh();
+    if (!success && state.selected) {
       updateActionBar(state.selected);
     }
+    state.finishLock = false;
   }
 
   async function cancelCraft() {
     if (!state.craftId) return;
     await post('cancel', { craftId: state.craftId });
+    state.progressGen = (state.progressGen || 0) + 1;
     state.crafting = false;
     state.craftId = null;
+    state.craftDurationMs = null;
     const fill = $('#progress-fill');
     if (fill) fill.style.width = '0%';
     setFabState('ready');
@@ -1501,7 +1591,10 @@
 
   async function refresh() {
     const data = await post('refresh', { benchKey: state.benchKey });
-    if (data && data.ok) applyMenu(data);
+    if (data && data.ok) {
+      applyMenu(data);
+      if (data.session) hydrateSession(data.session);
+    }
   }
 
   function updateStationHeader(data) {
@@ -1639,10 +1732,18 @@
     renderCategories();
     renderList();
     updateFabIdleConsole();
+    const session = data.session;
+    const hasActive = !!(session && session.active && session.active[0]);
+    if (hasActive) {
+      // Prevent selectRecipe/updateActionBar from flipping fab back to ready
+      state.crafting = true;
+      state.craftId = session.active[0].craftId;
+    }
     if (state.selected) {
       const again = state.recipes.find((r) => r.id === state.selected.id);
       if (again) selectRecipe(again);
     }
+    if (session) hydrateSession(session);
   }
 
   function renderQueue() {
@@ -1680,8 +1781,18 @@
   }
 
   async function loadQueue() {
+    if (state.benchKey) {
+      const sess = await post('getCraftSession', { benchKey: state.benchKey });
+      if (sess && sess.ok && sess.session) {
+        const stationId = sess.session.stationId || state.benchKey;
+        state.queue = (sess.session.queued || []).filter((e) => !stationId || !e.benchKey || e.benchKey === stationId);
+        renderQueue();
+        return;
+      }
+    }
     const data = await post('queueList', {});
-    state.queue = (data && data.queue) || [];
+    const all = (data && data.queue) || [];
+    state.queue = all.filter((e) => !state.benchKey || !e.benchKey || e.benchKey === state.benchKey);
     renderQueue();
   }
 
@@ -1957,7 +2068,12 @@
       app.classList.remove('hidden');
       try { state.lastCraft = localStorage.getItem(LAST_CRAFT_KEY); } catch (_) { /* ignore */ }
       applyMenu(msg.data || {});
-      loadQueue().then(() => updateFabIdleConsole());
+      // Session last: do not let applyMenu/selectRecipe overwrite fab-active
+      if (msg.data && msg.data.session) {
+        hydrateSession(msg.data.session);
+      } else {
+        loadQueue().then(() => updateFabIdleConsole());
+      }
       openTab(state.sideTab || 'queue');
       if (msg.data && msg.data.ui && msg.data.ui.Accent) {
         document.documentElement.style.setProperty('--accent', msg.data.ui.Accent);
