@@ -658,24 +658,8 @@
       }
     }
 
-    // —— FABRIQUER ——
-    const can = !!r.canCraft && !state.crafting;
-    const craftBtn = $('#btn-craft');
-    craftBtn.disabled = !can;
-    const reasons = disableReasons(r);
-    const whyEl = $('#craft-why');
-    if (!can && reasons.length) {
-      whyEl.textContent = reasons[0];
-      whyEl.classList.remove('hidden');
-      craftBtn.title = reasons.length > 1 ? reasons.join(' · ') : reasons[0];
-    } else {
-      whyEl.classList.add('hidden');
-      craftBtn.title = can ? 'Lancer la fabrication' : '';
-    }
-
-    $('#batch-wrap').classList.toggle('hidden', !state.flags.batch);
-    $('#btn-queue').classList.toggle('hidden', !state.flags.queue);
-    $('#btn-shop').classList.toggle('hidden', state.flags.shopping === false);
+    // —— FABRIQUER / module fabrication ——
+    updateActionBar(r);
 
     const favBtn = $('#btn-fav');
     const on = isFavorite(r.id);
@@ -685,16 +669,186 @@
     renderList();
   }
 
+  let fabDoneTimer = null;
+
+  function setFabState(mode) {
+    const mod = $('#fab-module');
+    const ready = $('#fab-ready');
+    const active = $('#fab-active');
+    const done = $('#fab-done');
+    if (!ready || !active || !done) return;
+    const next = mode === 'active' || mode === 'done' ? mode : 'ready';
+    if (fabDoneTimer && next !== 'done') {
+      clearTimeout(fabDoneTimer);
+      fabDoneTimer = null;
+    }
+    ready.classList.toggle('hidden', next !== 'ready');
+    active.classList.toggle('hidden', next !== 'active');
+    done.classList.toggle('hidden', next !== 'done');
+    if (mod) mod.setAttribute('data-fab-state', next);
+  }
+
+  function craftPhaseFor(recipe, progress) {
+    const p = Math.max(0, Math.min(1, progress || 0));
+    const cat = String((recipe && recipe.category) || '').toLowerCase();
+    let mid = 'Assemblage';
+    if (/medical|medecin|soin|pharma/.test(cat)) mid = 'Stérilisation';
+    else if (/cuisine|boucherie|food|cook/.test(cat)) mid = 'Cuisson';
+    else if (/forge|fonderie|forgeron/.test(cat)) mid = 'Forge';
+    else if (/mechanic|mecano|ingenieur|armurier|weapon|munition|construction/.test(cat)) mid = 'Réglage';
+    if (p < 0.22) return 'Préparation';
+    if (p < 0.48) return 'Assemblage';
+    if (p < 0.78) return mid;
+    return 'Finalisation';
+  }
+
+  function fillFabActive(recipe, batch) {
+    if (!recipe) return;
+    const qty = Math.max(1, batch || 1);
+    const resCount = ((recipe.result && recipe.result.count) || 1) * qty;
+    const nameEl = $('#fab-active-name');
+    const qtyEl = $('#fab-active-qty');
+    if (nameEl) nameEl.textContent = recipe.label || recipe.id || '—';
+    if (qtyEl) qtyEl.textContent = `×${resCount}`;
+    const phaseEl = $('#fab-active-phase');
+    if (phaseEl) phaseEl.textContent = craftPhaseFor(recipe, 0);
+    const timeEl = $('#fab-active-time');
+    if (timeEl) timeEl.textContent = durationLabel(recipe.duration);
+    const pctEl = $('#fab-active-pct');
+    if (pctEl) pctEl.textContent = '0%';
+    const resultItem = (recipe.result && recipe.result.item) || recipe.id;
+    bindItemImg($('#fab-active-img'), resultItem, $('#fab-active-img-fallback'));
+  }
+
+  function updateActionBar(r) {
+    const recipe = r || state.selected;
+    const batchEl = $('#batch');
+    const batch = Math.max(1, parseInt(batchEl && batchEl.value, 10) || 1);
+
+    const lotEl = $('#fab-ready-lot');
+    if (lotEl) lotEl.textContent = `×${batch}`;
+
+    if (recipe) {
+      const resCount = ((recipe.result && recipe.result.count) || 1) * batch;
+      const resItem = (recipe.result && recipe.result.item) || recipe.id || '—';
+      const resLabel = recipe.label || humanize(resItem);
+      const resultEl = $('#fab-ready-result');
+      if (resultEl) resultEl.textContent = `${resCount}× ${resLabel}`;
+      const durEl = $('#fab-ready-dur');
+      if (durEl) {
+        const base = recipe.duration || 0;
+        durEl.textContent = durationLabel(state.flags.batch ? base * batch : base);
+      }
+      const xpEl = $('#fab-ready-xp');
+      if (xpEl) {
+        if (recipe.xp && recipe.xp.amount != null) {
+          const amt = recipe.xp.amount * (state.flags.batch ? batch : 1);
+          xpEl.textContent = `+${amt}`;
+        } else {
+          xpEl.textContent = '—';
+        }
+      }
+      const noiseChip = $('#fab-chip-noise');
+      const noiseVal = $('#fab-ready-noise');
+      if (noiseChip && noiseVal) {
+        if (recipe.noiseLevel != null) {
+          noiseChip.classList.remove('hidden');
+          noiseVal.textContent = String(recipe.noiseLevel);
+        } else {
+          noiseChip.classList.add('hidden');
+        }
+      }
+      const energyChip = $('#fab-chip-energy');
+      const energyVal = $('#fab-ready-energy');
+      if (energyChip && energyVal) {
+        if (recipe.powerCost != null) {
+          energyChip.classList.remove('hidden');
+          energyVal.textContent = String(recipe.powerCost);
+        } else {
+          energyChip.classList.add('hidden');
+        }
+      }
+    } else {
+      const resultEl = $('#fab-ready-result');
+      if (resultEl) resultEl.textContent = '—';
+      const durEl = $('#fab-ready-dur');
+      if (durEl) durEl.textContent = '—';
+      const xpEl = $('#fab-ready-xp');
+      if (xpEl) xpEl.textContent = '—';
+    }
+
+    const can = !!(recipe && recipe.canCraft && !state.crafting);
+    const craftBtn = $('#btn-craft');
+    if (craftBtn) {
+      craftBtn.disabled = !can;
+      const reasons = recipe ? disableReasons(recipe) : ['Aucune recette sélectionnée'];
+      const whyEl = $('#craft-why');
+      if (!can && reasons.length && !state.crafting) {
+        if (whyEl) {
+          whyEl.textContent = reasons[0];
+          whyEl.classList.remove('hidden');
+        }
+        craftBtn.title = reasons.length > 1 ? reasons.join(' · ') : reasons[0];
+      } else {
+        if (whyEl) whyEl.classList.add('hidden');
+        craftBtn.title = can ? 'Lancer la fabrication' : '';
+      }
+    }
+
+    const batchWrap = $('#batch-wrap');
+    if (batchWrap) batchWrap.classList.toggle('hidden', !state.flags.batch);
+    const qBtn = $('#btn-queue');
+    if (qBtn) qBtn.classList.toggle('hidden', !state.flags.queue);
+    const sBtn = $('#btn-shop');
+    if (sBtn) sBtn.classList.toggle('hidden', state.flags.shopping === false);
+
+    if (!state.crafting) {
+      const mod = $('#fab-module');
+      const cur = mod && mod.getAttribute('data-fab-state');
+      if (cur !== 'done') setFabState('ready');
+    }
+  }
+
+  function syncFabQueueMini() {
+    const mini = $('#fab-queue-mini');
+    if (!mini) return;
+    const show = !!(state.flags.queue && state.queue && state.queue.length > 0);
+    mini.classList.toggle('hidden', !show);
+    if (!show) {
+      mini.innerHTML = '';
+      return;
+    }
+    const e = state.queue[0];
+    const qty = e.batch || e.count || e.qty || 1;
+    const now = Math.floor(Date.now() / 1000);
+    const left = Math.max(0, (e.finishAt || 0) - now);
+    const eta = left > 0 ? `ETA ${left}s` : 'PRÊT';
+    mini.innerHTML = `
+      <span class="fab-q-k">File</span>
+      <span class="fab-q-v">${escapeHtml(e.label || e.recipeId)} · ×${escapeHtml(qty)}</span>
+      <span class="fab-q-eta">${escapeHtml(eta)}</span>
+    `;
+  }
+
   function runProgress(duration, onDone) {
-    $('#progress-wrap').classList.remove('hidden');
-    $('#btn-craft').disabled = true;
-    $('#progress-fill').style.width = '0%';
+    const craftBtn = $('#btn-craft');
+    if (craftBtn) craftBtn.disabled = true;
+    const fill = $('#progress-fill');
+    if (fill) fill.style.width = '0%';
     const start = performance.now();
     const dur = duration || 5000;
+    const recipe = state.selected;
     const tick = (now) => {
       if (!state.crafting) return;
       const p = Math.min(1, (now - start) / dur);
-      $('#progress-fill').style.width = `${p * 100}%`;
+      if (fill) fill.style.width = `${p * 100}%`;
+      const pctEl = $('#fab-active-pct');
+      if (pctEl) pctEl.textContent = `${Math.round(p * 100)}%`;
+      const leftMs = Math.max(0, dur - (now - start));
+      const timeEl = $('#fab-active-time');
+      if (timeEl) timeEl.textContent = durationLabel(leftMs);
+      const phaseEl = $('#fab-active-phase');
+      if (phaseEl) phaseEl.textContent = craftPhaseFor(recipe, p);
       if (p < 1) requestAnimationFrame(tick);
       else onDone();
     };
@@ -713,6 +867,10 @@
     }
     state.crafting = true;
     state.craftId = data.craftId;
+    fillFabActive(state.selected, batch);
+    setFabState('active');
+    const whyEl = $('#craft-why');
+    if (whyEl) whyEl.classList.add('hidden');
     runProgress(data.duration, finishCraft);
   }
 
@@ -726,18 +884,28 @@
         label: data.stepLabel || data.label,
         args: [data.stepIndex, data.totalSteps, data.stepLabel || data.label],
       });
+      const phaseEl = $('#fab-active-phase');
+      if (phaseEl && data.stepLabel) phaseEl.textContent = data.stepLabel;
       runProgress(data.duration, finishCraft);
       return;
     }
     state.crafting = false;
     state.craftId = null;
-    $('#progress-wrap').classList.add('hidden');
-    $('#progress-fill').style.width = '0%';
+    const fill = $('#progress-fill');
+    if (fill) fill.style.width = '0%';
     if (data && data.ok) {
       beep('success');
       if (data.chainNext) beep('blueprint');
+      const doneLabel = $('#fab-done-label');
+      if (doneLabel) {
+        doneLabel.textContent = data.label
+          || (state.selected && state.selected.label)
+          || 'Objet fabriqué';
+      }
+      setFabState('done');
     } else {
       beep('error');
+      setFabState('ready');
     }
     await post('notify', {
       type: data.ok ? 'success' : 'error',
@@ -745,6 +913,16 @@
       label: data.label,
     });
     await refresh();
+    if (data && data.ok) {
+      if (fabDoneTimer) clearTimeout(fabDoneTimer);
+      fabDoneTimer = setTimeout(() => {
+        fabDoneTimer = null;
+        setFabState('ready');
+        if (state.selected) updateActionBar(state.selected);
+      }, 1600);
+    } else if (state.selected) {
+      updateActionBar(state.selected);
+    }
   }
 
   async function cancelCraft() {
@@ -752,8 +930,9 @@
     await post('cancel', { craftId: state.craftId });
     state.crafting = false;
     state.craftId = null;
-    $('#progress-wrap').classList.add('hidden');
-    $('#progress-fill').style.width = '0%';
+    const fill = $('#progress-fill');
+    if (fill) fill.style.width = '0%';
+    setFabState('ready');
     if (state.selected) selectRecipe(state.selected);
   }
 
@@ -923,6 +1102,7 @@
       });
       track.appendChild(card);
     });
+    syncFabQueueMini();
   }
 
   async function loadQueue() {
@@ -1051,6 +1231,15 @@
 
   bindUi('#btn-craft', 'click', startCraft);
   bindUi('#btn-cancel', 'click', cancelCraft);
+  const batchInput = $('#batch');
+  if (batchInput) {
+    batchInput.addEventListener('input', () => {
+      if (state.selected) updateActionBar(state.selected);
+    });
+    batchInput.addEventListener('change', () => {
+      if (state.selected) updateActionBar(state.selected);
+    });
+  }
   bindUi('#btn-fav', 'click', async () => {
     if (!state.selected) return;
     await post('favorite', { recipeId: state.selected.id });
