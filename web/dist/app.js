@@ -1460,14 +1460,21 @@
       updateFabIdleConsole();
       setFabState('done');
     } else {
-      beep('error');
-      setFabState('ready');
+      // Tracker may have completed first (craft_invalid) — soft ignore
+      if (data && data.reason === 'craft_invalid') {
+        setFabState('done');
+      } else {
+        beep('error');
+        setFabState('ready');
+      }
     }
+    if (!(data && !data.ok && data.reason === 'craft_invalid')) {
     await post('notify', {
       type: data.ok ? 'success' : 'error',
       reason: data.ok ? 'craft_success' : (data.reason || 'craft_failed'),
       label: data.label,
     });
+    }
     await refresh();
     if (data && data.ok) {
       if (fabDoneTimer) clearTimeout(fabDoneTimer);
@@ -1956,10 +1963,10 @@
         document.documentElement.style.setProperty('--accent', msg.data.ui.Accent);
       }
       if (msg.data && msg.data.ui && msg.data.ui.Sounds) state.sounds = msg.data.ui.Sounds;
-    } else if (msg.action === 'close') {
+    } else if (msg.action === 'close' || msg.action === 'craftUiClose') {
+      // Close craft catalogue only — do NOT cancel active craft / clear craftId.
+      // Tracker (sibling #craft-tracker) keeps progress + completion ownership when pinned.
       app.classList.add('hidden');
-      state.crafting = false;
-      state.craftId = null;
     } else if (msg.action === 'queue') {
       state.queue = msg.queue || [];
       renderQueue();

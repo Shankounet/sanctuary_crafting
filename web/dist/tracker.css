@@ -1,0 +1,309 @@
+/* Craft Tracker — floating production HUD (independent of #app) */
+#craft-tracker {
+  --ct-bg: #1a1a1a;
+  --ct-bg-2: #222222;
+  --ct-panel: #1e1e1e;
+  --ct-edge: #2c2c2c;
+  --ct-line: rgba(154, 136, 102, 0.28);
+  --ct-accent: #9a8866;
+  --ct-accent-dim: rgba(154, 136, 102, 0.55);
+  --ct-text: #d8d2c6;
+  --ct-muted: #8a8478;
+  --ct-ok: #6f9a6a;
+  --ct-err: #a86a5c;
+  --ct-warn: #b39a5a;
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 2147482000;
+  width: 292px;
+  max-width: min(292px, calc(100vw - 24px));
+  color: var(--ct-text);
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+}
+
+#craft-tracker.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  pointer-events: auto;
+}
+
+#craft-tracker.hidden-panel {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#craft-tracker .ct-shell {
+  background:
+    linear-gradient(180deg, rgba(154, 136, 102, 0.06), transparent 28%),
+    linear-gradient(135deg, var(--ct-panel), var(--ct-bg));
+  border: 1px solid var(--ct-edge);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.45),
+    0 12px 28px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#craft-tracker .ct-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ct-line);
+  background: linear-gradient(180deg, #242424, #1b1b1b);
+  cursor: grab;
+}
+
+#craft-tracker .ct-header:active { cursor: grabbing; }
+
+#craft-tracker .ct-title {
+  flex: 1;
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ct-accent);
+  font-weight: 700;
+}
+
+#craft-tracker .ct-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 2px;
+  background: rgba(154, 136, 102, 0.15);
+  border: 1px solid var(--ct-accent-dim);
+  color: var(--ct-accent);
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#craft-tracker .ct-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--ct-edge);
+  background: var(--ct-bg-2);
+  color: var(--ct-muted);
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+#craft-tracker .ct-btn:hover {
+  color: var(--ct-text);
+  border-color: var(--ct-accent-dim);
+}
+
+#craft-tracker .ct-btn.is-on {
+  color: var(--ct-accent);
+  border-color: var(--ct-accent);
+  background: rgba(154, 136, 102, 0.12);
+}
+
+#craft-tracker .ct-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 420px;
+  overflow: auto;
+}
+
+#craft-tracker .ct-job {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  position: relative;
+}
+
+#craft-tracker .ct-job:hover {
+  background: rgba(154, 136, 102, 0.06);
+}
+
+#craft-tracker .ct-job:last-child { border-bottom: 0; }
+
+#craft-tracker .ct-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 3px;
+  background: #141414;
+  border: 1px solid var(--ct-edge);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  position: relative;
+}
+
+#craft-tracker .ct-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+#craft-tracker .ct-thumb img.is-fallback,
+#craft-tracker .ct-thumb img:not([src]),
+#craft-tracker .ct-thumb img[src=""] {
+  display: none;
+}
+
+#craft-tracker .ct-thumb-fallback {
+  color: var(--ct-accent-dim);
+  font-size: 14px;
+}
+
+#craft-tracker .ct-body { min-width: 0; }
+
+#craft-tracker .ct-row1 {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+#craft-tracker .ct-label {
+  flex: 1;
+  font-weight: 650;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #ebe4d6;
+}
+
+#craft-tracker .ct-batch {
+  color: var(--ct-muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+#craft-tracker .ct-phase {
+  color: var(--ct-accent);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+#craft-tracker .ct-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  color: var(--ct-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+#craft-tracker .ct-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: #101010;
+  border: 1px solid #2a2a2a;
+  overflow: hidden;
+}
+
+#craft-tracker .ct-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #7a6b4e, var(--ct-accent));
+  box-shadow: 0 0 8px rgba(154, 136, 102, 0.35);
+  transition: width 0.2s linear;
+}
+
+#craft-tracker .ct-job.is-done .ct-fill {
+  background: linear-gradient(90deg, #4f7a4c, var(--ct-ok));
+}
+
+#craft-tracker .ct-job.is-error .ct-fill {
+  background: linear-gradient(90deg, #7a4a40, var(--ct-err));
+}
+
+#craft-tracker .ct-job.is-queued .ct-phase { color: var(--ct-warn); }
+
+#craft-tracker .ct-job.is-done .ct-phase { color: var(--ct-ok); }
+#craft-tracker .ct-job.is-error .ct-phase { color: var(--ct-err); }
+
+#craft-tracker .ct-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  background: transparent;
+  color: var(--ct-muted);
+  cursor: pointer;
+  opacity: 0;
+  padding: 0;
+}
+
+#craft-tracker .ct-job:hover .ct-dismiss { opacity: 1; }
+#craft-tracker .ct-dismiss:hover { color: var(--ct-text); }
+
+/* Modes */
+#craft-tracker.mode-compact { width: 240px; }
+#craft-tracker.mode-compact .ct-job { padding: 8px; grid-template-columns: 32px 1fr; }
+#craft-tracker.mode-compact .ct-thumb { width: 32px; height: 32px; }
+#craft-tracker.mode-compact .ct-phase { display: none; }
+#craft-tracker.mode-compact .ct-meta .ct-pct { display: none; }
+
+#craft-tracker.mode-minimal {
+  width: auto;
+  min-width: 0;
+}
+#craft-tracker.mode-minimal .ct-shell {
+  background: rgba(26, 26, 26, 0.92);
+}
+#craft-tracker.mode-minimal .ct-header {
+  padding: 8px 10px;
+  border-bottom: 0;
+  gap: 6px;
+}
+#craft-tracker.mode-minimal .ct-title,
+#craft-tracker.mode-minimal .ct-btn-mode,
+#craft-tracker.mode-minimal .ct-list,
+#craft-tracker.mode-minimal .ct-btn-reset {
+  display: none;
+}
+#craft-tracker.mode-minimal.is-visible .ct-minimal {
+  display: inline-flex;
+}
+#craft-tracker .ct-minimal {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  color: var(--ct-accent);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+}
+#craft-tracker .ct-minimal i { font-size: 14px; }
+
+#craft-tracker .ct-empty {
+  padding: 14px 12px;
+  color: var(--ct-muted);
+  text-align: center;
+  font-size: 11px;
+}

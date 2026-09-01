@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <link rel="stylesheet" href="style.css" />
 <link rel="stylesheet" href="book.css" />
+<link rel="stylesheet" href="tracker.css" />
 <style id="book-critical">
   /* CEF hard paint — book must never stay blank when open */
   #book-app.hidden { display: none !important; }
@@ -578,7 +579,33 @@
   <p id="book-sub" class="visually-hidden">Journal technique de terrain</p>
 </div>
 
+
+<!-- Craft Tracker v2.6.0 — floating productions HUD (outside #app / #book-app) -->
+<div id="craft-tracker" class="mode-normal" aria-live="polite" aria-label="Suivi des productions">
+  <div class="ct-shell">
+    <header class="ct-header" id="ct-header">
+      <p class="ct-title">Productions</p>
+      <span class="ct-count" id="ct-count">0</span>
+      <button type="button" class="ct-btn" id="ct-pin" title="Épingler" aria-label="Épingler le tracker" aria-pressed="false">
+        <i class="fa-solid fa-thumbtack" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="ct-btn ct-btn-mode" id="ct-mode" title="Mode d'affichage" aria-label="Changer le mode">
+        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="ct-btn ct-btn-reset" id="ct-reset" title="Réinitialiser la position" aria-label="Réinitialiser la position">
+        <i class="fa-solid fa-crosshairs" aria-hidden="true"></i>
+      </button>
+    </header>
+    <div class="ct-minimal" id="ct-minimal" aria-hidden="true">
+      <i class="fa-solid fa-hammer" aria-hidden="true"></i>
+      <span id="ct-minimal-count">0</span>
+    </div>
+    <div class="ct-list" id="ct-list"></div>
+  </div>
+</div>
+
 <script src="app.js"></script>
+<script src="tracker.js"></script>
 <script src="book.js"></script>
 </body>
 </html>
