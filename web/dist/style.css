@@ -4597,3 +4597,57 @@ button, input { font: inherit; color: inherit; }
 #app #btn-craft.craft-engage:disabled::after {
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent) !important;
 }
+
+
+/* === v2.4.2 — clean catalogue cards: no bottom micro-icons === */
+#app .card-mastery,
+#app .card-mastery-ring,
+#app .card-mastery-dots,
+#app .card-rarity-mark,
+#app .card-knowledge-mark,
+#app .card-followed,
+#app .card-mastered-badge {
+  display: none !important;
+}
+
+#app .card-corner-mark {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 5;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 0.62rem;
+  line-height: 1;
+  color: #d4c4a0;
+  background: rgba(28, 28, 26, 0.92);
+  border: 1px solid rgba(154, 136, 102, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 1px 3px rgba(0,0,0,0.35);
+  clip-path: polygon(0 2px, 2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px));
+  pointer-events: none;
+  cursor: help;
+}
+#app .card-corner-mark.is-mastered {
+  color: #e2d4b0;
+  border-color: rgba(154, 136, 102, 0.7);
+}
+#app .card-corner-mark.is-blueprint {
+  color: rgba(176, 196, 214, 0.95);
+  border-color: rgba(120, 140, 160, 0.55);
+}
+#app .card-corner-mark.is-followed {
+  color: #9a8866;
+  border-color: rgba(154, 136, 102, 0.5);
+}
+
+/* Identity only — denser card body without mastery row */
+#app .recipe-card .card-body {
+  padding: 8px 10px 10px !important;
+}
+#app .recipe-card .card-identity {
+  gap: 3px !important;
+}
