@@ -68,12 +68,12 @@
 
   <main class="layout-3">
     <!-- LEFT: PANEL LIST — nav / filters / categories / sub-console -->
-    <aside class="panel panel-list col-nav" aria-label="Navigation">
+    <aside class="panel panel-list family-nav col-nav" aria-label="Navigation">
       <div class="panel-band" aria-hidden="true"><span>INDEX</span></div>
 
       <div class="tech-field search-wrap">
         <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-        <input id="search" type="search" placeholder="Recherche technique…" autocomplete="off" />
+        <input id="search" type="search" placeholder="Réf. / objet / catégorie…" autocomplete="off" />
       </div>
 
       <div class="nav-section nav-filters">
@@ -95,29 +95,31 @@
 
       <div class="side-console side-tabs-wrap">
         <div class="side-console-head">
-          <span class="t-l4">Sous-systèmes</span>
+          <span class="t-l4">Sous-systèmes station</span>
         </div>
         <div class="tabs" role="tablist">
-          <button type="button" class="tab active" data-tab="queue" role="tab" title="File de production"><i class="fa-solid fa-list-ol"></i><span>File</span></button>
-          <button type="button" class="tab" data-tab="tree" role="tab" title="Arbre technique / plan"><i class="fa-solid fa-sitemap"></i><span>Arbre</span></button>
-          <button type="button" class="tab" data-tab="shop" role="tab" title="Liste de récupération"><i class="fa-solid fa-basket-shopping"></i><span>Courses</span></button>
+          <button type="button" class="tab active" data-tab="queue" role="tab" title="Console de production"><i class="fa-solid fa-industry"></i><span>Production</span></button>
+          <button type="button" class="tab" data-tab="tree" role="tab" title="Schéma technique / dépendances"><i class="fa-solid fa-diagram-project"></i><span>Schéma</span></button>
+          <button type="button" class="tab" data-tab="shop" role="tab" title="Checklist récupération"><i class="fa-solid fa-clipboard-list"></i><span>Récup.</span></button>
         </div>
         <div id="tab-queue" class="tab-body">
           <p class="side-caption"><i class="fa-solid fa-industry" aria-hidden="true"></i> Console de production</p>
           <div id="queue-list" class="queue-track"></div>
-          <div class="empty-state" id="queue-empty">
-            <i class="fa-solid fa-industry" aria-hidden="true"></i>
-            <p>Aucune fabrication en file</p>
-            <span class="empty-hint">Ajoutez une recette via « File » sur la fiche</span>
+          <div class="empty-state empty-prod" id="queue-empty">
+            <span class="empty-ico" aria-hidden="true"><i class="fa-solid fa-industry"></i></span>
+            <span class="empty-kicker">Console de production</span>
+            <p>Aucune tâche active</p>
+            <span class="empty-hint">Station disponible — ajoutez une recette depuis le catalogue via « File »</span>
           </div>
         </div>
         <div id="tab-tree" class="tab-body hidden">
           <p class="side-caption"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> Schéma technique</p>
           <div id="tree-view" class="tree-graph" aria-live="polite">
             <div class="empty-state compact">
-              <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
-              <p>Sélectionnez une recette</p>
-              <span class="empty-hint">Puis ouvrez l’arbre pour le plan de dépendances</span>
+              <span class="empty-ico" aria-hidden="true"><i class="fa-solid fa-diagram-project"></i></span>
+              <span class="empty-kicker">Schéma technique</span>
+              <p>Aucun plan chargé</p>
+              <span class="empty-hint">Sélectionnez une recette puis ouvrez Schéma</span>
             </div>
           </div>
         </div>
@@ -125,9 +127,10 @@
           <p class="side-caption"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i> Checklist récupération</p>
           <ul id="shop-list" class="shop-list"></ul>
           <div class="empty-state compact" id="shop-empty">
-            <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+            <span class="empty-ico" aria-hidden="true"><i class="fa-solid fa-clipboard-list"></i></span>
+            <span class="empty-kicker">Récupération</span>
             <p>Checklist vide</p>
-            <span class="empty-hint">Ajoutez les manquants depuis la fiche recette</span>
+            <span class="empty-hint">Ajoutez les manquants depuis la fiche</span>
           </div>
           <button type="button" id="btn-shop-clear" class="ghost small">
             <i class="fa-solid fa-trash"></i> Vider
@@ -137,7 +140,7 @@
     </aside>
 
     <!-- CENTER: PANEL PRIMARY — recipe catalogue -->
-    <section class="panel panel-primary col-grid" aria-label="Recettes">
+    <section class="panel panel-primary family-recipe col-grid" aria-label="Recettes">
       <div class="panel-head">
         <div>
           <p class="t-l4 panel-kicker">Catalogue</p>
@@ -147,21 +150,24 @@
       </div>
       <div id="recipe-grid" class="recipe-grid"></div>
       <div class="empty-state" id="recipe-empty">
-        <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+        <span class="empty-ico" aria-hidden="true"><i class="fa-solid fa-box-open"></i></span>
+        <span class="empty-kicker">Catalogue</span>
         <p>Aucune recette ne correspond</p>
         <span class="empty-hint">Modifiez filtres, catégorie ou recherche</span>
       </div>
     </section>
 
     <!-- RIGHT: PANEL TECH + ACTION — technical fiche -->
-    <section class="panel panel-tech col-detail" aria-label="Détail recette">
+    <section class="panel panel-tech family-tech col-detail" aria-label="Détail recette">
       <div id="detail-empty" class="empty-state">
-        <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i>
+        <span class="empty-ico" aria-hidden="true"><i class="fa-solid fa-file-lines"></i></span>
+        <span class="empty-kicker">Fiche technique</span>
         <p>Sélectionnez une recette</p>
-        <span class="empty-hint">Fiche technique affichée ici</span>
+        <span class="empty-hint">Identité, paramètres et fabrication s’affichent ici</span>
       </div>
       <div id="detail" class="detail-fiche hidden">
-        <!-- Identity -->
+        <!-- L1 Identity -->
+        <p class="fiche-l1-label">Fiche · Identité</p>
         <div class="fiche-identity identity-block">
           <div class="fiche-img tech-frame detail-img-wrap">
             <img id="d-image" alt="" />
@@ -182,7 +188,8 @@
           </button>
         </div>
 
-        <!-- Instrument cluster (not 4 clone cards) -->
+        <!-- L2 Requirements — instrument cluster -->
+        <p class="fiche-section-label">Paramètres · Station</p>
         <div class="instr-cluster detail-meta-grid" aria-label="Paramètres techniques">
           <div class="cluster-cell">
             <span class="t-l4">Qualité</span>
@@ -276,24 +283,31 @@
             </button>
           </div>
           <div class="action-secondary-row">
-            <button type="button" id="btn-queue" class="ghost icon-only" title="Ajouter à la file de production" aria-label="File de production">
-              <i class="fa-solid fa-list-ol"></i>
+            <button type="button" id="btn-queue" class="ghost action-tool" title="Ajouter à la file de production" aria-label="File de production">
+              <i class="fa-solid fa-list-ol" aria-hidden="true"></i><span class="tool-label">File</span>
             </button>
-            <button type="button" id="btn-shop" class="ghost icon-only" title="Ajouter à la liste de courses / récupération" aria-label="Liste de courses">
-              <i class="fa-solid fa-basket-shopping"></i>
+            <button type="button" id="btn-shop" class="ghost action-tool" title="Ajouter à la liste de récupération" aria-label="Liste de récupération">
+              <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i><span class="tool-label">Courses</span>
             </button>
-            <button type="button" id="btn-tree" class="ghost icon-only" title="Ouvrir l’arbre de dépendances" aria-label="Arbre de dépendances">
-              <i class="fa-solid fa-sitemap"></i>
+            <button type="button" id="btn-tree" class="ghost action-tool" title="Ouvrir le schéma de dépendances" aria-label="Schéma de dépendances">
+              <i class="fa-solid fa-diagram-project" aria-hidden="true"></i><span class="tool-label">Arbre</span>
             </button>
-            <button type="button" id="btn-pin" class="ghost icon-only" title="Épingler la recette au carnet" aria-label="Épingler au carnet">
-              <i class="fa-solid fa-thumbtack"></i>
+            <button type="button" id="btn-pin" class="ghost action-tool" title="Épingler la recette au carnet" aria-label="Épingler au carnet">
+              <i class="fa-solid fa-thumbtack" aria-hidden="true"></i><span class="tool-label">Pin</span>
             </button>
-            <button type="button" id="btn-obj" class="ghost icon-only" title="Ajouter un objectif carnet" aria-label="Objectif carnet">
-              <i class="fa-solid fa-bullseye"></i>
-            </button>
-            <button type="button" id="btn-book" class="ghost icon-only" title="Ouvrir le carnet de survie" aria-label="Ouvrir le carnet">
-              <i class="fa-solid fa-book"></i>
-            </button>
+            <details class="action-more">
+              <summary class="ghost icon-only" title="Plus d’actions" aria-label="Plus d’actions">
+                <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+              </summary>
+              <div class="action-more-menu">
+                <button type="button" id="btn-obj" class="ghost" title="Ajouter un objectif carnet" aria-label="Objectif carnet">
+                  <i class="fa-solid fa-bullseye" aria-hidden="true"></i> Objectif
+                </button>
+                <button type="button" id="btn-book" class="ghost" title="Ouvrir le carnet de survie" aria-label="Ouvrir le carnet">
+                  <i class="fa-solid fa-book" aria-hidden="true"></i> Carnet
+                </button>
+              </div>
+            </details>
           </div>
         </div>
         <p id="craft-why" class="craft-why panel-alert hidden"></p>

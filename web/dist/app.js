@@ -330,12 +330,12 @@
         <button type="button" class="card-fav${favOn ? ' on' : ''}" data-fav="${escapeHtml(r.id)}" title="Favori" aria-label="Favori">
           <i class="fa-${favOn ? 'solid' : 'regular'} fa-star" aria-hidden="true"></i>
         </button>
-        <div class="card-img-zone">
+        <div class="card-img-zone" aria-hidden="true">
           <span class="ph"><i class="fa-solid fa-cube"></i></span>
           <img alt="" />
         </div>
         <div class="card-body">
-          <div>
+          <div class="card-identity">
             <div class="card-title">${escapeHtml(r.label)}</div>
             <div class="card-cat">${escapeHtml(categoryLabel(r.category))}</div>
           </div>
@@ -346,9 +346,10 @@
           <div class="card-ings">
             ${ings.map((ing) => {
               const info = ingOwnedRequired(ing, r);
-              return `<span class="ing-chip ${info.cls}">${escapeHtml(info.text)} ${escapeHtml(ing.item)}</span>`;
+              const short = humanize(ing.item);
+              return `<span class="ing-chip ${info.cls}" title="${escapeHtml(short)}">${escapeHtml(info.text)} ${escapeHtml(short)}</span>`;
             }).join('')}
-            ${more > 0 ? `<span class="ing-chip more">+${more} autres</span>` : ''}
+            ${more > 0 ? `<span class="ing-chip more">+${more}</span>` : ''}
           </div>
         </div>
       `;
@@ -417,10 +418,16 @@
     }
 
     const desc = r.description
-      || (r.tags && r.tags.length ? r.tags.map(humanize).join(' · ') : '');
+      || r.desc
+      || r.itemDescription
+      || (r.result && (r.result.description || r.result.desc))
+      || (r.tags && r.tags.length ? r.tags.map(humanize).join(' · ') : '')
+      || `Composant documenté pour atelier. Assemblage « ${r.label} » — procédure reconstruite et maintenue.`;
     const descEl = $('#d-desc');
-    descEl.textContent = desc || '';
-    descEl.style.display = desc ? '' : 'none';
+    if (descEl) {
+      descEl.textContent = desc;
+      descEl.style.display = '';
+    }
 
     const lock = lockText(r);
     const locksEl = $('#d-locks');
@@ -878,7 +885,7 @@
       const eta = left > 0 ? `ETA ${left}s` : 'PRÊT';
       card.innerHTML = `
         <div class="qlabel">${escapeHtml(e.label || e.recipeId)}</div>
-        <div class="qmeta"><span>×${escapeHtml(qty)} · ${Math.round(done * 100)}%</span><span>${eta}</span></div>
+        <div class="qmeta"><span>Lot ×${escapeHtml(qty)} · ${Math.round(done * 100)}%</span><span>${eta}</span></div>
         <div class="qbar"><div class="qfill" style="width:${Math.round(done * 100)}%"></div></div>
       `;
       card.addEventListener('click', async () => {
@@ -915,7 +922,7 @@
       const ownedTxt = owned != null ? `${owned}/${need}` : `×${need}`;
       const miss = owned != null ? owned < need : true;
       li.innerHTML = `
-        <span class="check-mark" aria-hidden="true"><i class="fa-regular fa-square"></i></span>
+        <span class="check-mark" aria-hidden="true"><i class="fa-${miss ? 'regular fa-square' : 'solid fa-square-check'}"></i></span>
         <img class="ing-thumb" alt="" />
         <span class="iname">${escapeHtml(humanize(item))}</span>
         <span class="shop-need${miss ? '' : ' ok'}">${escapeHtml(ownedTxt)}</span>
@@ -944,7 +951,7 @@
     if (node.type === 'raw') {
       return `<div class="tree-node raw">
         <div class="t-label">${escapeHtml(humanize(node.item))} ×${escapeHtml(node.count)}</div>
-        <div class="t-sub">Ressource brute</div>
+        <div class="t-sub">Ressource · brute</div>
       </div>`;
     }
     const rid = node.recipeId || node.id || '';
@@ -952,7 +959,7 @@
     const result = node.result && node.result.item ? `${node.result.item}` : '';
     let html = `<div class="tree-node" data-tree-id="${escapeHtml(rid)}">
       <div class="t-label">${escapeHtml(label)}</div>
-      <div class="t-sub">${result ? 'Produit · ' + escapeHtml(humanize(result)) : 'Nœud de fabrication'}</div>
+      <div class="t-sub">${result ? 'Nœud · ' + escapeHtml(humanize(result)) : 'Nœud de fabrication'}</div>
     </div>`;
     const kids = node.children || [];
     if (kids.length) {
@@ -965,7 +972,7 @@
     const view = $('#tree-view');
     if (!view) return;
     if (!tree) {
-      view.innerHTML = `<div class="empty-state compact"><i class="fa-solid fa-diagram-project"></i><p>Arbre indisponible</p><span class="empty-hint">Plan technique non disponible pour cette recette</span></div>`;
+      view.innerHTML = `<div class="empty-state compact"><span class="empty-ico" aria-hidden="true"><i class="fa-solid fa-diagram-project"></i></span><span class="empty-kicker">Schéma technique</span><p>Plan indisponible</p><span class="empty-hint">Aucune dépendance documentée pour cette recette</span></div>`;
       return;
     }
     view.innerHTML = renderTreeNode(tree);
