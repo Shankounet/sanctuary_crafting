@@ -1,5 +1,5 @@
 /* sanctuary_crafting — Craft atelier design system (#app only). Book uses book.css. */
-/* v2.2.11 — catalogue: corner state badge in image bay (no full-width banner) */
+/* v2.2.12 — ergonomics polish: badges, hover, fiche, FABRIQUER, nav, empty console */
 
 :root {
   /* —— Color tokens (canonical) — neutral charcoal hierarchy —— */
@@ -2124,4 +2124,263 @@ button, input { font: inherit; color: inherit; }
 /* Keep object clear of badge: slight bottom-right safe margin via object position bias */
 #app .card-img-zone img {
   object-position: center 42%;
+}
+
+
+/* ============================================================
+   v2.2.12 — Ergonomics + signature polish (layout intact)
+   ============================================================ */
+
+/* 1) Corner badges — readable, uniform, not oversized */
+#app .card-state-badge {
+  right: 7px;
+  bottom: 7px;
+  min-width: 7.6em;
+  padding: 3px 8px;
+  font-size: 0.52rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-align: center;
+  border: 1px solid rgba(70,70,70,0.9);
+  background: rgba(14,14,14,0.82);
+  backdrop-filter: blur(2px);
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+#app .card-state-badge.ok {
+  color: #8a9a74;
+  border-color: rgba(100, 112, 80, 0.62);
+  background: rgba(18, 24, 16, 0.86);
+}
+#app .card-state-badge.bad,
+#app .card-state-badge.warn {
+  color: #9a7066;
+  border-color: rgba(110, 72, 62, 0.58);
+  background: rgba(26, 16, 14, 0.86);
+}
+
+/* 2) Hover cards — light */
+#app .recipe-card {
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+#app .recipe-card:hover {
+  border-color: rgba(154,136,102,0.55);
+  background: #242424;
+  box-shadow:
+    0 8px 18px rgba(0,0,0,0.32),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+  transform: none;
+}
+#app .recipe-card:hover .card-img-zone img {
+  transform: scale(1.025);
+}
+
+/* 3) Selected card */
+#app .recipe-card.selected {
+  border-color: #9a8866;
+  background: #2a2822;
+  box-shadow:
+    0 0 0 1px rgba(154,136,102,0.45),
+    0 12px 22px rgba(0,0,0,0.36),
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    inset 3px 0 0 #9a8866;
+  transform: none;
+}
+#app .recipe-card.selected .card-img-zone img {
+  filter: brightness(1.14) contrast(1.05);
+}
+
+/* 4) Right identity */
+#app .fiche-identity, #app .identity-block {
+  grid-template-columns: 168px 1fr auto;
+  gap: 18px;
+  align-items: center;
+}
+#app .fiche-img, #app .detail-img-wrap,
+#app .fiche-img.tech-frame, #app .detail-img-wrap.tech-frame {
+  width: 158px !important;
+  height: 158px !important;
+}
+#app .fiche-img img, #app .detail-img-wrap img {
+  width: 92% !important;
+  height: 92% !important;
+  max-width: 140px !important;
+  max-height: 140px !important;
+}
+#app .detail-title {
+  font-size: 1.38rem;
+  font-weight: 820;
+  letter-spacing: 0.02em;
+}
+#app .detail-desc {
+  margin-top: 11px;
+  line-height: 1.64;
+  max-width: 34ch;
+  color: #b6b2aa;
+}
+#app .status-tag, #app .locks {
+  margin-top: 12px;
+  border-left: 2px solid currentColor;
+  padding: 4px 10px;
+  letter-spacing: 0.12em;
+}
+
+/* 5) FABRIQUER — worn matte brass / mechanical */
+#app .primary {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent 30%),
+    linear-gradient(180deg, #7e6e52 0%, #6a5c44 42%, #524636 76%, #3a3228 100%) !important;
+  color: #f2ebe2 !important;
+  border: 1px solid #5e5240 !important;
+  letter-spacing: 0.17em;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.45);
+  box-shadow:
+    0 4px 0 #16120e,
+    0 8px 16px rgba(0,0,0,0.46),
+    inset 0 1px 0 rgba(210,190,150,0.08),
+    inset 0 -3px 0 rgba(0,0,0,0.42),
+    inset 2px 0 0 rgba(0,0,0,0.16),
+    inset -2px 0 0 rgba(0,0,0,0.2) !important;
+}
+#app .primary:hover:not(:disabled) {
+  filter: brightness(1.04);
+  border-color: #9a8866 !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 32%),
+    linear-gradient(180deg, #8a785a 0%, #746448 44%, #5a4e3a 78%, #42382e 100%) !important;
+  transform: translateY(-1px);
+}
+#app .primary:active:not(:disabled) {
+  transform: translateY(3px) scale(0.992);
+  box-shadow:
+    0 1px 0 #2a241c,
+    inset 0 3px 8px rgba(0,0,0,0.52),
+    inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+
+/* 6) Left categories — console plates + icons */
+#app .cat-item {
+  gap: 9px;
+  padding: 8px 9px;
+  background: rgba(0,0,0,0.22);
+  border: 1px solid rgba(50,50,50,0.85);
+  border-left: 2px solid transparent;
+}
+#app .cat-item > i {
+  width: 1.1rem;
+  text-align: center;
+  color: rgba(154,154,154,0.55);
+  font-size: 0.72rem;
+}
+#app .cat-item:hover > i { color: rgba(154,136,102,0.75); }
+#app .cat-item.active {
+  background: linear-gradient(90deg, rgba(154,136,102,0.14), rgba(255,255,255,0.03));
+  border-color: rgba(154,136,102,0.35);
+  border-left-color: #9a8866;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+#app .cat-item.active > i { color: #9a8866; }
+
+/* 7) Recipe codes — secondary */
+#app .card-code,
+#app .recipe-code {
+  font-size: 0.44rem !important;
+  letter-spacing: 0.08em;
+  color: rgba(154,154,154,0.32) !important;
+  opacity: 0.85;
+  font-weight: 500;
+  border-color: transparent !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+#app .recipe-card.selected .card-code {
+  color: rgba(154,136,102,0.42) !important;
+}
+
+/* 8) Empty production console — immersive */
+#app .empty-prod {
+  position: relative;
+  border: 1px solid rgba(58,58,58,0.75);
+  border-top: 1px solid rgba(154,136,102,0.28);
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(154,136,102,0.07), transparent 55%),
+    rgba(0,0,0,0.32);
+  padding: 16px 12px 14px;
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.35);
+}
+#app .empty-prod::before,
+#app .empty-prod::after {
+  content: "";
+  position: absolute;
+  width: 10px; height: 10px;
+  border-color: rgba(154,136,102,0.28);
+  border-style: solid;
+  pointer-events: none;
+}
+#app .empty-prod::before {
+  top: 6px; left: 6px;
+  border-width: 1px 0 0 1px;
+}
+#app .empty-prod::after {
+  bottom: 6px; right: 6px;
+  border-width: 0 1px 1px 0;
+}
+#app .empty-prod .empty-kicker {
+  color: rgba(154,136,102,0.8);
+  letter-spacing: 0.18em;
+  font-weight: 750;
+}
+#app .empty-prod .empty-sys {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 2px;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(154,154,154,0.7);
+}
+#app .empty-prod .empty-sys .led-dot {
+  width: 6px; height: 6px;
+}
+
+/* 9) Micro technical separators */
+#app .nav-heading::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
+}
+#app .panel-head {
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,0.05);
+}
+#app .fiche-hero::after {
+  content: "";
+  position: absolute;
+  left: 14px; right: 14px; bottom: 10px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  pointer-events: none;
+  opacity: 0.7;
+}
+#app .side-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#app .side-caption::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(154,136,102,0.22), transparent);
+}
+
+@media (max-width: 1440px) {
+  #app .fiche-identity { grid-template-columns: 132px 1fr auto; }
+  #app .fiche-img, #app .detail-img-wrap,
+  #app .fiche-img.tech-frame, #app .detail-img-wrap.tech-frame {
+    width: 128px !important;
+    height: 128px !important;
+  }
 }

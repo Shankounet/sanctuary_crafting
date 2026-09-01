@@ -250,7 +250,36 @@
     if (el) el.classList.toggle('hidden', !show);
   }
 
-  function renderCategories() {
+  function categoryIcon(cat) {
+    const map = {
+      all: 'fa-layer-group',
+      scrap: 'fa-recycle',
+      medical: 'fa-kit-medical',
+      weapons: 'fa-gun',
+      survival: 'fa-campground',
+      survie: 'fa-campground',
+      mechanic: 'fa-wrench',
+      mecano: 'fa-wrench',
+      ingenieur: 'fa-gears',
+      tailleur: 'fa-scissors',
+      boucherie: 'fa-drumstick-bite',
+      forgeron: 'fa-hammer',
+      manche_forgeron: 'fa-hammer',
+      fonderie_forgeron: 'fa-fire',
+      reparation_forgeron: 'fa-screwdriver-wrench',
+      agriculture: 'fa-seedling',
+      schema: 'fa-drafting-compass',
+      accessoires: 'fa-puzzle-piece',
+      decoration: 'fa-couch',
+      munition: 'fa-bullseye',
+      cuisine: 'fa-utensils',
+      construction: 'fa-helmet-safety',
+      armurier: 'fa-shield-halved',
+    };
+    return map[String(cat || '').toLowerCase()] || 'fa-tag';
+  }
+
+    function renderCategories() {
     const nav = $('#cat-list');
     if (!nav) return;
     const counts = {};
@@ -261,12 +290,12 @@
     const cats = Object.keys(counts).sort((a, b) => categoryLabel(a).localeCompare(categoryLabel(b), 'fr'));
     const total = state.recipes.length;
     let html = `<button type="button" class="cat-item${state.category === 'all' ? ' active' : ''}" data-cat="all">
-      <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+      <i class="fa-solid ${categoryIcon('all')}" aria-hidden="true"></i>
       <span>Toutes</span><span class="count">${total}</span>
     </button>`;
     cats.forEach((c) => {
       html += `<button type="button" class="cat-item${state.category === c ? ' active' : ''}" data-cat="${escapeHtml(c)}">
-        <i class="fa-solid fa-tag" aria-hidden="true"></i>
+        <i class="fa-solid ${categoryIcon(c)}" aria-hidden="true"></i>
         <span>${escapeHtml(categoryLabel(c))}</span><span class="count">${counts[c]}</span>
       </button>`;
     });
