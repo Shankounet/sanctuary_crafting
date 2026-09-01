@@ -8,27 +8,45 @@
 <link rel="stylesheet" href="style.css" />
 <link rel="stylesheet" href="book.css" />
 <style id="book-critical">
-  /* CEF fallback if book.css @import/filter fails */
+  /* CEF hard paint — book must never stay blank when open */
+  #book-app.hidden { display: none !important; }
   #book-app:not(.hidden), #book-app.is-open {
     display: block !important;
     position: fixed !important;
     inset: 0 !important;
-    z-index: 10000 !important;
+    z-index: 2147483000 !important;
     visibility: visible !important;
     opacity: 1 !important;
     pointer-events: auto !important;
   }
-  #book-app.hidden { display: none !important; }
-  #book-app .book-spread {
-    width: min(1080px, 88vw);
-    height: min(680px, 82vh);
-    display: grid !important;
-    grid-template-columns: 1fr 28px 1fr;
+  #book-app.is-open .book-stage { display: grid !important; place-items: center; inset: 0; position: absolute; }
+  #book-app.is-open .book-world-dim {
+    position: absolute; inset: 0;
+    background: rgba(8, 6, 4, 0.78) !important;
   }
-  #book-app .book-page {
+  #book-app.is-open .book-spread {
+    position: relative; z-index: 2;
+    width: min(1080px, 88vw) !important;
+    height: min(680px, 82vh) !important;
+    display: grid !important;
+    grid-template-columns: 1fr 28px 1fr !important;
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  #book-app.is-open .book-page {
     background: #f3ead6 !important;
     color: #2c2418 !important;
-    min-height: 200px;
+    min-height: 200px !important;
+    opacity: 1 !important;
+  }
+  #book-app.is-open .book-page-inner {
+    color: #2c2418 !important;
+    opacity: 1 !important;
+    padding: 22px 26px;
+  }
+  #book-app.is-open .book-binding {
+    background: #4a3220 !important;
   }
 </style>
 </head>

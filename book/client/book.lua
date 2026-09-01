@@ -48,8 +48,8 @@ local function bookFallbackMeta()
         theme = (Config.Book and Config.Book.Theme) or 'field_manual',
         modules = modules,
         locale = Config.Locale or 'fr',
-        title = _('book_title'),
-        subtitle = _('book_subtitle'),
+        title = (type(_) == 'function' and _('book_title')) or 'Carnet de survie',
+        subtitle = (type(_) == 'function' and _('book_subtitle')) or 'Manuel de terrain',
     }
 end
 
@@ -74,15 +74,18 @@ function OpenSurvivalBook(page)
     local lazy = Config.Book.LazyLoad ~= false
     local meta = bookFallbackMeta()
 
-    -- Paint NUI first, then focus, then re-send (CEF sometimes drops the first message)
+    -- Focus + repeated bookOpen (CEF often drops the first NUI message)
     bookOpen = true
-    pushBookOpen(pageName, meta, lazy)
     SetNuiFocus(true, true)
     SetNuiFocusKeepInput(false)
     pushBookOpen(pageName, meta, lazy)
+    pushBookOpen(pageName, meta, lazy)
 
     CreateThread(function()
-        Wait(75)
+        Wait(50)
+        if not bookOpen then return end
+        pushBookOpen(pageName, meta, lazy)
+        Wait(150)
         if not bookOpen then return end
         pushBookOpen(pageName, meta, lazy)
 

@@ -60,6 +60,13 @@
     }).then((r) => r.json()).catch(() => ({}));
   }
 
+  function postWithTimeout(name, data = {}, ms = 2500) {
+    return Promise.race([
+      post(name, data),
+      new Promise((resolve) => setTimeout(() => resolve({ ok: false, timeout: true }), ms)),
+    ]);
+  }
+
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -183,7 +190,7 @@
 
   async function loadModule(name, payload) {
     const key = name + JSON.stringify(payload || {});
-    const r = await post('bookModule', { module: name, payload: payload || {} });
+    const r = await postWithTimeout('bookModule', { module: name, payload: payload || {} }, 2500);
     if (r && r.ok) state.cache[key] = r.data;
     return r;
   }
@@ -224,7 +231,7 @@
 
   /* ========== ACCUEIL (editorial spread) ========== */
   async function renderDashboard() {
-    const r = await post('bookDashboard', {});
+    const r = await postWithTimeout('bookDashboard', {}, 2500);
     if (!r || !r.ok) {
       setPages(
         pageHead('Accueil', 'Synthèse indisponible') + emptyBox('fa-book-open', 'Dashboard indisponible', 'Le module Tableau de bord est désactivé ou inaccessible.'),
@@ -950,6 +957,40 @@
     );
   }
 
+  function paintShellVisible() {
+    book.classList.remove('hidden');
+    book.classList.add('is-open');
+    book.removeAttribute('hidden');
+    book.setAttribute('aria-hidden', 'false');
+    book.style.cssText = 'display:block!important;visibility:visible!important;opacity:1!important;position:fixed!important;inset:0!important;z-index:2147483000!important;pointer-events:auto!important;';
+    const spread = $('#book-spread');
+    if (spread) {
+      spread.style.opacity = '1';
+      spread.style.visibility = 'visible';
+      spread.style.transform = 'none';
+      spread.style.animation = 'none';
+    }
+  }
+
+  function paintBootPages(title, subtitle) {
+    const left = `
+      <div class="accueil-hero">
+        <p class="book-stamp">Dossier personnel</p>
+        <h2 class="accueil-title">${esc(String(title || 'Carnet de survie'))}</h2>
+        <p class="accueil-sub">${esc(subtitle || 'Journal technique de terrain')}</p>
+        <hr class="book-rule" />
+        <p class="hand-note">Ouverture du carnet…</p>
+      </div>
+      <h3 class="section-title">Compétences</h3>
+      <div class="paper-card empty">Chargement des données de terrain…</div>
+      ${folio('i')}`;
+    const right = `
+      ${pageHead('Aujourd’hui', 'Synthèse en cours')}
+      <div class="paper-card empty">Le contenu se remplit dès que le serveur répond.</div>
+      ${folio('ii')}`;
+    setPages(left, right);
+  }
+
   function openBook(msg) {
     state.open = true;
     state.meta = (msg && msg.meta) || {};
@@ -960,28 +1001,24 @@
       } catch (_) { /* ignore */ }
     }
     const title = state.meta.title || 'CARNET DE SURVIE';
+    const subtitle = state.meta.subtitle || 'Journal technique de terrain';
     const titleEl = $('#book-title');
     const subEl = $('#book-sub');
     if (titleEl) titleEl.textContent = String(title).toUpperCase();
-    if (subEl) subEl.textContent = state.meta.subtitle || 'Journal technique de terrain';
-    /* Force visible BEFORE async navigate (blank NUI = classic focus-without-paint) */
-    book.classList.remove('hidden');
-    book.classList.add('is-open');
-    book.removeAttribute('hidden');
-    book.setAttribute('aria-hidden', 'false');
-    book.style.display = 'block';
-    book.style.visibility = 'visible';
-    book.style.opacity = '1';
+    if (subEl) subEl.textContent = subtitle;
+    /* 1) Force shell visible BEFORE any await */
+    paintShellVisible();
     book.classList.remove('is-opening');
-    void book.offsetWidth;
-    book.classList.add('is-opening');
     closeIndex();
     renderTabs();
+    /* 2) Sync Accueil skeleton so ivory pages are never empty */
+    paintBootPages(title, subtitle);
     const page = (msg && msg.page) || 'dashboard';
     Promise.resolve()
       .then(() => navigate(page))
       .catch((err) => {
         console.error('[sanctuary_crafting book navigate]', err);
+        paintShellVisible();
         setPages(
           pageHead('Carnet de survie', 'Ouverture partielle') +
             emptyBox('fa-book-open', 'Contenu indisponible', 'Réessaie ou rouvre le carnet.'),
