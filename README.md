@@ -51,7 +51,8 @@ sanctuary_crafting/
 ├── dismantle/ hooks/
 ├── client/                    # benches, place, NUI bridge, craft fallback ox_lib
 ├── web/dist/                  # NUI (html/css/js)
-├── locales/fr.lua + en.lua
+├── web/sounds/                # SFX .ogg (click/success/error/blueprint)
+├── locales/fr.lua + en.lua    # parité complète
 └── sql/
 ```
 
@@ -108,9 +109,10 @@ Tous les modules sont **implémentés**. Les flags activent/désactivent le comp
 | `Config.ReverseEngineering` | analyse item → blueprint |
 | `Config.ShoppingList` | liste courses serveur |
 | `Config.Stations.UpgradesEnabled` | levels / modules |
-| `Config.Power.Enabled` | pont énergie (sinon always-on) |
+| `Config.Power.Enabled` | pont énergie + `ExternalBridge` (sinon always-on ; fallback `power_cell`) |
 | `Config.Noise.Enabled` | event bruit |
 | `Config.UI.UseNui` | NUI (sinon menu ox_lib) |
+| `Config.UI.Sounds` | SFX NUI (WebAudio + `.ogg`), `Enabled` / `Volume` / `Files` |
 
 ---
 
@@ -141,10 +143,17 @@ Tous les modules sont **implémentés**. Les flags activent/désactivent le comp
   noiseLevel = 1,
   dismantle = false,
   dismantleYields = { ... },
+  -- Multi-étapes (même craftId) :
+  steps = {
+    { label = 'Découpe', ingredients = { { item = 'scrap_metal', count = 3 } }, duration = 4000 },
+    { label = 'Assemblage', ingredients = { { item = 'cloth', count = 1 } }, duration = 4000 },
+  },
+  -- OU chaîne de recettes (réponse complete.chainNext, même craftUID) :
+  chain = { 'ex_reinforced_plate' },
 }
 ```
 
-9 exemples : `config/examples.lua` (`Config.LoadExampleRecipes`).
+9 exemples : `config/examples.lua` (`Config.LoadExampleRecipes`). `ex_cut_pipe` démo `steps[]`.
 
 ---
 
@@ -154,8 +163,10 @@ Tous les modules sont **implémentés**. Les flags activent/désactivent le comp
 - 3 colonnes : liste (search/filtres/favoris) · détail (locks, batch, craft/queue) · file / arbre / courses.
 - Mode compact, Escape pour fermer.
 - Perf : CSS léger, pas de libs lourdes, callbacks NUI ciblés.
+- **SFX** (optionnels) : WebAudio beep + placeholders `web/sounds/{click,success,error,blueprint}.ogg`.
+  Désactiver : `Config.UI.Sounds.Enabled = false`.
 
-Désactiver : `Config.UI.UseNui = false` → menu ox_lib.
+Désactiver NUI : `Config.UI.UseNui = false` → menu ox_lib.
 
 ---
 
@@ -176,7 +187,30 @@ Désactiver : `Config.UI.UseNui = false` → menu ox_lib.
   server = { export = 'sanctuary_crafting.useBlueprintItem' } },
 ```
 
-Les items des 9 exemples (`scrap_metal`, `metal_plate`, etc.) sont à déclarer selon votre économie.
+### Items des 9 recettes d'exemple (`config/examples.lua`)
+
+À déclarer selon votre économie (labels / poids libres) :
+
+| Item | Rôle (exemples) |
+|------|-----------------|
+| `scrap_metal` | ingrédient de base |
+| `metal_plate` | résultat / ingrédient |
+| `reinforced_plate` | résultat skill-gated |
+| `cloth` | médical / survie / steps |
+| `plastic` | masque filtrant |
+| `filter_mask` | résultat blueprint |
+| `hand_saw` | outil (durabilité) |
+| `cut_pipe` | résultat multi-steps |
+| `alcohol` | médical |
+| `medkit_basic` | résultat qualité |
+| `repair_kit` | résultat mechanic |
+| `metal_ingot` | fonte |
+| `slag` / `coal_dust` | byproducts |
+| `gunpowder` / `brass` | presse munitions |
+| `ammo_9mm` | résultat queue/machine |
+| `weapon_pistol` | démontage (source) |
+| `weapon_parts` / `spring` | yields démontage |
+| `power_cell` | module station (fallback Power) |
 
 ---
 
@@ -206,6 +240,40 @@ Events : `sanctuary_crafting:noise`, hooks `craftStarted` / `craftCompleted` / `
 Commande admin : `/placeworldbench [category]` (ACE `sanctuary.crafting.admin`).
 
 ---
+
+## Power (`Config.Power`)
+
+- `Enabled = false` → toujours alimenté.
+- `Enabled = true` → résolution :
+  1. **Pont externe** `Config.Power.ExternalBridge = { resource, export }` (ou `fn`)
+  2. Fallback modules station : `power_cell` / `generator` (`FallbackModules`)
+  3. Bancs monde : `powered ~= false`
+- Exports : `SetPowerBridge(fn)`, `HasStationPower(station, recipe?)`
+
+```lua
+Config.Power = {
+  Enabled = true,
+  ExternalBridge = { resource = 'my_power_grid', export = 'HasStationPower' },
+  FallbackModules = { 'power_cell', 'generator' },
+}
+```
+
+## Multi-étapes / chaîne
+
+- **`recipe.steps[]`** : étapes séquentielles d'ingrédients ; le serveur avance sous le **même `craftId`** (`complete` → `{ advanced=true, stepIndex, duration }`).
+- **`recipe.chain`** : après complete final, réponse `chainNext` (+ `craftUID` stable) pour enchaîner une autre recette / projet.
+- Cancel / disconnect : refund de tout `removedHistory` (toutes les étapes consommées).
+
+## Polish v2 leftovers (fermés)
+
+- [x] Exécuteur multi-étapes (`steps[]` / `chain`)
+- [x] SFX NUI (WebAudio + `.ogg`, `Config.UI.Sounds`)
+- [x] Parité `locales/en.lua` ↔ `fr.lua`
+- [x] Pont `Config.Power.ExternalBridge` + fallback `power_cell`
+- [x] README items exemples + gaps documentés
+- [x] Nil-guards pipeline + `fxmanifest` fichiers `web/sounds/*.ogg`
+
+**ml_skills** reste la seule source XP via `CraftingSkills` (pas d'XP craft parallèle).
 
 ## Licence
 

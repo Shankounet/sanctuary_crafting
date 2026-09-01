@@ -24,10 +24,17 @@ Config = {}
       requireLevel = 1,                      -- optionnel ; si ml_skills down → refuse
       requireSkill = 'crafting_basic',       -- optionnel UID ml_skills ; idem
 
-      -- Champs Phase 2+ (ignorés tant que les feature flags sont false) :
+      -- Multi-étapes (v2 polish) — steps[] OU chain (même craftId / craftUID) :
+      -- steps = {
+      --   { label = 'Étape 1', ingredients = { { item = 'scrap_metal', count = 2 } }, duration = 3000 },
+      --   { label = 'Étape 2', ingredients = { { item = 'cloth', count = 1 } }, duration = 4000 },
+      -- },
+      -- chain = { 'next_recipe_id' },       -- après complete → chainNext (client / project)
+
+      -- Champs Phase 2+ (flags Config.*.Enabled) :
       -- blueprintId   = 'bp_metal_plate',   -- Config.Blueprints.Enabled
       -- quality       = true,               -- Config.Quality.Enabled
-      -- powerCost     = 0,                  -- Config.Power.Enabled
+      -- powerCost     = 0,                  -- Config.Power.Enabled (+ ExternalBridge)
       -- noiseLevel    = 0,                  -- Config.Noise.Enabled
       -- queueSlot     = 1,                  -- Config.Queue.Enabled
       -- projectId     = nil,                -- Config.Projects.Enabled
@@ -47,7 +54,12 @@ Config.Quality     = { Enabled = false }
 Config.Blueprints  = { Enabled = false }
 Config.Queue       = { Enabled = false }
 Config.Projects    = { Enabled = false }
-Config.Power       = { Enabled = false }   -- CraftingPower.HasPower → true si false
+Config.Power = {
+    Enabled = false,  -- false → CraftingPower.HasPower toujours true
+    -- Pont externe optionnel (voir integrations/power.lua) ; sinon fallback power_cell
+    ExternalBridge = nil, -- { resource="my_power", export="HasStationPower" } ou { fn = function(station, recipe) return true end }
+    FallbackModules = { "power_cell", "generator" },
+}
 Config.Noise       = { Enabled = false }
 Config.Dismantling = { Enabled = false }
 

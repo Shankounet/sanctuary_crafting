@@ -2,6 +2,13 @@
     9 recettes d'EXEMPLE minimales (pas un pack économie).
     Activées seulement si Config.LoadExampleRecipes == true.
     Couvrent : simple, skill, blueprint, tool, quality, mechanic, byproducts, machine/queue, dismantle.
+
+    Multi-étapes (optionnel) :
+      steps = {
+        { label = 'Découpe', ingredients = { { item = 'scrap_metal', count = 3 } }, duration = 4000 },
+        { label = 'Assemblage', ingredients = { { item = 'cloth', count = 1 } }, duration = 5000 },
+      },
+      -- OU chain = { 'ex_reinforced_plate' }  -- après complete, serveur renvoie chainNext (même craftUID)
 ]]
 
 Config.LoadExampleRecipes = Config.LoadExampleRecipes ~= false -- default true for examples pack
@@ -52,19 +59,22 @@ local Examples = {
         requireBlueprint = 'bp_filter_mask',
         blueprintId = 'bp_filter_mask',
     },
-    -- 4. Tool required + durability
+    -- 4. Tool + multi-step (steps[] sous le même craftId)
     {
         id = 'ex_cut_pipe',
-        label = 'Tuyau découpé (exemple outil)',
+        label = 'Tuyau découpé (exemple outil + steps)',
         category = 'scrap',
-        tags = { 'metal', 'tool' },
-        ingredients = {
-            { item = 'scrap_metal', count = 3 },
+        tags = { 'metal', 'tool', 'steps' },
+        ingredients = {}, -- remplacé par steps[].ingredients
+        steps = {
+            { label = 'Mesure / découpe', ingredients = { { item = 'scrap_metal', count = 3 } }, duration = 4000 },
+            { label = 'Ébavurage', ingredients = { { item = 'cloth', count = 1 } }, duration = 4000 },
         },
         result = { item = 'cut_pipe', count = 1 },
         duration = 8000,
         xp = { category = 'crafting', amount = 12 },
         requireTool = { item = 'hand_saw', durabilityCost = 5 },
+        -- chain = { 'ex_reinforced_plate' }, -- décommenter pour enchaîner (réponse chainNext)
     },
     -- 5. Quality roll
     {

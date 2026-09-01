@@ -87,6 +87,8 @@ RegisterNUICallback('notify', function(data, cb)
     local desc = data.reason or 'craft_failed'
     if data.reason == 'craft_success' and data.label then
         desc = _('craft_success', 1, data.label)
+    elseif type(data.args) == 'table' and #data.args > 0 then
+        desc = _(desc, table.unpack(data.args))
     else
         desc = _(desc)
     end

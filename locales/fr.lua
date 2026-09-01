@@ -70,4 +70,6 @@ Locales['fr'] = {
     ['reverse_fail'] = 'Analyse échouée',
     ['reverse_success'] = 'Analyse réussie : %s',
     ['shopping_disabled'] = 'Liste de courses désactivée',
+    ['craft_step_advance'] = 'Étape %s/%s : %s',
+    ['craft_chain_next'] = 'Prochaine étape chaîne : %s',
 }
