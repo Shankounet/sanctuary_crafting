@@ -7,6 +7,30 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <link rel="stylesheet" href="style.css" />
 <link rel="stylesheet" href="book.css" />
+<style id="book-critical">
+  /* CEF fallback if book.css @import/filter fails */
+  #book-app:not(.hidden), #book-app.is-open {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 10000 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  #book-app.hidden { display: none !important; }
+  #book-app .book-spread {
+    width: min(1080px, 88vw);
+    height: min(680px, 82vh);
+    display: grid !important;
+    grid-template-columns: 1fr 28px 1fr;
+  }
+  #book-app .book-page {
+    background: #f3ead6 !important;
+    color: #2c2418 !important;
+    min-height: 200px;
+  }
+</style>
 </head>
 <body>
 <div id="app" class="hidden" data-compact="0" data-side="">

@@ -952,7 +952,7 @@
 
   function openBook(msg) {
     state.open = true;
-    state.meta = msg.meta || {};
+    state.meta = (msg && msg.meta) || {};
     state.modules = (state.meta.modules) || {};
     if (state.meta.accent) {
       try {
@@ -964,21 +964,41 @@
     const subEl = $('#book-sub');
     if (titleEl) titleEl.textContent = String(title).toUpperCase();
     if (subEl) subEl.textContent = state.meta.subtitle || 'Journal technique de terrain';
+    /* Force visible BEFORE async navigate (blank NUI = classic focus-without-paint) */
     book.classList.remove('hidden');
+    book.classList.add('is-open');
+    book.removeAttribute('hidden');
     book.setAttribute('aria-hidden', 'false');
+    book.style.display = 'block';
+    book.style.visibility = 'visible';
+    book.style.opacity = '1';
     book.classList.remove('is-opening');
     void book.offsetWidth;
     book.classList.add('is-opening');
     closeIndex();
     renderTabs();
-    navigate(msg.page || 'dashboard');
+    const page = (msg && msg.page) || 'dashboard';
+    Promise.resolve()
+      .then(() => navigate(page))
+      .catch((err) => {
+        console.error('[sanctuary_crafting book navigate]', err);
+        setPages(
+          pageHead('Carnet de survie', 'Ouverture partielle') +
+            emptyBox('fa-book-open', 'Contenu indisponible', 'Réessaie ou rouvre le carnet.'),
+          folio('—')
+        );
+      });
   }
 
   function closeBook() {
     state.open = false;
     closeIndex();
     book.classList.add('hidden');
+    book.classList.remove('is-open', 'is-opening');
     book.setAttribute('aria-hidden', 'true');
+    book.style.display = '';
+    book.style.visibility = '';
+    book.style.opacity = '';
     post('bookClose', {});
   }
 
@@ -992,7 +1012,11 @@
       state.open = false;
       closeIndex();
       book.classList.add('hidden');
+      book.classList.remove('is-open', 'is-opening');
       book.setAttribute('aria-hidden', 'true');
+      book.style.display = '';
+      book.style.visibility = '';
+      book.style.opacity = '';
     }
     if (data.action === 'bookPins') {
       // HUD handled in Lua
