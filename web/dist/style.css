@@ -2932,13 +2932,12 @@ button, input { font: inherit; color: inherit; }
   color: rgba(154,154,154,0.8);
 }
 
-/* FABRIQUER press/hover micro enhance */
-#app #fab-module .primary:hover:not(:disabled) {
-  filter: brightness(1.05);
-  border-color: #a89470 !important;
+/* FABRIQUER — leave press/hover to #btn-craft plate rules (v2.4.3) */
+#app #fab-module #btn-craft.primary:hover:not(:disabled) {
+  filter: none !important;
 }
-#app #fab-module .primary:active:not(:disabled) {
-  transform: translateY(3px) scale(0.99);
+#app #fab-module #btn-craft.primary:active:not(:disabled) {
+  /* plate active owns transform */
 }
 
 @media (max-width: 1440px) {
@@ -4393,9 +4392,9 @@ button, input { font: inherit; color: inherit; }
 
 
 /* ============================================================
-   v2.4.1 — FABRIQUER as industrial station command plate
-   Burnished brass / workshop metal — not flat beige web button.
-   Scope: #btn-craft only (layout unchanged).
+   v2.4.3 — FABRIQUER: ONE industrial command plate
+   Icon + label integrated — NO separate icon square.
+   Matte burnished steel / tarnished brass accent #9a8866.
    ============================================================ */
 #app #btn-craft.primary,
 #app #btn-craft.craft-engage {
@@ -4405,46 +4404,48 @@ button, input { font: inherit; color: inherit; }
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 10px !important;
-  min-height: 48px !important;
-  padding: 12px 18px !important;
+  gap: 0 !important;
+  min-height: 50px !important;
+  padding: 0 22px !important;
   border-radius: 0 !important;
   cursor: pointer;
   overflow: hidden;
-  color: #f3eee4 !important;
-  font-weight: 850 !important;
-  font-size: 0.92rem !important;
-  letter-spacing: 0.2em !important;
+  color: #e8e0d2 !important;
+  font-weight: 800 !important;
+  font-size: 0.9rem !important;
+  letter-spacing: 0.12em !important;
   text-transform: uppercase !important;
-  text-shadow: 0 1px 0 rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.35) !important;
-  border: 1px solid #6a5c44 !important;
-  border-top-color: #8a7a58 !important;
-  border-bottom-color: #3e3628 !important;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.6) !important;
+  /* metallic rim — accent as edge, not flashy fill */
+  border: 1px solid #5c5344 !important;
+  border-top-color: #7a6f5a !important;
+  border-left-color: #6a6254 !important;
+  border-right-color: #4a4438 !important;
+  border-bottom-color: #2e2a24 !important;
   background:
-    linear-gradient(180deg, rgba(255,236,200,0.14) 0%, transparent 34%),
-    linear-gradient(180deg, #7a6a4c 0%, #6a5a40 28%, #564830 62%, #3e3426 100%) !important;
+    linear-gradient(180deg, rgba(255,255,255,0.07) 0%, transparent 22%),
+    linear-gradient(180deg, rgba(0,0,0,0.18) 78%, rgba(0,0,0,0.42) 100%),
+    linear-gradient(180deg, #4a4640 0%, #3c3834 38%, #2e2c2a 72%, #242220 100%) !important;
   box-shadow:
-    0 4px 0 #18140e,
-    0 8px 18px rgba(0,0,0,0.5),
-    inset 0 1px 0 rgba(255,230,190,0.22),
-    inset 0 -3px 0 rgba(0,0,0,0.45),
-    inset 2px 0 0 rgba(255,220,170,0.06),
-    inset -2px 0 0 rgba(0,0,0,0.25) !important;
+    0 3px 0 #12100c,
+    0 6px 14px rgba(0,0,0,0.48),
+    inset 0 1px 0 rgba(255,255,255,0.1),
+    inset 0 -2px 6px rgba(0,0,0,0.45),
+    inset 0 0 0 1px rgba(154,136,102,0.22) !important;
   clip-path: polygon(
-    0 5px, 5px 0, calc(100% - 5px) 0, 100% 5px,
-    100% calc(100% - 5px), calc(100% - 5px) 100%, 5px 100%, 0 calc(100% - 5px)
+    0 3px, 3px 0, calc(100% - 3px) 0, 100% 3px,
+    100% calc(100% - 3px), calc(100% - 3px) 100%, 3px 100%, 0 calc(100% - 3px)
   ) !important;
   transition:
-    background 140ms ease,
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    transform 90ms ease,
-    color 140ms ease,
-    filter 140ms ease !important;
+    background 130ms ease,
+    border-color 130ms ease,
+    box-shadow 130ms ease,
+    transform 100ms ease,
+    color 130ms ease !important;
   filter: none !important;
 }
 
-/* brushed plate sheen */
+/* subtle brushed grain across the whole plate */
 #app #btn-craft.craft-engage::before {
   content: "" !important;
   position: absolute !important;
@@ -4453,52 +4454,68 @@ button, input { font: inherit; color: inherit; }
   z-index: 0 !important;
   background:
     repeating-linear-gradient(
-      115deg,
-      transparent 0 2px,
-      rgba(255,255,255,0.015) 2px 3px
+      100deg,
+      transparent 0 3px,
+      rgba(255,255,255,0.012) 3px 4px
     ),
-    linear-gradient(90deg, rgba(0,0,0,0.18), transparent 18%, transparent 82%, rgba(0,0,0,0.2)) !important;
-  opacity: 0.85 !important;
+    linear-gradient(90deg, rgba(0,0,0,0.22), transparent 14%, transparent 86%, rgba(0,0,0,0.22)) !important;
+  opacity: 1 !important;
 }
 
-/* top edge highlight */
+/* top edge light catch — plate, not glow */
 #app #btn-craft.craft-engage::after {
   content: "" !important;
   position: absolute !important;
-  left: 12px; right: 12px; top: 6px;
+  left: 14px; right: 14px; top: 5px;
   height: 1px !important;
   pointer-events: none !important;
   z-index: 1 !important;
-  background: linear-gradient(90deg, transparent, rgba(255,236,200,0.35), transparent) !important;
+  background: linear-gradient(90deg, transparent, rgba(200,188,160,0.28), transparent) !important;
 }
 
+/* single face: icon + label as one unit */
+#app #btn-craft .craft-engage-face {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+/* ICON — naked on the plate, no box / no square */
 #app #btn-craft .craft-engage-ico,
+#app #btn-craft i.craft-engage-ico {
+  display: inline-block !important;
+  position: relative !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: none !important;
+  box-shadow: none !important;
+  clip-path: none !important;
+  border-radius: 0 !important;
+  color: #c4b498 !important;
+  font-size: 0.78rem !important;
+  line-height: 1 !important;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.55) !important;
+  flex: 0 0 auto;
+}
+
 #app #btn-craft .craft-engage-label {
   position: relative;
   z-index: 2;
-}
-#app #btn-craft .craft-engage-ico {
-  display: inline-grid;
-  place-items: center;
-  width: 1.55rem;
-  height: 1.55rem;
-  border: 1px solid rgba(154,136,102,0.45);
-  background:
-    linear-gradient(180deg, rgba(255,230,190,0.1), transparent 60%),
-    rgba(0,0,0,0.28);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    inset 0 -1px 0 rgba(0,0,0,0.35);
-  clip-path: polygon(0 2px, 2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px));
-  color: #e8dcc0;
-  font-size: 0.78rem;
-}
-#app #btn-craft .craft-engage-label {
-  font-weight: 850;
-  letter-spacing: 0.2em;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  font-size: 0.9rem;
+  line-height: 1;
+  color: inherit;
 }
 
-/* corner screws */
+/* 2 discreet corner fixings only */
 #app #btn-craft .craft-engage-screws {
   position: absolute;
   inset: 0;
@@ -4507,97 +4524,113 @@ button, input { font: inherit; color: inherit; }
 }
 #app #btn-craft .craft-engage-screws i {
   position: absolute;
-  width: 5px; height: 5px;
+  width: 4px; height: 4px;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 35% 30%, #c4b090, #6a5c44 55%, #2a2418 100%);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
-  opacity: 0.7;
+    radial-gradient(circle at 35% 30%, #9a9080, #5a5448 55%, #1e1c18 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.4),
+    0 0 0 1px rgba(154,136,102,0.15);
+  opacity: 0.55;
 }
-#app #btn-craft .craft-engage-screws i:nth-child(1) { top: 7px; left: 8px; }
-#app #btn-craft .craft-engage-screws i:nth-child(2) { top: 7px; right: 8px; }
-#app #btn-craft .craft-engage-screws i:nth-child(3) { bottom: 7px; left: 8px; }
-#app #btn-craft .craft-engage-screws i:nth-child(4) { bottom: 7px; right: 8px; }
+#app #btn-craft .craft-engage-screws i:nth-child(1) { top: 8px; left: 10px; }
+#app #btn-craft .craft-engage-screws i:nth-child(2) { top: 8px; right: 10px; }
+#app #btn-craft .craft-engage-screws i:nth-child(3),
+#app #btn-craft .craft-engage-screws i:nth-child(4) { display: none; }
 
-/* HOVER — brighter plate, more relief, no neon glow */
+/* HOVER — warmer rim, slightly lighter plate, light shift, no glow */
 #app #btn-craft.primary:hover:not(:disabled),
 #app #btn-craft.craft-engage:hover:not(:disabled) {
-  color: #fff8ec !important;
+  color: #f2ebe0 !important;
   border-color: #9a8866 !important;
-  border-top-color: #b09a72 !important;
+  border-top-color: #b09a74 !important;
+  border-bottom-color: #3a342a !important;
   background:
-    linear-gradient(180deg, rgba(255,236,200,0.2) 0%, transparent 36%),
-    linear-gradient(180deg, #8a7854 0%, #746448 30%, #5e4e36 64%, #463a2a 100%) !important;
+    linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 26%),
+    linear-gradient(180deg, rgba(0,0,0,0.12) 80%, rgba(0,0,0,0.36) 100%),
+    linear-gradient(180deg, #56524a 0%, #46423c 40%, #363430 74%, #2a2824 100%) !important;
   box-shadow:
-    0 5px 0 #18140e,
-    0 10px 20px rgba(0,0,0,0.52),
-    inset 0 1px 0 rgba(255,236,200,0.28),
-    inset 0 -3px 0 rgba(0,0,0,0.4),
-    inset 0 0 0 1px rgba(154,136,102,0.18) !important;
-  transform: translateY(-1px) !important;
+    0 3px 0 #12100c,
+    0 7px 16px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,245,220,0.14),
+    inset 0 -2px 6px rgba(0,0,0,0.4),
+    inset 0 0 0 1px rgba(154,136,102,0.38) !important;
+  transform: none !important;
   filter: none !important;
 }
-#app #btn-craft.craft-engage:hover:not(:disabled) .craft-engage-ico {
-  border-color: rgba(176,154,114,0.7);
-  color: #f5ead0;
-  background:
-    linear-gradient(180deg, rgba(255,230,190,0.16), transparent 60%),
-    rgba(0,0,0,0.22);
+#app #btn-craft.craft-engage:hover:not(:disabled) .craft-engage-ico,
+#app #btn-craft.craft-engage:hover:not(:disabled) i.craft-engage-ico {
+  color: #d4c4a0 !important;
+  border: none !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+#app #btn-craft.craft-engage:hover:not(:disabled)::after {
+  background: linear-gradient(90deg, transparent, rgba(220,200,160,0.4), transparent) !important;
 }
 
-/* PRESSED — mechanical engage */
+/* CLIC — sink 1–2px, stronger inset, mechanical */
 #app #btn-craft.primary:active:not(:disabled),
 #app #btn-craft.craft-engage:active:not(:disabled) {
-  transform: translateY(3px) scale(0.992) !important;
-  border-top-color: #5a4e3a !important;
-  border-bottom-color: #2a2418 !important;
+  transform: translateY(2px) !important;
+  border-top-color: #3a3630 !important;
+  border-bottom-color: #2a2824 !important;
   background:
-    linear-gradient(180deg, rgba(0,0,0,0.12) 0%, transparent 40%),
-    linear-gradient(180deg, #5a4c36 0%, #4a3e2c 45%, #3a3224 100%) !important;
+    linear-gradient(180deg, rgba(0,0,0,0.22) 0%, transparent 40%),
+    linear-gradient(180deg, #32302c 0%, #2a2826 50%, #22201e 100%) !important;
   box-shadow:
-    0 1px 0 #2a2418,
-    inset 0 3px 10px rgba(0,0,0,0.55),
-    inset 0 1px 0 rgba(255,255,255,0.06) !important;
+    0 1px 0 #1a1814,
+    inset 0 3px 10px rgba(0,0,0,0.62),
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    inset 0 0 0 1px rgba(154,136,102,0.12) !important;
   filter: none !important;
 }
 #app #btn-craft.craft-engage:active:not(:disabled)::after {
-  opacity: 0.35 !important;
+  opacity: 0.25 !important;
+  top: 4px;
 }
 
-/* DISABLED — dark workshop plate, still handsome */
+/* DISABLED — dark metal plate, not opacity dump */
 #app #btn-craft.primary:disabled,
 #app #btn-craft.craft-engage:disabled {
   cursor: not-allowed !important;
   opacity: 1 !important;
-  color: #8a8276 !important;
-  text-shadow: 0 1px 0 rgba(0,0,0,0.35) !important;
-  border-color: #3a3630 !important;
-  border-top-color: #4a4640 !important;
-  border-bottom-color: #242220 !important;
+  color: #7a746a !important;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.4) !important;
+  border-color: #3a3834 !important;
+  border-top-color: #484640 !important;
+  border-bottom-color: #22201e !important;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 40%),
-    linear-gradient(180deg, #3a3a38 0%, #2e2e2c 50%, #222220 100%) !important;
+    linear-gradient(180deg, rgba(255,255,255,0.035) 0%, transparent 30%),
+    linear-gradient(180deg, #343432 0%, #2a2a28 52%, #1e1e1c 100%) !important;
   box-shadow:
-    0 3px 0 #12100e,
-    0 6px 12px rgba(0,0,0,0.4),
-    inset 0 1px 0 rgba(255,255,255,0.05),
-    inset 0 -2px 0 rgba(0,0,0,0.45) !important;
+    0 2px 0 #10100e,
+    0 4px 10px rgba(0,0,0,0.38),
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    inset 0 -2px 4px rgba(0,0,0,0.4) !important;
   transform: none !important;
   filter: none !important;
 }
-#app #btn-craft.craft-engage:disabled .craft-engage-ico {
-  color: #6a6660;
-  border-color: #3a3834;
-  background: rgba(0,0,0,0.35);
+#app #btn-craft.craft-engage:disabled .craft-engage-ico,
+#app #btn-craft.craft-engage:disabled i.craft-engage-ico {
+  color: #5a5650 !important;
+  border: none !important;
+  background: none !important;
+  box-shadow: none !important;
 }
 #app #btn-craft.craft-engage:disabled .craft-engage-screws i {
-  opacity: 0.35;
-  filter: grayscale(0.4);
+  opacity: 0.28;
+  filter: grayscale(0.5);
 }
 #app #btn-craft.craft-engage:disabled::after {
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent) !important;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent) !important;
 }
 
+/* kill any leftover "icon in a square" from older layers */
+#app #btn-craft .craft-engage-ico::before,
+#app #btn-craft .craft-engage-ico::after {
+  /* keep FA glyph; no extra chrome */
+}
 
 /* === v2.4.2 — clean catalogue cards: no bottom micro-icons === */
 #app .card-mastery,
