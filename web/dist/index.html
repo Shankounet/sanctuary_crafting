@@ -166,26 +166,28 @@
         <span class="empty-hint">Identité, paramètres et fabrication s’affichent ici</span>
       </div>
       <div id="detail" class="detail-fiche hidden">
-        <!-- L1 Identity -->
-        <p class="fiche-l1-label">Fiche · Identité</p>
-        <div class="fiche-identity identity-block">
-          <div class="fiche-img tech-frame detail-img-wrap">
-            <img id="d-image" alt="" />
-            <div class="img-fallback" id="d-image-fallback"><i class="fa-solid fa-cube"></i></div>
-          </div>
-          <div class="fiche-id-text">
-            <div class="detail-badges">
-              <span class="badge" id="d-category"></span>
-              <span class="badge soft rarity-plate" id="d-rarity"></span>
-              <span class="recipe-code" id="d-code" aria-hidden="true"></span>
+        <!-- L1 Identity hero -->
+        <div class="fiche-hero">
+          <p class="fiche-l1-label">Fiche · Identité</p>
+          <div class="fiche-identity identity-block">
+            <div class="fiche-img tech-frame detail-img-wrap">
+              <img id="d-image" alt="" />
+              <div class="img-fallback" id="d-image-fallback"><i class="fa-solid fa-cube"></i></div>
             </div>
-            <h2 id="d-title" class="t-l2 detail-title"></h2>
-            <p id="d-desc" class="t-l6 detail-desc"></p>
-            <p id="d-locks" class="status-tag"></p>
+            <div class="fiche-id-text">
+              <div class="detail-badges">
+                <span class="badge" id="d-category"></span>
+                <span class="badge soft rarity-plate" id="d-rarity"></span>
+                <span class="recipe-code" id="d-code" aria-hidden="true"></span>
+              </div>
+              <h2 id="d-title" class="t-l2 detail-title"></h2>
+              <p id="d-desc" class="t-l6 detail-desc"></p>
+              <p id="d-locks" class="status-tag"></p>
+            </div>
+            <button type="button" id="btn-fav" class="fav-btn quiet" title="Favori" aria-label="Favori">
+              <i class="fa-regular fa-star" aria-hidden="true"></i>
+            </button>
           </div>
-          <button type="button" id="btn-fav" class="fav-btn quiet" title="Favori" aria-label="Favori">
-            <i class="fa-regular fa-star" aria-hidden="true"></i>
-          </button>
         </div>
 
         <!-- L2 Requirements — instrument cluster -->
