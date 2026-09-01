@@ -647,18 +647,6 @@
       const code = recipeCode(r);
       const showNouveau = uxOn('nouveauIndicator', true) && recipeMarkedNew(r) && !seenRecipes.has(r.id);
       const tip = uxOn('badgeTooltips', true) ? (status.tip || status.text) : status.text;
-      const showMastery = uxOn('masteryDots', true) && state.flags.mastery && (r.mastery != null);
-      const filled = showMastery ? masteryDots(r.mastery) : 0;
-      const masteryPct = Math.max(0, Math.min(100, Number(r.mastery) || 0));
-      const masteryHtml = showMastery
-        ? `<div class="card-mastery" title="Maîtrise recette : ${escapeHtml(masteryPct)}%${r.mastered ? ' · MAÎTRISÉ' : ''}" aria-label="Maîtrise ${escapeHtml(masteryPct)}%">
-            <span class="card-mastery-ring" style="--m:${masteryPct}"></span>
-            <span class="card-mastery-dots" aria-hidden="true">${[0,1,2].map((i) => `<i class="${i < filled ? 'on' : ''}"></i>`).join('')}</span>
-          </div>`
-        : '';
-      const followedHtml = isPinned(r.id)
-        ? '<span class="card-followed" title="Suivi dans le Carnet"><i class="fa-solid fa-bookmark" aria-hidden="true"></i></span>'
-        : '';
       const nouveauHtml = showNouveau
         ? '<span class="card-nouveau">NOUVEAU</span>'
         : '';
@@ -667,11 +655,17 @@
         card.classList.add(`knowledge-${kn}`);
         card.dataset.knowledge = kn;
       }
+      // Une seule marque importante en coin (pas de micro-icônes bas / rareté / stack)
+      // Priorité : Maîtrisé > Blueprint > Suivi Carnet. Favori reste le bouton étoile.
+      let cornerHtml = '';
       const masteredOn = uxOn('masteredBadge', true) && (r.mastered === true || kn === 'mastered');
-      const masteredHtml = masteredOn
-        ? '<span class="card-mastered-badge" title="Maîtrisé">MAÎTRISÉ</span>'
-        : '';
-      const knMark = kn ? knowledgeMarkHtml(kn) : '';
+      if (masteredOn) {
+        cornerHtml = '<span class="card-corner-mark is-mastered" title="Maîtrisé"><i class="fa-solid fa-certificate" aria-hidden="true"></i></span>';
+      } else if (kn === 'blueprint') {
+        cornerHtml = '<span class="card-corner-mark is-blueprint" title="Appris via blueprint / plan technique"><i class="fa-solid fa-drafting-compass" aria-hidden="true"></i></span>';
+      } else if (isPinned(r.id)) {
+        cornerHtml = '<span class="card-corner-mark is-followed" title="Suivi dans le Carnet"><i class="fa-solid fa-bookmark" aria-hidden="true"></i></span>';
+      }
       const titleText = kn === 'unknown' ? '???' : r.label;
       const veilImg = (kn === 'unknown' || kn === 'partial');
 
@@ -683,10 +677,7 @@
           <span class="ph" aria-hidden="true"><i class="fa-solid ${kn === 'unknown' ? 'fa-question' : 'fa-cube'}"></i></span>
           <img alt="" />
           ${nouveauHtml}
-          ${masteredHtml}
-          ${followedHtml}
-          ${knMark}
-          ${r.rarity ? `<span class="card-rarity-mark rarity-${rarityKey(r.rarity)}" title="${escapeHtml('Rareté · ' + rarityLabel(r.rarity))}"><i class="fa-solid ${RARITY_ICON[rarityKey(r.rarity)] || 'fa-circle'}" aria-hidden="true"></i></span>` : ''}
+          ${cornerHtml}
           <span class="card-state-badge ${status.cls}" title="${escapeHtml(tip)}">${status.text}</span>
         </div>
         <div class="card-body">
@@ -696,7 +687,6 @@
               <span class="card-cat">${escapeHtml(categoryLabel(r.category))}</span>
               <span class="card-code">${escapeHtml(code)}</span>
             </div>
-            ${masteryHtml}
           </div>
         </div>
       `;
