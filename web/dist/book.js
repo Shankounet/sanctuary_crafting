@@ -101,12 +101,63 @@
       <p class="book-stamp">Carnet de survie</p>
       <h2 class="book-page-title">${esc(title)}</h2>
       ${lede ? `<p class="book-lede">${esc(lede)}</p>` : ''}
-      <hr class="book-rule" />
+      <hr class="ink-rule" />
     </div>`;
   }
 
   function folio(n) {
     return `<div class="folio">— ${esc(n)} —</div>`;
+  }
+
+  function skillLabel(k) {
+    const map = { crafting: 'Artisanat', survival: 'Survie' };
+    return map[k] || k;
+  }
+
+  function pickSpecialization(levels) {
+    if (state.meta && state.meta.specialization) return state.meta.specialization;
+    const keys = Object.keys(levels || {});
+    if (!keys.length) return null;
+    let best = keys[0];
+    let bestLv = -1;
+    keys.forEach((k) => {
+      const lv = Number((levels[k] && levels[k].level) || 0);
+      if (lv > bestLv) { bestLv = lv; best = k; }
+    });
+    return skillLabel(best);
+  }
+
+  function characterName() {
+    return (state.meta && (state.meta.characterName || state.meta.playerName || state.meta.name)) || null;
+  }
+
+  function msSkillLines(levels) {
+    const keys = Object.keys(levels || {});
+    if (!keys.length) return '<p class="hand-note">ml_skills indisponible — aucune ligne de compétence.</p>';
+    return `<div class="ms-lines">${keys.map((k) => {
+      const lv = levels[k] || {};
+      const level = Math.max(0, Number(lv.level) || 0);
+      const pct = Math.min(100, Math.max(4, level * 8));
+      const ticks = Array.from({ length: 5 }).map((_, i) =>
+        `<span class="tick ${level > i * 2 ? 'on' : ''}"></span>`
+      ).join('');
+      return `<div class="ms-line">
+        <span class="ms-name">${esc(skillLabel(k))}</span>
+        <span class="ms-lvl">Niv. ${esc(level)}</span>
+        <div class="ms-gauge">${ticks}<div class="ms-bar"><span style="width:${pct}%"></span></div></div>
+        <div class="widget-foot" style="grid-column:1/-1">Bonus ${esc(lv.bonus || 0)}% · lecture ml_skills</div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  function dayNoteFromStats(st, objs) {
+    const open = st.objectivesOpen || (objs && objs.length) || 0;
+    const arts = st.artisans || 0;
+    const bp = st.blueprints || 0;
+    if (open > 0) return `Aujourd'hui : ${open} objectif${open > 1 ? 's' : ''} encore ouverts. Tenir le cap.`;
+    if (arts > 0) return `${arts} contact${arts > 1 ? 's' : ''} notés dans le carnet. Le réseau tient.`;
+    if (bp > 0) return `${bp} plan${bp > 1 ? 's' : ''} archivés. Continuer les relevés de terrain.`;
+    return 'Journée calme. Noter toute découverte avant la nuit.';
   }
 
   function modEnabled(mod) {
@@ -139,16 +190,21 @@
 
   function setContext() { /* no sidebar context in physical book */ }
 
+  const TAB_MATERIALS = ['mat-terre', 'mat-olive', 'mat-ocre', 'mat-bleu', 'mat-brun', 'mat-beige', 'mat-cardboard', 'mat-cloth'];
+
   function renderTabs() {
     const nav = $('#book-tabs');
     if (!nav) return;
     nav.innerHTML = '';
+    let ti = 0;
     PRIMARY_TABS.forEach((n) => {
       if (!modEnabled(n.mod)) return;
       const b = document.createElement('button');
       b.type = 'button';
       b.dataset.page = n.id;
       b.textContent = n.label;
+      b.classList.add(TAB_MATERIALS[ti % TAB_MATERIALS.length]);
+      ti += 1;
       if (state.page === n.id) b.classList.add('active');
       b.addEventListener('click', () => {
         closeIndex();
@@ -229,7 +285,7 @@
     }
   }
 
-  /* ========== ACCUEIL (editorial spread) ========== */
+  /* ========== ACCUEIL (diegetic spread) ========== */
   async function renderDashboard() {
     const r = await postWithTimeout('bookDashboard', {}, 2500);
     if (!r || !r.ok) {
@@ -243,7 +299,6 @@
     const st = d.stats || {};
     const prog = d.progression || {};
     const levels = prog.levels || {};
-    const levelKeys = Object.keys(levels);
     const next = (d.nextUnlocks || [])[0];
     const objs = d.objectives || [];
     const pins = d.pins || [];
@@ -253,91 +308,75 @@
     const canCraft = d.canCraft || [];
     const title = (state.meta && state.meta.title) || 'Carnet de survie';
     const subtitle = (state.meta && state.meta.subtitle) || 'Journal technique de terrain';
-
-    const skillBlock = levelKeys.length
-      ? levelKeys.map((k) => {
-          const lv = levels[k] || {};
-          const pct = Math.min(100, Math.max(8, (Number(lv.level) || 0) * 8));
-          return `<div class="skill-card">
-            <div class="skill-name"><span>${esc(k)}</span><span class="badge accent">Niv. ${esc(lv.level || 0)}</span></div>
-            <div class="skill-bar"><span style="width:${pct}%"></span></div>
-            <div class="widget-foot">Bonus ${esc(lv.bonus || 0)}% · ml_skills</div>
-          </div>`;
-        }).join('')
-      : `<div class="paper-card empty">ml_skills indisponible</div>`;
+    const charName = characterName();
+    const spec = pickSpecialization(levels);
+    const discovery = almost[0] || canCraft[0] || null;
+    const artisanHint = (st.artisans || 0) > 0
+      ? `${st.artisans} contact${st.artisans > 1 ? 's' : ''} recensés`
+      : 'Aucun artisan noté';
 
     const left = `
       <div class="accueil-hero">
         <p class="book-stamp">Dossier personnel</p>
         <h2 class="accueil-title">${esc(String(title))}</h2>
-        <p class="accueil-sub">${esc(subtitle)}</p>
-        <hr class="book-rule" />
-        <p class="hand-note">Notes de terrain — synthèse du jour.</p>
-        <div class="ink-stamp">Ouvert</div>
+        ${charName ? `<p class="accueil-char">Propriétaire : ${esc(charName)}</p>` : `<p class="accueil-char">${esc(subtitle)}</p>`}
+        <div class="accueil-seal-row">
+          ${spec ? `<span class="stamp">Spécialisation · ${esc(spec)}</span>` : `<span class="stamp">Terrain</span>`}
+          <span class="stamp seal">SC<br/>OK</span>
+        </div>
+        <hr class="ink-rule" />
       </div>
-      <h3 class="section-title">Compétences</h3>
-      ${skillBlock}
-      <h3 class="section-title">Repères</h3>
-      <div class="pill-row">
-        <span class="badge accent">${st.artisans || 0} contacts</span>
-        <span class="badge">${st.notes || 0} notes</span>
-        <span class="badge">${st.blueprints || 0} plans</span>
-        <span class="badge">${st.resources || 0} ressources</span>
-      </div>
+      <h3 class="section-title">Compétences — manuscrit</h3>
+      ${msSkillLines(levels)}
+      <div class="day-note">${esc(dayNoteFromStats(st, objs))}</div>
       ${folio('i')}`;
 
     const right = `
-      <p class="book-stamp">Feuillet droit</p>
+      <p class="book-stamp">Feuillet du jour</p>
       <h2 class="book-page-title">Situation</h2>
-      <hr class="book-rule" />
-      <div class="widget-grid">
-        <div class="widget">
-          <div class="widget-k">Objectifs actifs</div>
-          <div class="widget-v">${st.objectivesOpen || objs.length || 0}</div>
-          <ul class="mini-list">${(objs.slice(0, 3).map((o) => `<li><span>${esc(o.title)}</span><span class="badge">${esc(o.kind || '')}</span></li>`).join('')) || '<li class="empty">Aucun objectif ouvert</li>'}</ul>
-        </div>
-        <div class="widget">
-          <div class="widget-k">Projet principal</div>
-          ${projects[0]
-            ? `<div class="widget-body"><strong>${esc(projects[0].label)}</strong>
-                <div class="widget-foot">${projects[0].isOwner ? 'Propriétaire' : 'Contributeur'} · ${esc(projects[0].status || 'open')}</div></div>`
-            : `<div class="widget-body empty">Aucun projet ouvert</div>`}
-        </div>
-        <div class="widget">
-          <div class="widget-k">Prochain déblocage</div>
-          ${next
-            ? `<div class="widget-body"><strong>${esc(next.label)}</strong>
-                <div class="widget-foot">${next.requireSkill ? `Skill: ${esc(next.requireSkill)}` : `Niv. ${esc(next.requireLevel)} (Δ ${esc(next.delta || '?')})`}</div></div>`
-            : `<div class="widget-body empty">Rien de proche</div>`}
-        </div>
-        <div class="widget">
-          <div class="widget-k">Épingles</div>
-          <div class="widget-v">${st.pins || pins.length || 0}</div>
-          <ul class="mini-list">${pins.slice(0, 3).map((p) => `<li><span>${esc(p.label)}</span></li>`).join('') || '<li class="empty">—</li>'}</ul>
-        </div>
-        <div class="widget">
-          <div class="widget-k">Productions</div>
-          <div class="widget-v">${prods.length}</div>
-          <ul class="mini-list">${prods.slice(0, 3).map((q) => `<li><span>${esc(q.label)}</span><span class="badge">x${q.batch || 1}</span></li>`).join('') || '<li class="empty">File vide</li>'}</ul>
-        </div>
-        <div class="widget">
-          <div class="widget-k">Dernière piste</div>
-          ${almost[0]
-            ? `<div class="widget-body"><strong>${esc(almost[0].label)}</strong>
-                <div class="widget-foot">Presque craftable · manque ${(almost[0].missing || []).length}</div></div>`
-            : canCraft[0]
-              ? `<div class="widget-body"><strong>${esc(canCraft[0].label)}</strong><div class="widget-foot">Faisable maintenant</div></div>`
-              : `<div class="widget-body empty">Pas de découverte récente</div>`}
-        </div>
-        <div class="widget wide">
-          <div class="widget-k">Faisable maintenant</div>
-          <ul class="mini-list">${canCraft.slice(0, 6).map((x) => `<li><span>${esc(x.label)}</span><span class="badge ok">${esc(x.category || '')}</span></li>`).join('') || '<li class="empty">Rien de prêt — ouvrez Suggestions (Index)</li>'}</ul>
-        </div>
+      <hr class="ink-rule" />
+
+      <div class="scrap-note rot-l">
+        <span class="tape top-l"></span>
+        <span class="tape top-r"></span>
+        <div class="scrap-title">Projet principal</div>
+        ${projects[0]
+          ? `<div class="scrap-body"><strong>${esc(projects[0].label)}</strong></div>
+             <div class="scrap-foot">${projects[0].isOwner ? 'Propriétaire' : 'Contributeur'} · ${esc(projects[0].status || 'open')}</div>`
+          : `<div class="scrap-body empty">Aucun chantier ouvert</div>`}
       </div>
+
+      <h3 class="section-title">Objectifs</h3>
+      <ul class="checklist">
+        ${(objs.slice(0, 4).map((o) =>
+          `<li class="${o.done ? 'done' : ''}"><span class="box ${o.done ? 'checked' : ''}"></span><span>${esc(o.title)}${o.kind ? ` <em>(${esc(o.kind)})</em>` : ''}</span></li>`
+        ).join('')) || '<li><span class="box"></span><span class="empty">Aucun objectif ouvert</span></li>'}
+      </ul>
+
+      <div class="scrap-note rot-r flat" style="margin-top:14px">
+        <span class="tape top-l"></span>
+        <div class="scrap-title">Dernière découverte</div>
+        ${discovery
+          ? `<div class="scrap-body"><strong>${esc(discovery.label)}</strong></div>
+             <div class="scrap-foot">${almost[0] ? `Presque craftable · manque ${(almost[0].missing || []).length}` : 'Faisable maintenant'}</div>`
+          : `<div class="scrap-body empty">Pas de piste récente</div>`}
+      </div>
+
+      <div class="dossier-sheet">
+        <div class="dossier-mark">Prochain déblocage</div>
+        ${next
+          ? `<h4>${esc(next.label)}</h4>
+             <p class="hand-note" style="font-size:14px;margin:4px 0">${next.requireSkill ? `Skill : ${esc(next.requireSkill)}` : `Niv. ${esc(next.requireLevel)} (Δ ${esc(next.delta || '?')})`}</p>`
+          : `<p class="empty">Rien de proche</p>`}
+      </div>
+
+      <p class="hand-note" style="margin-top:10px">Artisan récent — ${esc(artisanHint)}. ${pins.length ? `Épingles : ${pins.length}.` : ''}</p>
+      ${prods.length ? `<p class="hand-note">File atelier : ${prods.slice(0, 2).map((q) => esc(q.label)).join(', ')}</p>` : ''}
       ${folio('ii')}`;
 
     setPages(left, right);
   }
+
 
   /* ========== PROGRESSION ========== */
   async function renderProgression() {
@@ -354,27 +393,30 @@
       return;
     }
     const levels = p.levels || {};
-    const left = pageHead('Progression', 'Compétences ml_skills · lecture seule') +
-      `<div class="cards">${Object.keys(levels).map((k) => {
-        const lv = levels[k] || {};
-        const pct = Math.min(100, Math.max(6, (Number(lv.level) || 0) * 8));
-        return `<div class="skill-card">
-          <div class="skill-name"><span>${esc(k)}</span><span class="badge accent">Niv. ${esc(lv.level || 0)}</span></div>
-          <div class="skill-bar"><span style="width:${pct}%"></span></div>
-          <div class="widget-foot">Bonus catégorie ${esc(lv.bonus || 0)}%</div>
-        </div>`;
-      }).join('')}</div>${folio('12')}`;
-    const right = `<p class="book-stamp">Annexes</p>
+    const spec = pickSpecialization(levels);
+    const left = `
+      <p class="book-stamp">Cahier de progression</p>
+      <h2 class="book-page-title">Compétences</h2>
+      <p class="hand-note">Lignes de manuscrit — ml_skills en lecture seule.</p>
+      <hr class="ink-rule" />
+      ${spec ? `<span class="stamp">Niveau · ${esc(spec)}</span>` : ''}
+      ${msSkillLines(levels)}
+      ${folio('12')}`;
+    const right = `
+      <p class="book-stamp">Annexes</p>
       <h2 class="book-page-title">Déblocages proches</h2>
-      <hr class="book-rule" />
+      <hr class="ink-rule" />
       <div class="unlock-list">${next.length ? next.map((x) => `
         <div class="unlock-row">
           <span>${esc(x.label)}</span>
-          <span class="badge warn">${x.requireSkill ? `skill · ${esc(x.requireSkill)}` : `niv. ${esc(x.requireLevel)} · Δ${esc(x.delta || '')}`}</span>
+          <span class="stamp" style="transform:rotate(-2deg);padding:2px 6px;font-size:9px;margin:0">${x.requireSkill ? `skill · ${esc(x.requireSkill)}` : `niv. ${esc(x.requireLevel)} · Δ${esc(x.delta || '')}`}</span>
         </div>`).join('') : '<p class="empty">Aucun déblocage proche</p>'}
-      </div>${folio('13')}`;
+      </div>
+      <p class="hand-note" style="margin-top:14px">Tampons de niveau = jalons, pas de barre SaaS.</p>
+      ${folio('13')}`;
     setPages(left, right);
   }
+
 
   async function renderNextUnlocks() {
     const r = await loadModule('nextUnlocks');
@@ -396,11 +438,15 @@
     const pinsR = modEnabled('Pins') ? await loadModule('pins') : { data: [] };
     const pinIds = new Set(((pinsR && pinsR.data) || []).map((p) => p.recipeId));
 
-    const left = pageHead('Objectifs', 'Cartes de mission — priorité, détail, suivi') + `
+    const left = `
+      <p class="book-stamp">Missions de terrain</p>
+      <h2 class="book-page-title">Objectifs</h2>
+      <p class="hand-note">Checklist et papillons collés — priorité et suivi.</p>
+      <hr class="ink-rule" />
       <div class="note-editor">
         <div class="editor-label">Nouvel objectif</div>
         <div class="row-actions" style="margin-top:0">
-          <input id="obj-title" type="text" placeholder="Titre de l’objectif…" style="flex:1;margin-top:0" />
+          <input id="obj-title" type="text" placeholder="Titre de l'objectif…" style="flex:1;margin-top:0" />
           <button type="button" class="primary" id="obj-add">Ajouter</button>
         </div>
       </div>
@@ -410,22 +456,15 @@
     if (!arr.length) {
       cards = emptyBox('fa-bullseye', 'Aucun objectif', 'Ajoutez une mission manuelle ou depuis le craft.');
     } else {
-      cards = `<div class="obj-grid" id="obj-grid">${arr.map((o) => {
+      cards = `<div id="obj-grid">${arr.map((o) => {
         const rid = o.payload && o.payload.recipeId;
         const pinned = rid && pinIds.has(rid);
-        const priority = o.done ? 'done' : (o.kind === 'recipe' ? 'haute' : 'normale');
-        return `<article class="obj-card ${o.done ? 'done' : ''}" data-id="${o.id}">
-          <div class="obj-top">
-            <div class="obj-title">${o.done ? '✓ ' : ''}${esc(o.title)}</div>
-            <span class="badge ${o.done ? 'ok' : 'accent'}">${esc(o.kind || 'manual')}</span>
-          </div>
-          <div class="pill-row">
-            <span class="badge">${esc(priority)}</span>
-            ${pinned ? '<span class="badge warn">épinglé</span>' : ''}
-            ${rid ? `<span class="badge">${esc(rid)}</span>` : ''}
-          </div>
-          <div class="obj-progress"><span style="width:${o.done ? 100 : 18}%"></span></div>
-          <div class="obj-actions">
+        return `<article class="sticky-note ${o.done ? 'done' : ''}" data-id="${o.id}">
+          <div class="st-title">${o.done ? '✓ ' : '☐ '}${esc(o.title)}</div>
+          <ul class="checklist">
+            <li class="${o.done ? 'done' : ''}"><span class="box ${o.done ? 'checked' : ''}"></span><span>${esc(o.kind || 'manual')}${pinned ? ' · épinglé' : ''}${rid ? ` · ${esc(rid)}` : ''}</span></li>
+          </ul>
+          <div class="st-actions obj-actions">
             ${!o.done ? `<button type="button" class="primary small" data-act="done">Terminer</button>` : ''}
             ${rid && modEnabled('Pins') && !pinned ? `<button type="button" class="ghost small" data-act="pin" data-rid="${esc(rid)}">Épingler</button>` : ''}
             ${rid && modEnabled('CraftTree') ? `<button type="button" class="ghost small" data-act="tree" data-rid="${esc(rid)}">Arbre</button>` : ''}
@@ -435,7 +474,12 @@
         </article>`;
       }).join('')}</div>`;
     }
-    const right = `<p class="book-stamp">Missions</p><h2 class="book-page-title">Suivi</h2><hr class="book-rule" />${cards}${folio('21')}`;
+    const right = `
+      <p class="book-stamp">Suivi</p>
+      <h2 class="book-page-title">Papillons</h2>
+      <hr class="ink-rule" />
+      ${cards}
+      ${folio('21')}`;
     setPages(left, right);
 
     const addBtn = $('#obj-add');
@@ -465,27 +509,36 @@
     };
   }
 
+
   /* ========== PROJECTS ========== */
   async function renderProjects() {
     const r = await loadModule('projects');
     const d = (r && r.data) || { queue: [], projects: [] };
     const projects = d.projects || [];
-    const left = pageHead('Projets', 'Dossiers de chantier — progression & liens terrain') +
-      `<p class="hand-note">Chaque chantier ouvert apparaît ici comme un dossier de terrain.</p>${folio('30')}`;
+    const left = `
+      <p class="book-stamp">Chantiers</p>
+      <h2 class="book-page-title">Projets</h2>
+      <p class="hand-note">Plans techniques annotés — flèches et listes de ressources.</p>
+      <hr class="ink-rule" />
+      <p class="hand-note">Chaque chantier ouvert apparaît ici comme un dossier de terrain.</p>
+      ${folio('30')}`;
     let right;
     if (!projects.length) {
       right = emptyBox('fa-folder-open', 'Aucun projet ouvert', 'Les projets craft auxquels vous participez apparaîtront ici.') + folio('31');
     } else {
-      right = `<div class="dossier-grid" id="proj-grid">${projects.map((p) => `
-        <article class="dossier-card" data-rid="${esc(p.recipeId || '')}">
-          <div class="dossier-mark">Dossier projet</div>
-          <h4>${esc(p.label || p.recipeId)}</h4>
-          <div class="dossier-meta">
-            <span class="badge accent">${esc(p.status || 'open')}</span>
-            <span class="badge">${p.isOwner ? 'Propriétaire' : 'Contributeur'}</span>
-            ${p.projectUid ? `<span class="badge">${esc(String(p.projectUid).slice(0, 8))}…</span>` : ''}
+      right = `<div id="proj-grid">${projects.map((p) => `
+        <article class="tech-plan" data-rid="${esc(p.recipeId || '')}">
+          <span class="paperclip"></span>
+          <div class="tp-head">
+            <h4>${esc(p.label || p.recipeId)}</h4>
+            <span class="stamp" style="margin:0;transform:rotate(3deg);padding:3px 6px;font-size:9px">${esc(p.status || 'open')}</span>
           </div>
-          <div class="pct-ring">Suivi chantier · composants via arbre / courses</div>
+          <div class="tp-arrow">→ ${p.isOwner ? 'Propriétaire du chantier' : 'Contributeur'} ${p.projectUid ? '· réf. ' + esc(String(p.projectUid).slice(0, 8)) : ''}</div>
+          <ul class="checklist">
+            <li><span class="box"></span><span>Composants via arbre / courses</span></li>
+            <li><span class="box"></span><span>Suivi d'avancement terrain</span></li>
+          </ul>
+          <div class="tp-annot">annot. : vérifier stocks avant reprise</div>
           <div class="row-actions">
             ${p.recipeId && modEnabled('CraftTree') ? `<button type="button" class="ghost small" data-act="tree" data-rid="${esc(p.recipeId)}">Arbre</button>` : ''}
             ${p.recipeId && modEnabled('Shopping') ? `<button type="button" class="ghost small" data-act="shop" data-rid="${esc(p.recipeId)}">Courses</button>` : ''}
@@ -502,40 +555,51 @@
     };
   }
 
+
   /* ========== RESOURCES ========== */
   async function renderResources() {
     const r = await loadModule('resources');
     const arr = (r && r.data) || [];
-    const left = pageHead('Ressources', 'Codex par découverte — pas de wiki omniscient') +
-      `<p class="hand-note">Les silhouettes restent inconnues jusqu’à découverte.</p>${folio('50')}`;
+    const left = `
+      <p class="book-stamp">Encyclopédie de terrain</p>
+      <h2 class="book-page-title">Ressources</h2>
+      <p class="hand-note">Silhouettes jusqu'à découverte — jamais de wiki omniscient.</p>
+      <hr class="ink-rule" />
+      <p class="hand-note">Marquer « Non identifié » tant que MaskItem / known = false.</p>
+      ${folio('50')}`;
     let right;
     if (!arr.length) {
-      right = emptyBox('fa-boxes-stacked', 'Codex vide', 'Craft & explorations révèlent les ressources.') +
-        Array.from({ length: 3 }).map(() => `
-        <article class="codex-card unknown" style="margin-top:8px">
-          <div class="codex-sil"><i class="fa-solid fa-question"></i></div>
-          <div class="codex-label">Ressource inconnue</div>
-          <div class="codex-id">non découverte</div>
-        </article>`).join('') + folio('51');
+      right = emptyBox('fa-boxes-stacked', 'Codex vide', 'Craft et explorations révèlent les ressources.') +
+        `<div class="ency-grid" style="margin-top:10px">${Array.from({ length: 4 }).map(() => `
+          <article class="ency-entry unknown">
+            <div class="sil">?</div>
+            <div class="ency-label">Non identifié</div>
+            <div class="ency-id">???</div>
+          </article>`).join('')}</div>` + folio('51');
     } else {
-      right = `<div class="codex-grid">${arr.map((x) => {
+      right = `<div class="ency-grid">${arr.map((x) => {
         const unknown = !x.label || x.label === '???' || x.known === false;
-        return `<article class="codex-card ${unknown ? 'unknown' : ''}">
-          <div class="codex-sil"><i class="fa-solid ${unknown ? 'fa-question' : 'fa-cube'}"></i></div>
-          <div class="codex-label">${unknown ? 'Ressource inconnue' : esc(x.label)}</div>
-          <div class="codex-id">${esc(x.item || '')}</div>
+        return `<article class="ency-entry ${unknown ? 'unknown' : 'known'}">
+          <div class="sil">${unknown ? '?' : '◆'}</div>
+          <div class="ency-label">${unknown ? 'Non identifié' : esc(x.label)}</div>
+          <div class="ency-id">${unknown ? '???' : esc(x.item || '')}</div>
         </article>`;
       }).join('')}</div>${folio('51')}`;
     }
     setPages(left, right);
   }
 
+
   /* ========== PLANS ========== */
   async function renderPlans() {
     const r = await loadModule('blueprints');
     const arr = (r && r.data) || [];
     const filter = state.planFilter || 'known';
-    const left = pageHead('Plans', 'Dossiers de schémas — connus, fragments, verrouillés') + `
+    const left = `
+      <p class="book-stamp">Schémas</p>
+      <h2 class="book-page-title">Plans</h2>
+      <p class="hand-note">Feuillets bleus scotchés — connus, fragments, verrouillés.</p>
+      <hr class="ink-rule" />
       <div class="plan-tabs">
         <button type="button" data-f="known" class="${filter === 'known' ? 'active' : ''}">Connus (${arr.length})</button>
         <button type="button" data-f="incomplete" class="${filter === 'incomplete' ? 'active' : ''}">Incomplets</button>
@@ -550,18 +614,19 @@
       if (!list.length) {
         gridHtml = emptyBox('fa-scroll', 'Aucun plan connu', 'Apprenez des blueprints via le craft pour les archiver ici.');
       } else {
-        gridHtml = `<div class="dossier-grid">${list.map((x) => `
-          <article class="dossier-card">
-            <div class="dossier-mark">Schéma · connu</div>
+        gridHtml = list.map((x) => `
+          <article class="blueprint-sheet">
+            <span class="tape top-l"></span>
+            <div class="bp-mark">Plan technique · connu</div>
             <h4>${esc(x.label || x.id)}</h4>
-            <div class="dossier-meta"><span class="badge ok">BP</span><span class="badge">${esc(x.id)}</span></div>
-            <div class="pct-ring">Archivé dans votre carnet technique</div>
-          </article>`).join('')}</div>`;
+            <div class="bp-id">${esc(x.id)}</div>
+            <p class="hand-note" style="font-size:13px;margin-top:6px;color:#3a5060">Archivé dans le carnet</p>
+          </article>`).join('');
       }
     } else {
       const hints = {
-        incomplete: ['fa-puzzle-piece', 'Pas de plans incomplets', 'Les schémas partiels apparaîtront ici lorsqu’ils seront supportés.'],
-        fragments: ['fa-clone', 'Aucun fragment', 'Les fragments de plans collectés s’assemblent progressivement.'],
+        incomplete: ['fa-puzzle-piece', 'Pas de plans incomplets', 'Les schémas partiels apparaîtront ici lorsqu\'ils seront supportés.'],
+        fragments: ['fa-clone', 'Aucun fragment', 'Les fragments de plans collectés s\'assemblent progressivement.'],
         locked: ['fa-lock', 'Rien de verrouillé listé', 'Les plans au-delà de votre connaissance restent hors dossier.'],
       };
       const h = hints[filter] || hints.incomplete;
@@ -574,63 +639,79 @@
     });
   }
 
+
   /* ========== ARTISANS ========== */
   async function renderArtisans() {
     const r = await loadModule('artisans');
     const arr = (r && r.data) || [];
-    const left = pageHead('Artisans', 'Contacts terrain — tiers qualitatifs uniquement') +
-      `<p class="hand-note">Pas d’inventaire exact — rencontres & spécialités seulement.</p>${folio('70')}`;
+    const left = `
+      <p class="book-stamp">Carnet d'adresses</p>
+      <h2 class="book-page-title">Artisans</h2>
+      <p class="hand-note">Cartes de visite clipées — tiers qualitatifs uniquement.</p>
+      <hr class="ink-rule" />
+      <p class="hand-note">Pas d'inventaire exact — rencontres et spécialités seulement.</p>
+      ${folio('70')}`;
     let right;
     if (!arr.length) {
       right = emptyBox('fa-address-book', 'Aucun contact', 'Rencontrez des artisans via ox_target, carte ou craft.') + folio('71');
     } else {
-      right = `<div class="contact-grid">${arr.map((a) => {
+      right = arr.map((a) => {
         const note = (a.meta && a.meta.note) || '';
         const fav = !!(a.meta && a.meta.favorite);
-        return `<article class="contact-card">
-          <div class="avatar"><i class="fa-solid fa-user-gear"></i></div>
-          <h4>${esc(a.displayName)} ${fav ? '<i class="fa-solid fa-star" style="color:var(--book-accent);font-size:12px"></i>' : ''}</h4>
-          <div class="pill-row">
-            <span class="badge accent">${esc(a.specialty || 'general')}</span>
-            <span class="badge warn">${esc(TIER_LABEL[a.tier] || a.tier || 'Inconnu')}</span>
-          </div>
-          <div class="meta-line"><i class="fa-solid fa-clock"></i> Dernière rencontre · ${fmtTime(a.metAt)}</div>
-          <div class="meta-line"><i class="fa-solid fa-location-crosshairs"></i> Source · ${esc(a.source || 'meet')}</div>
-          ${note ? `<div class="meta-line"><i class="fa-solid fa-sticky-note"></i> ${esc(note)}</div>` : '<div class="meta-line">Services : échange RP / craft</div>'}
+        return `<article class="visit-card">
+          <span class="paperclip"></span>
+          <div class="photo-clip" title="Portrait manquant"></div>
+          <h4>${esc(a.displayName)}${fav ? ' ★' : ''}</h4>
+          <div class="vc-meta">${esc(a.specialty || 'general')} · ${esc(TIER_LABEL[a.tier] || a.tier || 'Inconnu')}</div>
+          <div class="vc-meta">Dernière rencontre · ${fmtTime(a.metAt)} · ${esc(a.source || 'meet')}</div>
+          <div class="vc-note">${note ? esc(note) : 'Services : échange RP / craft'}</div>
         </article>`;
-      }).join('')}</div>${folio('71')}`;
+      }).join('') + folio('71');
     }
     setPages(left, right);
   }
+
 
   /* ========== NETWORK ========== */
   async function renderNetwork() {
     const r = await loadModule('network');
     const net = (r && r.data) || {};
     const keys = Object.keys(net);
-    const left = pageHead('Réseau', 'Domaines & densités de contacts par spécialité') + folio('72');
+    const left = `
+      <p class="book-stamp">Croquis de relations</p>
+      <h2 class="book-page-title">Réseau</h2>
+      <p class="hand-note">Nœuds à l'encre — densités par spécialité, pas un graphe SaaS.</p>
+      <hr class="ink-rule" />
+      ${folio('72')}`;
     let right;
     if (!keys.length) {
       right = emptyBox('fa-network-wired', 'Réseau vide', 'Chaque spécialité rencontrée devient un domaine ici.') + folio('73');
     } else {
-      right = `<div class="domain-grid">${keys.map((k) => {
+      const nodes = keys.map((k) => {
         const list = net[k] || [];
-        return `<article class="domain-card">
-          <div class="widget-k">${esc(k)}</div>
-          <div class="count">${list.length}</div>
-          <div class="widget-foot">${list.slice(0, 3).map((a) => esc(a.displayName)).join(' · ') || '—'}${list.length > 3 ? '…' : ''}</div>
-        </article>`;
-      }).join('')}</div>${folio('73')}`;
+        return `<span class="net-node">${esc(k)}<span class="nn-count">${list.length} contact${list.length > 1 ? 's' : ''}</span></span>`;
+      }).join('');
+      const links = keys.map((k) => {
+        const list = net[k] || [];
+        const names = list.slice(0, 3).map((a) => a.displayName).join(', ');
+        return `${esc(k)} → ${esc(names) || '—'}${list.length > 3 ? '…' : ''}`;
+      }).join('<br/>');
+      right = `<div class="net-sketch">${nodes}<div class="net-links">${links}</div></div>${folio('73')}`;
     }
     setPages(left, right);
   }
+
 
   /* ========== NOTES ========== */
   async function renderNotes() {
     const r = await loadModule('notes');
     const arr = (r && r.data) || [];
-    const left = pageHead('Notes', 'Carnet éditorial — notes libres, checklists') + `
-      <div class="note-editor">
+    const left = `
+      <p class="book-stamp">Pages libres</p>
+      <h2 class="book-page-title">Notes</h2>
+      <p class="hand-note">Papier ligné — observations de terrain.</p>
+      <hr class="ink-rule" />
+      <div class="note-editor lined-paper" style="line-height:1.45;padding-left:12px">
         <div class="editor-label">Nouvelle page</div>
         <input id="note-title" type="text" placeholder="Titre" />
         <textarea id="note-body" placeholder="Contenu, rappels, observations de terrain…"></textarea>
@@ -640,20 +721,21 @@
 
     let listHtml;
     if (!arr.length) {
-      listHtml = emptyBox('fa-pen-to-square', 'Carnet vide', 'Vos notes personnelles s’accumulent ici.');
+      listHtml = emptyBox('fa-pen-to-square', 'Carnet vide', 'Vos notes personnelles s\'accumulent ici.');
     } else {
-      listHtml = `<div class="note-list" id="note-list">${arr.map((n) => {
+      listHtml = `<div id="note-list">${arr.map((n) => {
         const checks = Array.isArray(n.checklist) ? n.checklist : [];
-        return `<article class="note-card" data-id="${n.id}">
-          <div class="obj-top"><h4>${esc(n.title)}</h4>
-            <button type="button" class="ghost small" data-act="del">Retirer</button></div>
-          <p>${esc((n.body || '').slice(0, 280))}${(n.body || '').length > 280 ? '…' : ''}</p>
-          ${checks.length ? `<ul class="checklist">${checks.map((c) => {
+        return `<article class="lined-paper" data-id="${n.id}">
+          <div class="note-title">${esc(n.title)}
+            <button type="button" class="ghost small" data-act="del" style="float:right;line-height:1.2">Retirer</button>
+          </div>
+          <div class="note-body">${esc((n.body || '').slice(0, 320))}${(n.body || '').length > 320 ? '…' : ''}</div>
+          ${checks.length ? `<ul class="checklist" style="padding-left:32px;line-height:1.4">${checks.map((c) => {
             const text = typeof c === 'string' ? c : (c && c.text) || '';
             const done = typeof c === 'object' && c && c.done;
-            return `<li><i class="fa-solid ${done ? 'fa-square-check' : 'fa-square'}"></i>${esc(text)}</li>`;
+            return `<li class="${done ? 'done' : ''}"><span class="box ${done ? 'checked' : ''}"></span><span>${esc(text)}</span></li>`;
           }).join('')}</ul>` : ''}
-          <div class="widget-foot">${fmtTime(n.updatedAt)}</div>
+          <div class="note-foot">${fmtTime(n.updatedAt)}</div>
         </article>`;
       }).join('')}</div>`;
     }
@@ -682,65 +764,79 @@
     };
   }
 
+
   /* ========== PRODUCTIONS ========== */
   async function renderProductions() {
     const r = await loadModule('productions');
     const d = (r && r.data) || { queue: [], projects: [] };
     const queue = d.queue || [];
     const projects = d.projects || [];
-    const left = pageHead('Productions', 'File & chantiers (pas le panneau craft)') + `
-      <div class="board-col">
-        <h3 class="section-title">En file</h3>
+    const left = `
+      <p class="book-stamp">Atelier</p>
+      <h2 class="book-page-title">Productions</h2>
+      <p class="hand-note">Journal de fabrication manuscrit — pas le panneau craft.</p>
+      <hr class="ink-rule" />
+      <h3 class="section-title">En file</h3>
+      <div class="fab-log">
         ${queue.length ? queue.map((q) => `
-          <div class="board-card" style="margin-bottom:8px">
-            <strong>${esc(q.label)}</strong>
-            <div class="pill-row" style="margin-top:8px">
-              <span class="badge">x${q.batch || 1}</span>
-              ${q.finishAt ? `<span class="badge warn">fin ${fmtTime(q.finishAt)}</span>` : ''}
-            </div>
+          <div class="fab-row">
+            <span class="fab-time">${q.finishAt ? fmtTime(q.finishAt) : 'en cours'}</span>
+            <span class="fab-label">${esc(q.label)}</span>
+            <span class="badge">x${q.batch || 1}</span>
           </div>`).join('') : '<p class="empty">File vide</p>'}
-      </div>${folio('90')}`;
+      </div>
+      ${folio('90')}`;
     const right = `
-      <h3 class="section-title">En cours / projets</h3>
-      ${projects.length ? projects.map((p) => `
-        <div class="board-card" style="margin-bottom:8px">
-          <strong>${esc(p.label)}</strong>
-          <div class="pill-row" style="margin-top:8px">
-            <span class="badge accent">${esc(p.status || 'open')}</span>
+      <h3 class="section-title">Chantiers / en cours</h3>
+      <div class="fab-log">
+        ${projects.length ? projects.map((p) => `
+          <div class="fab-row">
+            <span class="fab-time">${esc(p.status || 'open')}</span>
+            <span class="fab-label">${esc(p.label)}</span>
             <span class="badge">${p.isOwner ? 'owner' : 'contrib'}</span>
-          </div>
-        </div>`).join('') : '<p class="empty">Aucun chantier</p>'}
-      <h3 class="section-title">Prêt / à collecter</h3>
-      <p class="empty">La collecte se fait à l’atelier craft. Ce feuillet suit l’état sans cloner le banc.</p>
+          </div>`).join('') : '<p class="empty">Aucun chantier</p>'}
+      </div>
+      <div class="scrap-note rot-r" style="margin-top:16px">
+        <span class="tape top-l"></span>
+        <div class="scrap-title">Prêt / à collecter</div>
+        <div class="scrap-body">La collecte se fait à l'atelier craft. Ce feuillet suit l'état sans cloner le banc.</div>
+      </div>
       ${folio('91')}`;
     setPages(left, right);
   }
+
 
   /* ========== HISTORY ========== */
   async function renderHistory(page) {
     const mod = page === 'discoveries' ? 'discoveries' : 'history';
     const r = await loadModule(mod);
     const arr = (r && r.data) || [];
-    const left = pageHead(page === 'discoveries' ? 'Découvertes' : 'Historique', 'Chronologie de terrain') + folio('100');
+    const left = `
+      <p class="book-stamp">Chronologie</p>
+      <h2 class="book-page-title">${page === 'discoveries' ? 'Découvertes' : 'Historique'}</h2>
+      <p class="hand-note">Journal papier classé par date.</p>
+      <hr class="ink-rule" />
+      ${folio('100')}`;
     let right;
     if (!arr.length) {
-      right = emptyBox('fa-clock-rotate-left', 'Journal vide', 'Découvertes, objectifs et rencontres s’empilent ici.') + folio('101');
+      right = emptyBox('fa-clock-rotate-left', 'Journal vide', 'Découvertes, objectifs et rencontres s\'empilent ici.') + folio('101');
     } else {
-      right = `<div class="timeline">${arr.map((x) => {
+      right = `<div class="journal-log">${arr.map((x) => {
         let body = '';
         try {
           const p = x.payload || {};
           body = p.label || p.name || p.item || p.title || p.recipeId || JSON.stringify(p).slice(0, 80);
         } catch (_) { body = '—'; }
-        return `<article class="timeline-item">
-          <div class="t-type">${esc(x.type || 'event')}</div>
-          <div class="t-body">${esc(body)}</div>
-          <div class="t-time">${fmtTime(x.ts || x.createdAt || x.at)}</div>
+        return `<article class="journal-entry">
+          <div class="je-date">${fmtTime(x.ts || x.createdAt || x.at)}</div>
+          <div class="je-type">${esc(x.type || 'event')}</div>
+          <div class="je-body">${esc(body)}</div>
         </article>`;
       }).join('')}</div>${folio('101')}`;
     }
     setPages(left, right);
   }
+
 
   /* ========== SECONDARY ========== */
   async function renderPins() {
@@ -750,8 +846,9 @@
       <div class="row-actions" style="margin-top:0">
         <button type="button" class="ghost" id="hud-toggle"><i class="fa-solid fa-eye"></i> Basculer mini HUD</button>
       </div>${folio('110')}`;
-    const right = `<div class="dossier-grid">${arr.length ? arr.map((p) => `
-      <article class="dossier-card">
+    const right = `${arr.length ? arr.map((p) => `
+      <article class="dossier-sheet">
+        <span class="paperclip"></span>
         <div class="dossier-mark">Épingle</div>
         <h4>${esc(p.label)}</h4>
         <div class="dossier-meta"><span class="badge">${esc(p.category || '')}</span></div>
@@ -759,7 +856,7 @@
           <button type="button" class="ghost small" data-rid="${esc(p.recipeId)}">Retirer</button>
         </div>
       </article>`).join('') : emptyBox('fa-thumbtack', 'Aucune épingle', 'Épinglez depuis l’UI craft ou un objectif recette.')}
-    </div>${folio('111')}`;
+    ${folio('111')}`;
     setPages(left, right);
     rightEl() && rightEl().querySelectorAll('button[data-rid]').forEach((b) => {
       b.onclick = async () => {
@@ -776,11 +873,12 @@
     const arr = (r && r.data) || [];
     setPages(
       pageHead('Faisable maintenant', 'Recettes prêtes avec inventaire & skills') + folio('120'),
-      `<div class="dossier-grid">${arr.length ? arr.map((x) => `
-        <article class="dossier-card"><div class="dossier-mark">Prêt</div>
-        <h4>${esc(x.label)}</h4>
-        <div class="dossier-meta"><span class="badge ok">${esc(x.category || '')}</span></div></article>`).join('') : emptyBox('fa-check', 'Rien de faisable', 'Manque de composants ou de niveau.')}
-      </div>${folio('121')}`
+      `${arr.length ? arr.map((x) => `
+        <article class="scrap-note flat"><span class="tape top-l"></span>
+        <div class="dossier-mark">Prêt</div>
+        <h4 class="scrap-title">${esc(x.label)}</h4>
+        <div class="scrap-foot">${esc(x.category || '')}</div></article>`).join('') : emptyBox('fa-check', 'Rien de faisable', 'Manque de composants ou de niveau.')}
+      ${folio('121')}`
     );
   }
 
@@ -936,9 +1034,12 @@
     const keys = Object.keys(st);
     setPages(
       pageHead('Stats', 'Compteurs du dossier personnel') + folio('190'),
-      `<div class="cards">${keys.length ? keys.map((k) => `
-        <div class="card paper-card"><div class="k">${esc(k)}</div><div class="v">${esc(st[k])}</div></div>`).join('') : emptyBox('fa-chart-simple', 'Pas de stats', '')}
-      </div>${folio('191')}`
+      (keys.length ? keys.map((k, i) => `
+        <div class="scrap-note ${i % 2 ? 'rot-r' : 'rot-l'}" style="margin:8px 2px">
+          <span class="tape top-l"></span>
+          <div class="dossier-mark">${esc(k)}</div>
+          <div class="widget-v">${esc(st[k])}</div>
+        </div>`).join('') : emptyBox('fa-chart-simple', 'Pas de stats', '')) + folio('191')
     );
   }
 
@@ -978,15 +1079,22 @@
         <p class="book-stamp">Dossier personnel</p>
         <h2 class="accueil-title">${esc(String(title || 'Carnet de survie'))}</h2>
         <p class="accueil-sub">${esc(subtitle || 'Journal technique de terrain')}</p>
-        <hr class="book-rule" />
+        <hr class="ink-rule" />
         <p class="hand-note">Ouverture du carnet…</p>
+        <span class="stamp">Terrain</span>
       </div>
-      <h3 class="section-title">Compétences</h3>
-      <div class="paper-card empty">Chargement des données de terrain…</div>
+      <h3 class="section-title">Compétences — manuscrit</h3>
+      <p class="empty">Chargement des lignes de compétences…</p>
       ${folio('i')}`;
     const right = `
-      ${pageHead('Aujourd’hui', 'Synthèse en cours')}
-      <div class="paper-card empty">Le contenu se remplit dès que le serveur répond.</div>
+      <p class="book-stamp">Feuillet du jour</p>
+      <h2 class="book-page-title">Situation</h2>
+      <hr class="ink-rule" />
+      <div class="scrap-note">
+        <span class="tape top-l"></span>
+        <div class="scrap-title">Synthèse</div>
+        <div class="scrap-body empty">Le contenu se remplit dès que le serveur répond.</div>
+      </div>
       ${folio('ii')}`;
     setPages(left, right);
   }
