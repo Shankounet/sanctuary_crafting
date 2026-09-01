@@ -29,6 +29,8 @@
     audioCtx: null,
     sideTab: 'queue',
     searchIndex: {},
+    sort: 'name',
+    rarityFilter: 'all',
   };
 
   const SEEN_KEY = 'sanctuary_crafting:seenRecipes';
@@ -370,10 +372,17 @@
   function matchesFilter(r) {
     if (state.category && state.category !== 'all' && r.category !== state.category) return false;
     if (state.filter === 'craftable' && !r.canCraft) return false;
+    if (state.filter === 'almost') {
+      if (r.canCraft || !uxOn('almostCraftable', true) || !computeAlmost(r)) return false;
+    }
     if (state.filter === 'locked' && !r.locked) return false;
     if (state.filter === 'favorites' && !isFavorite(r.id)) return false;
     if (state.filter === 'new' && !isNewRecipe(r)) return false;
     if (state.filter === 'plans' && !hasKnownPlan(r)) return false;
+    if (state.rarityFilter && state.rarityFilter !== 'all') {
+      const rk = rarityKey(r.rarity);
+      if (rk !== state.rarityFilter) return false;
+    }
     if (state.search) {
       const q = state.search.toLowerCase().trim();
       if (q) {
@@ -432,23 +441,29 @@
   function knowledgeMarkHtml(kn) {
     if (!kn || kn === 'learned') return '';
     const map = {
-      unknown: { ico: 'fa-question', title: 'Inconnu' },
-      partial: { ico: 'fa-eye-low-vision', title: 'Connaissance partielle' },
-      blueprint: { ico: 'fa-drafting-compass', title: 'Plan technique' },
-      mastered: { ico: 'fa-certificate', title: 'Maîtrisé' },
+      unknown: { ico: 'fa-question', title: 'Inconnu — silhouette seulement' },
+      partial: { ico: 'fa-eye-low-vision', title: 'Connaissance partielle — détails incomplets' },
+      blueprint: { ico: 'fa-drafting-compass', title: 'Appris via blueprint / plan technique' },
+      mastered: { ico: 'fa-certificate', title: 'Recette maîtrisée (expérience sur cette fabrication)' },
     };
     const m = map[kn];
     if (!m) return '';
-    return `<span class="card-knowledge-mark kn-${kn}" title="${m.title}" aria-hidden="true"><i class="fa-solid ${m.ico}"></i></span>`;
+    return `<span class="card-knowledge-mark kn-${kn}" title="${m.title}"><i class="fa-solid ${m.ico}" aria-hidden="true"></i></span>`;
   }
 
   function cardStatus(r) {
-    if (r.canCraft) return { text: 'FAISABLE', cls: 'ok', tip: 'Conditions remplies' };
-    const almostEnabled = uxOn('almostCraftable', true);
-    if (almostEnabled && computeAlmost(r)) {
-      return { text: 'PRESQUE', cls: 'almost', tip: primaryBadgeReason(r) };
+    if (r.canCraft) {
+      const bits = ['Prêt à fabriquer'];
+      if (r.duration) bits.push(`Durée ${durationLabel(r.duration)}`);
+      if (r.xpReward || r.xp) bits.push(`XP ${r.xpReward || r.xp}`);
+      return { text: 'FAISABLE', cls: 'ok', tip: bits.join(' · ') };
     }
-    return { text: 'NON FAISABLE', cls: 'bad', tip: primaryBadgeReason(r) };
+    const almostEnabled = uxOn('almostCraftable', true);
+    const reason = primaryBadgeReason(r);
+    if (almostEnabled && computeAlmost(r)) {
+      return { text: 'PRESQUE', cls: 'almost', tip: reason ? `Presque — ${reason}` : 'Une seule condition mineure manque' };
+    }
+    return { text: 'NON FAISABLE', cls: 'bad', tip: reason || 'Conditions non remplies' };
   }
 
   function disableReasons(r) {
@@ -479,8 +494,39 @@
     return 'Variable';
   }
 
+  const RARITY_RANK = { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5 };
+
+  function feasibilityRank(r) {
+    if (r.canCraft) return 0;
+    if (uxOn('almostCraftable', true) && computeAlmost(r)) return 1;
+    if (r.locked) return 3;
+    return 2;
+  }
+
+  function sortedRecipes(list) {
+    const arr = list.slice();
+    const mode = state.sort || 'name';
+    arr.sort((a, b) => {
+      if (mode === 'feasibility') {
+        const d = feasibilityRank(a) - feasibilityRank(b);
+        if (d) return d;
+      } else if (mode === 'rarity') {
+        const d = (RARITY_RANK[rarityKey(b.rarity)] || 0) - (RARITY_RANK[rarityKey(a.rarity)] || 0);
+        if (d) return d;
+      } else if (mode === 'duration') {
+        const d = (a.duration || 0) - (b.duration || 0);
+        if (d) return d;
+      } else if (mode === 'mastery') {
+        const d = (b.mastery || 0) - (a.mastery || 0);
+        if (d) return d;
+      }
+      return String(a.label || a.id || '').localeCompare(String(b.label || b.id || ''), 'fr', { sensitivity: 'base' });
+    });
+    return arr;
+  }
+
   function filteredRecipes() {
-    return state.recipes.filter(matchesFilter);
+    return sortedRecipes(state.recipes.filter(matchesFilter));
   }
 
   function setEmpty(el, show) {
@@ -603,8 +649,15 @@
       const tip = uxOn('badgeTooltips', true) ? (status.tip || status.text) : status.text;
       const showMastery = uxOn('masteryDots', true) && state.flags.mastery && (r.mastery != null);
       const filled = showMastery ? masteryDots(r.mastery) : 0;
+      const masteryPct = Math.max(0, Math.min(100, Number(r.mastery) || 0));
       const masteryHtml = showMastery
-        ? `<div class="card-mastery" title="Maîtrise ${escapeHtml(r.mastery || 0)}%" aria-hidden="true">${[0,1,2].map((i) => `<span class="${i < filled ? 'on' : ''}"></span>`).join('')}</div>`
+        ? `<div class="card-mastery" title="Maîtrise recette : ${escapeHtml(masteryPct)}%${r.mastered ? ' · MAÎTRISÉ' : ''}" aria-label="Maîtrise ${escapeHtml(masteryPct)}%">
+            <span class="card-mastery-ring" style="--m:${masteryPct}"></span>
+            <span class="card-mastery-dots" aria-hidden="true">${[0,1,2].map((i) => `<i class="${i < filled ? 'on' : ''}"></i>`).join('')}</span>
+          </div>`
+        : '';
+      const followedHtml = isPinned(r.id)
+        ? '<span class="card-followed" title="Suivi dans le Carnet"><i class="fa-solid fa-bookmark" aria-hidden="true"></i></span>'
         : '';
       const nouveauHtml = showNouveau
         ? '<span class="card-nouveau">NOUVEAU</span>'
@@ -631,8 +684,9 @@
           <img alt="" />
           ${nouveauHtml}
           ${masteredHtml}
+          ${followedHtml}
           ${knMark}
-          ${r.rarity ? `<span class="card-rarity-mark rarity-${rarityKey(r.rarity)}" title="${escapeHtml(rarityLabel(r.rarity))}"><i class="fa-solid ${RARITY_ICON[rarityKey(r.rarity)] || 'fa-circle'}" aria-hidden="true"></i></span>` : ''}
+          ${r.rarity ? `<span class="card-rarity-mark rarity-${rarityKey(r.rarity)}" title="${escapeHtml('Rareté · ' + rarityLabel(r.rarity))}"><i class="fa-solid ${RARITY_ICON[rarityKey(r.rarity)] || 'fa-circle'}" aria-hidden="true"></i></span>` : ''}
           <span class="card-state-badge ${status.cls}" title="${escapeHtml(tip)}">${status.text}</span>
         </div>
         <div class="card-body">
@@ -1573,6 +1627,8 @@
     state.recipes = data.recipes || [];
     state.favorites = data.favorites || [];
     state.pinned = data.pinned || [];
+    const rarityNav = $('#rarity-filters');
+    if (rarityNav) rarityNav.hidden = !uxOn('rarityFilters', true);
     state.flags = data.flags || {};
     state.ux = (data.ui && data.ui.Ux) || data.ux || state.ux || {};
     state.compare = data.compare || { enabled: !!(state.flags && state.flags.compare), map: {} };
@@ -1733,15 +1789,40 @@
   });
   bindUi('#search', 'input', (e) => { state.search = e.target.value; renderList(); });
 
-  $$('.chip').forEach((btn) => {
+  $$('#filters .chip').forEach((btn) => {
     btn.addEventListener('click', () => {
-      $$('.chip').forEach((b) => b.classList.remove('active'));
+      $$('#filters .chip').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       state.filter = btn.dataset.filter;
       playTick();
       renderList();
     });
   });
+
+  const rarityNav = $('#rarity-filters');
+  if (rarityNav) {
+    const showRarity = uxOn('rarityFilters', true);
+    rarityNav.hidden = !showRarity;
+    rarityNav.querySelectorAll('.chip').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        rarityNav.querySelectorAll('.chip').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.rarityFilter = btn.dataset.rarity || 'all';
+        playTick();
+        renderList();
+      });
+    });
+  }
+
+  const sortEl = $('#catalog-sort');
+  if (sortEl) {
+    sortEl.value = state.sort || 'name';
+    sortEl.addEventListener('change', () => {
+      state.sort = sortEl.value || 'name';
+      playTick();
+      renderList();
+    });
+  }
 
   $$('.tab').forEach((btn) => {
     btn.addEventListener('click', () => {

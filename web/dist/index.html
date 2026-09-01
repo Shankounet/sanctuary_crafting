@@ -134,11 +134,23 @@
         <nav class="filters" id="filters" aria-label="Filtres">
           <button type="button" class="chip active" data-filter="all"><i class="fa-solid fa-border-all"></i><span>Tous</span></button>
           <button type="button" class="chip" data-filter="craftable"><i class="fa-solid fa-check"></i><span>Faisables</span></button>
+          <button type="button" class="chip" data-filter="almost"><i class="fa-solid fa-hourglass-half"></i><span>Presque</span></button>
           <button type="button" class="chip" data-filter="favorites"><i class="fa-solid fa-star"></i><span>Favoris</span></button>
           <button type="button" class="chip" data-filter="locked"><i class="fa-solid fa-lock"></i><span>Verrouillés</span></button>
           <button type="button" class="chip" data-filter="new"><i class="fa-solid fa-certificate"></i><span>Nouveaux</span></button>
           <button type="button" class="chip" data-filter="plans"><i class="fa-solid fa-scroll"></i><span>Plans</span></button>
         </nav>
+        <div class="nav-section nav-rarity" id="rarity-filters" hidden>
+          <h2 class="t-l3 nav-heading">Rareté</h2>
+          <nav class="filters rarity-filters" aria-label="Filtres rareté">
+            <button type="button" class="chip active" data-rarity="all"><span>Toutes</span></button>
+            <button type="button" class="chip" data-rarity="common"><span>Commun</span></button>
+            <button type="button" class="chip" data-rarity="uncommon"><span>Peu com.</span></button>
+            <button type="button" class="chip" data-rarity="rare"><span>Rare</span></button>
+            <button type="button" class="chip" data-rarity="epic"><span>Épique</span></button>
+            <button type="button" class="chip" data-rarity="legendary"><span>Légend.</span></button>
+          </nav>
+        </div>
       </div>
 
       <div class="nav-section flex-grow nav-cats">
@@ -201,6 +213,16 @@
           <h2 class="t-l2">Recettes</h2>
         </div>
         <span class="t-l5 muted" id="recipe-count"></span>
+          <label class="catalog-sort-wrap" title="Trier le catalogue">
+            <span class="t-l4">Tri</span>
+            <select id="catalog-sort" aria-label="Trier le catalogue">
+              <option value="name">Nom</option>
+              <option value="feasibility">Faisabilité</option>
+              <option value="rarity">Rareté</option>
+              <option value="duration">Durée</option>
+              <option value="mastery">Maîtrise</option>
+            </select>
+          </label>
       </div>
       <div id="recipe-grid" class="recipe-grid"></div>
       <div class="empty-state" id="recipe-empty">
