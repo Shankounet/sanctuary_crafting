@@ -73,7 +73,7 @@ sanctuary_crafting/
 ├── security/                  # rate-limit, distance, CanCarry, admin
 ├── recipes/                   # registry + validation schéma
 ├── stations/                  # monde + SQL + levels/upgrades/modules
-├── crafting/pipeline.lua      # craftId, start/complete/cancel, inventaire
+├── server/crafting/pipeline.lua      # craftId, start/complete/cancel, inventaire
 ├── blueprints/                # Learn/Has/Forget + SQL + item
 ├── tools/ quality/ mastery/
 ├── queue/ projects/ reverse/
@@ -105,7 +105,7 @@ Ordre de chargement serveur (fxmanifest) : **shared → integrations → core �
 
 ## CraftingSkills / ml_skills
 
-Fichier : `integrations/ml_skills.lua`.
+Fichier : `server/integrations/ml_skills.lua`.
 
 | Wrapper | API réelle |
 |---------|------------|
