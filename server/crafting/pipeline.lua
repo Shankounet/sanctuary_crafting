@@ -604,6 +604,147 @@ AddEventHandler('playerDropped', function()
 end)
 
 
+
+-- Interactive crafts live in RAM (GetGameTimer). Close/reopen NUI rehydrates via GetSession.
+-- Disconnect still cancels interactive crafts (playerDropped). Queue SQL covers queued/offline.
+-- Persisting interactive crafts across reconnect is deferred (not in this version).
+
+local function craftSessionDebug()
+    return Config.Debug or (Config.CraftTracker and Config.CraftTracker.Debug)
+end
+
+local function serializeActiveCraft(craft)
+    local nowMs = GetGameTimer()
+    local startedAtMs = craft.startedAt or nowMs
+    local durationMs = tonumber(craft.duration) or 0
+    local remainingMs = math.max(0, durationMs - (nowMs - startedAtMs))
+    local nowUnix = os.time()
+    local startedUnix = craft.startedUnix
+    if type(startedUnix) ~= 'number' then
+        startedUnix = nowUnix - math.floor(math.max(0, nowMs - startedAtMs) / 1000)
+    end
+    -- finishesAt from remaining (GetGameTimer) so reopen shows advanced progress
+    local finishesAt = startedUnix + math.ceil(remainingMs / 1000)
+
+    local recipe = Config.RecipeById and Config.RecipeById[craft.recipeId]
+    local bench = Benches and Benches.Resolve and Benches.Resolve(craft.benchKey)
+    local batch = craft.batch or 1
+    local resultItem = recipe and recipe.result and recipe.result.item or nil
+    local resultCount = recipe and recipe.result and ((recipe.result.count or 1) * batch) or batch
+    local label = (recipe and recipe.label) or craft.recipeId
+    local step = recipe and select(1, currentStepInfo(recipe, craft.stepIndex or 1)) or nil
+    local stepLabel = (step and step.label) or label
+    local category = (recipe and recipe.category) or (bench and bench.category)
+    local benchLabel = (bench and bench.label) or nil
+
+    return {
+        craftId = craft.craftId,
+        recipeId = craft.recipeId,
+        benchKey = craft.benchKey,
+        benchLabel = benchLabel,
+        label = label,
+        resultItem = resultItem,
+        resultCount = resultCount,
+        batch = batch,
+        quantity = batch,
+        state = 'active',
+        startedAt = startedUnix,
+        finishesAt = finishesAt,
+        duration = remainingMs,
+        durationMs = durationMs,
+        remainingMs = remainingMs,
+        stepIndex = craft.stepIndex or 1,
+        totalSteps = craft.totalSteps or 1,
+        stepLabel = stepLabel,
+        category = category,
+        phaseFamily = category,
+    }
+end
+
+--- Serialize in-memory interactive crafts for src.
+--- @param src number
+--- @param benchKey string|nil  if set, first return is this station only; second is other benches
+--- @return table matching, table other
+function CraftingPipeline.SerializeActive(src, benchKey)
+    local matching, other = {}, {}
+    local set = activeBySrc[src]
+    if not set then return matching, other end
+    for craftId in pairs(set) do
+        local craft = activeById[craftId]
+        if craft and craft.src == src and not craft.completed then
+            local row = serializeActiveCraft(craft)
+            if benchKey and craft.benchKey ~= benchKey then
+                other[#other + 1] = row
+            else
+                matching[#matching + 1] = row
+            end
+        end
+    end
+    return matching, other
+end
+
+--- Station-scoped session (source of truth for NUI rehydrate).
+--- Interactive = RAM pipeline; queued = CraftQueue (SQL-backed offline).
+function CraftingPipeline.GetSession(src, benchKey)
+    local active, other = CraftingPipeline.SerializeActive(src, benchKey)
+    local queued = {}
+    if CraftQueue and CraftQueue.List then
+        local list = CraftQueue.List(src) or {}
+        for i = 1, #list do
+            local e = list[i]
+            if not benchKey or e.benchKey == benchKey then
+                local finishAt = tonumber(e.finishAt) or 0
+                local createdAt = tonumber(e.createdAt) or finishAt
+                local durationMs = tonumber(e.duration) or math.max(0, (finishAt - createdAt) * 1000)
+                local remainingMs = math.max(0, (finishAt - os.time()) * 1000)
+                queued[#queued + 1] = {
+                    craftId = e.craftId,
+                    recipeId = e.recipeId,
+                    benchKey = e.benchKey,
+                    batch = e.batch or 1,
+                    quantity = e.batch or 1,
+                    ingredients = e.ingredients,
+                    finishAt = finishAt,
+                    finishesAt = finishAt,
+                    createdAt = createdAt,
+                    startedAt = createdAt,
+                    duration = durationMs,
+                    durationMs = durationMs,
+                    remainingMs = remainingMs,
+                    label = e.label,
+                    state = 'queued',
+                }
+            end
+        end
+    end
+    local session = {
+        stationId = benchKey,
+        active = active,
+        queued = queued,
+        other = other,
+    }
+    if craftSessionDebug() then
+        local first = active[1]
+        print(('[sanctuary_crafting] opening station=%s stationId=%s active=%d queued=%d craftId=%s startedAt=%s finishesAt=%s'):format(
+            tostring(benchKey),
+            tostring(session.stationId),
+            #active,
+            #queued,
+            first and first.craftId or '-',
+            first and tostring(first.startedAt) or '-',
+            first and tostring(first.finishesAt) or '-'
+        ))
+    end
+    return session
+end
+
+lib.callback.register('sanctuary_crafting:getCraftSession', function(src, benchKey)
+    if type(benchKey) ~= 'string' then
+        return { ok = false, reason = 'craft_invalid' }
+    end
+    return { ok = true, session = CraftingPipeline.GetSession(src, benchKey) }
+end)
+
 -- Menu / NUI data
 local function itemLabelOf(item)
     if not item then return nil end
@@ -1229,12 +1370,15 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
     local ux = (Config.UI and Config.UI.Ux) or {}
     local compareCfg = Config.Compare or {}
 
+    local session = CraftingPipeline.GetSession(src, benchKey)
+
     return {
         ok = true, benchKey = benchKey, category = bench.category,
         label = bench.label or _(Config.BenchLabels[bench.category] or 'bench_scrap'),
         stationLevel = benchLevel, modules = bench.modules or {},
         powered = (CraftingPower and CraftingPower.HasPower and CraftingPower.HasPower(bench)) or false,
         recipes = out, favorites = favorites, pinned = pinned,
+        session = session,
         ui = Config.UI, ux = ux,
         compare = {
             enabled = compareCfg.Enabled == true,

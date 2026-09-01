@@ -3,6 +3,7 @@
 ]]
 
 local nuiOpen = false
+local lastBenchKey = nil
 
 local function useNui()
     return Config.UI and Config.UI.UseNui ~= false
@@ -23,12 +24,45 @@ function CloseCraftNui()
     end
 end
 
+local function applySessionToTracker(session, benchKey)
+    if not trackerEnabled() or type(session) ~= 'table' then return end
+    local key = benchKey or lastBenchKey
+    if CraftTracker.SetLastBench and key then
+        CraftTracker.SetLastBench(key)
+    end
+    if CraftTracker.ApplySession then
+        CraftTracker.ApplySession(key, session)
+    else
+        -- Fallback: upsert active + queued individually
+        for _, a in ipairs(session.active or {}) do
+            if CraftTracker.FromSessionActive then
+                local e = CraftTracker.FromSessionActive(a)
+                if e then CraftTracker.Upsert(e) end
+            end
+        end
+        for _, q in ipairs(session.queued or {}) do
+            local e = CraftTracker.FromQueueEntry and CraftTracker.FromQueueEntry(q)
+            if e then CraftTracker.Upsert(e) end
+        end
+    end
+end
+
 function OpenCraftNui(menuData)
     if not useNui() then return false end
     nuiOpen = true
+    if menuData and menuData.benchKey then
+        lastBenchKey = menuData.benchKey
+    end
     SetNuiFocus(true, true)
     SendNUIMessage({ action = 'open', data = menuData })
     if trackerEnabled() then
+        if lastBenchKey and CraftTracker.SetLastBench then
+            CraftTracker.SetLastBench(lastBenchKey)
+        end
+        -- Upsert station session so tracker RAM matches pipeline (replace jobs for this bench)
+        if menuData and menuData.session then
+            applySessionToTracker(menuData.session, lastBenchKey)
+        end
         CraftTracker.SetMenuOpen(true)
         CraftTracker.Sync()
     end
@@ -41,8 +75,23 @@ RegisterNUICallback('close', function(_, cb)
 end)
 
 RegisterNUICallback('refresh', function(data, cb)
-    local menu = lib.callback.await('sanctuary_crafting:getMenu', false, data.benchKey)
+    local benchKey = data and data.benchKey or lastBenchKey
+    if benchKey then lastBenchKey = benchKey end
+    local menu = lib.callback.await('sanctuary_crafting:getMenu', false, benchKey)
+    if menu and menu.ok and menu.session then
+        applySessionToTracker(menu.session, benchKey)
+    end
     cb(menu or { ok = false })
+end)
+
+RegisterNUICallback('getCraftSession', function(data, cb)
+    local benchKey = (data and data.benchKey) or lastBenchKey
+    if benchKey then lastBenchKey = benchKey end
+    local r = lib.callback.await('sanctuary_crafting:getCraftSession', false, benchKey)
+    if r and r.ok and r.session then
+        applySessionToTracker(r.session, benchKey)
+    end
+    cb(r or { ok = false })
 end)
 
 RegisterNUICallback('craft', function(data, cb)

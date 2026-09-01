@@ -7,6 +7,8 @@ CraftTracker = CraftTracker or {}
 
 local jobs = {} -- [craftId] = entry
 local menuOpen = false
+local lastBenchKey = nil
+local lastSessionFetch = 0
 local cfg
 
 local function trackerCfg()
@@ -88,8 +90,104 @@ local function listJobs()
     return out
 end
 
+function CraftTracker.SetLastBench(key)
+    if type(key) == 'string' and key ~= '' then
+        lastBenchKey = key
+    end
+end
+
+function CraftTracker.FromSessionActive(entry)
+    if not entry or not entry.craftId then return nil end
+    local remaining = tonumber(entry.remainingMs)
+    if remaining == nil then remaining = tonumber(entry.duration) or 0 end
+    local duration = tonumber(entry.durationMs) or remaining
+    local started = nowMs() - math.max(0, duration - remaining)
+    local category = entry.category or entry.phaseFamily
+    return {
+        craftId = entry.craftId,
+        recipeId = entry.recipeId,
+        label = entry.label or entry.stepLabel or entry.recipeId,
+        item = entry.resultItem or entry.item,
+        count = entry.resultCount or entry.batch or 1,
+        batch = entry.batch or 1,
+        benchKey = entry.benchKey,
+        benchLabel = entry.benchLabel,
+        status = 'active',
+        startedAt = started,
+        endsAt = nowMs() + remaining,
+        duration = duration,
+        stepIndex = entry.stepIndex or 1,
+        totalSteps = entry.totalSteps or 1,
+        stepLabel = entry.stepLabel or entry.label,
+        phaseFamily = entry.phaseFamily or phaseFamilyFor(category),
+        category = category,
+        clientTimer = nowMs(),
+        wallNow = wallMs(),
+        useWallClock = false,
+    }
+end
+
+--- Replace RAM jobs for this bench with server session (station-scoped).
+--- Other benches' jobs are kept; session.other is upserted without removal.
+function CraftTracker.ApplySession(benchKey, session)
+    if not enabled() or type(session) ~= 'table' then return end
+    if type(benchKey) == 'string' and benchKey ~= '' then
+        lastBenchKey = benchKey
+    end
+    local keep = {}
+    for _, a in ipairs(session.active or {}) do
+        local e = CraftTracker.FromSessionActive(a)
+        if e then
+            CraftTracker.Upsert(e)
+            keep[e.craftId] = true
+        end
+    end
+    for _, q in ipairs(session.queued or {}) do
+        local e = CraftTracker.FromQueueEntry(q)
+        if e then
+            CraftTracker.Upsert(e)
+            keep[e.craftId] = true
+        end
+    end
+    for _, o in ipairs(session.other or {}) do
+        local e = CraftTracker.FromSessionActive(o)
+        if e then CraftTracker.Upsert(e) end
+    end
+    local key = benchKey or lastBenchKey
+    if key then
+        local drop = {}
+        for id, job in pairs(jobs) do
+            if job.benchKey == key and not keep[id] then
+                local st = job.status
+                if st == 'active' or st == 'queued' or st == 'paused' then
+                    drop[#drop + 1] = id
+                end
+            end
+        end
+        for i = 1, #drop do
+            CraftTracker.Remove(drop[i])
+        end
+    end
+end
+
+function CraftTracker.RefreshSession(benchKey)
+    if not enabled() then return end
+    benchKey = benchKey or lastBenchKey
+    if type(benchKey) ~= 'string' or benchKey == '' then return end
+    local t = nowMs()
+    if (t - lastSessionFetch) < 300 then return end
+    lastSessionFetch = t
+    local r = lib.callback.await('sanctuary_crafting:getCraftSession', false, benchKey)
+    if r and r.ok and r.session then
+        CraftTracker.ApplySession(benchKey, r.session)
+    end
+end
+
 function CraftTracker.Sync()
     if not enabled() then return end
+    if menuOpen and lastBenchKey then
+        CraftTracker.RefreshSession(lastBenchKey)
+    end
     send('tracker:sync', {
         jobs = listJobs(),
         menuOpen = menuOpen,
@@ -135,6 +233,9 @@ end
 function CraftTracker.SetMenuOpen(isOpen)
     menuOpen = isOpen and true or false
     if not enabled() then return end
+    if menuOpen and lastBenchKey then
+        CraftTracker.RefreshSession(lastBenchKey)
+    end
     send('tracker:menuState', {
         menuOpen = menuOpen,
         config = buildConfigPayload(),
