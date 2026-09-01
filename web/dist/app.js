@@ -321,10 +321,19 @@
 
       const favOn = isFavorite(r.id);
       const status = cardStatus(r);
+      card.classList.add(`state-${status.cls || 'bad'}`);
+      const toneIdx = (String(r.category || r.id || '').length + (r.id || '').length) % 3;
+      card.classList.add(`tone-${['a', 'b', 'c'][toneIdx]}`);
+      if (r.rarity) {
+        const rk = String(r.rarity).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        if (rk) card.classList.add(`rarity-${rk}`);
+      }
       const resultItem = (r.result && r.result.item) || r.id;
       const allIngs = r.ingredients || [];
-      const ings = allIngs.slice(0, 3);
+      const maxNeeds = allIngs.length > 3 ? 2 : Math.min(3, allIngs.length);
+      const ings = allIngs.slice(0, maxNeeds);
       const more = allIngs.length - ings.length;
+      const code = recipeCode(r);
 
       card.innerHTML = `
         <button type="button" class="card-fav${favOn ? ' on' : ''}" data-fav="${escapeHtml(r.id)}" title="Favori" aria-label="Favori">
@@ -337,19 +346,21 @@
         <div class="card-body">
           <div class="card-identity">
             <div class="card-title">${escapeHtml(r.label)}</div>
-            <div class="card-cat">${escapeHtml(categoryLabel(r.category))}</div>
+            <div class="card-meta-line">
+              <span class="card-cat">${escapeHtml(categoryLabel(r.category))}</span>
+              <span class="card-code">${escapeHtml(code)}</span>
+            </div>
           </div>
           <div class="card-status-row">
-            <span class="status-pill ${status.cls}">${status.text}</span>
-            <span class="card-dur"><i class="fa-regular fa-clock" aria-hidden="true"></i>${escapeHtml(durationLabel(r.duration))}</span>
+            <span class="status-plate status-pill ${status.cls}">${status.text}</span>
           </div>
           <div class="card-ings">
             ${ings.map((ing) => {
               const info = ingOwnedRequired(ing, r);
               const short = humanize(ing.item);
-              return `<span class="ing-chip ${info.cls}" title="${escapeHtml(short)}">${escapeHtml(info.text)} ${escapeHtml(short)}</span>`;
+              return `<div class="need-row ${info.cls}" title="${escapeHtml(short)}"><span class="need-name">${escapeHtml(short)}</span><span class="need-qty">${escapeHtml(info.text)}</span></div>`;
             }).join('')}
-            ${more > 0 ? `<span class="ing-chip more">+${more}</span>` : ''}
+            ${more > 0 ? `<div class="need-more">+${more} autres</div>` : ''}
           </div>
         </div>
       `;
