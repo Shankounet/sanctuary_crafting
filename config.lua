@@ -101,7 +101,7 @@ Config.WorldBenchCommand = 'placeworldbench'
 --------------------------------------------------------------------------------
 -- ml_skills (Micio Mods) — soft-fail via CraftingSkills
 -- Si une recette a requireLevel / requireSkill et ml_skills est down → refuse
--- (PAS de bypass silencieux).
+-- (PAS de bypass silencieux en prod). BypassRequirements = false par défaut.
 --------------------------------------------------------------------------------
 Config.Skills = {
     enabled = true,
@@ -110,6 +110,18 @@ Config.Skills = {
     survivalCategory = 'survival',
     craftTimeBonus = true,
     maxCraftTimeReduction = 0.40,
+
+    --[[ Mode test sans skills (DEV ONLY)
+         BypassRequirements = true  → TOUS les joueurs sautent requireLevel / requireSkill
+         BypassAce (optionnel)      → si défini, les joueurs avec cet ACE (ou Config.AdminGroups
+                                       / Config.AdminAce via Validation.IsAdmin) bypassent même
+                                       si BypassRequirements = false
+         NE JAMAIS activer BypassRequirements sur un serveur public / production.
+    ]]
+    BypassRequirements = false,
+    BypassAce = 'sanctuary.crafting.bypassskills',
+    BypassAlsoSkipXP = false, -- false = toujours tenter AddXp si ml_skills est up
+    BypassNotify = false,     -- true = notify ox_lib une fois (aussi si Config.Debug)
 }
 
 --------------------------------------------------------------------------------

@@ -72,6 +72,9 @@ function CraftQueue._startQueued(src, recipeId, benchKey, batch)
 
     local okSkill, reason, args = CraftingSkills.CheckRecipeGates(src, recipe)
     if not okSkill then return nil, reason, args end
+    if CraftingSkills.NotifyBypassIfNeeded then
+        CraftingSkills.NotifyBypassIfNeeded(src)
+    end
     if not Validation.IsNearBench(src, bench.coords, Config.InteractDistance) then
         return nil, 'craft_too_far'
     end

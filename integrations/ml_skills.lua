@@ -8,13 +8,67 @@
       GetPlayerLevel(categoryUid?, source)
       HasUnlockedSkill(categoryUid?, skillUid, source)
       GetTotalCategoryBonus(categoryUid, source)
+
+    Mode test (Config.Skills.Bypass*) : saute requireLevel / requireSkill uniquement.
+    Ne crée PAS d'XP parallèle. Ingrédients / station / distance restent stricts.
 ]]
 
 CraftingSkills = CraftingSkills or {}
 
+local bypassNotified = {} -- [src] = true (notify once per session)
+
 local function resourceName()
     return (Config.Skills and Config.Skills.resource) or 'ml_skills'
 end
+
+--- Global OU per-admin (BypassAce / AdminGroups) — voir Config.Skills
+---@param src number|nil
+---@return boolean
+function CraftingSkills.ShouldBypassRequirements(src)
+    if not Config.Skills then return false end
+
+    -- Global : tous les joueurs (DEV ONLY — jamais en prod public)
+    if Config.Skills.BypassRequirements == true then
+        return true
+    end
+
+    if not src or src < 1 then return false end
+
+    -- Per-admin : ACE dédié et/ou AdminGroups / AdminAce (Validation.IsAdmin)
+    local ace = Config.Skills.BypassAce
+    if type(ace) == 'string' and ace ~= '' then
+        if IsPlayerAceAllowed(src, ace) then
+            return true
+        end
+        if Validation and Validation.IsAdmin and Validation.IsAdmin(src) then
+            return true
+        end
+    end
+
+    return false
+end
+
+--- Notify ox_lib une seule fois si Debug ou BypassNotify
+---@param src number
+function CraftingSkills.NotifyBypassIfNeeded(src)
+    if not src or src < 1 then return end
+    if bypassNotified[src] then return end
+    if not CraftingSkills.ShouldBypassRequirements(src) then return end
+    local notify = (Config.Debug == true) or (Config.Skills and Config.Skills.BypassNotify == true)
+    if not notify then return end
+    bypassNotified[src] = true
+    local msg = _('craft_skills_bypass_active')
+    TriggerClientEvent('ox_lib:notify', src, {
+        type = 'inform',
+        description = msg,
+    })
+    DebugPrint('CraftingSkills bypass active for', src)
+end
+
+AddEventHandler('playerDropped', function()
+    local src = source
+    if src then bypassNotified[src] = nil end
+end)
 
 --- Ressource ml_skills démarrée et feature activée
 ---@return boolean
@@ -30,6 +84,10 @@ end
 ---@param source number
 ---@return boolean
 function CraftingSkills.AddXP(categoryUid, amount, source)
+    if Config.Skills and Config.Skills.BypassAlsoSkipXP
+        and CraftingSkills.ShouldBypassRequirements(source) then
+        return false
+    end
     if not CraftingSkills.IsAvailable() then return false end
     if not categoryUid or not amount or amount <= 0 then return false end
     local ok, granted = pcall(function()
@@ -60,6 +118,9 @@ end
 ---@return boolean
 function CraftingSkills.HasRequiredLevel(categoryUid, requiredLevel, source)
     if not requiredLevel then return true end
+    if CraftingSkills.ShouldBypassRequirements(source) then
+        return true
+    end
     return CraftingSkills.GetLevel(categoryUid, source) >= requiredLevel
 end
 
@@ -68,6 +129,9 @@ end
 ---@param source number
 ---@return boolean
 function CraftingSkills.HasSkill(categoryUid, skillUid, source)
+    if CraftingSkills.ShouldBypassRequirements(source) then
+        return true
+    end
     if not CraftingSkills.IsAvailable() then return false end
     if not skillUid then return false end
     local ok, has = pcall(function()
@@ -107,6 +171,7 @@ function CraftingSkills.LevelCategoryForRecipe(recipe)
 end
 
 --- Réduction durée craft via GetTotalCategoryBonus (plafond maxCraftTimeReduction)
+--- Soft-fail si ml_skills down (retourne durée de base).
 ---@param baseDuration number ms
 ---@param source number
 ---@return number
@@ -123,13 +188,17 @@ function CraftingSkills.ApplyCraftTimeBonus(baseDuration, source)
 end
 
 --[[
-    Gates serveur : si la recette exige level/skill et ml_skills est down → refuse.
-    Pas de bypass silencieux.
+    Gates serveur : si la recette exige level/skill et ml_skills est down → refuse
+    (sauf mode test BypassRequirements / BypassAce).
     @return ok boolean, reason string|nil, args table|nil
 ]]
 function CraftingSkills.CheckRecipeGates(src, recipe)
     local needsGate = (recipe.requireLevel ~= nil) or (recipe.requireSkill ~= nil)
     if not needsGate then
+        return true
+    end
+
+    if CraftingSkills.ShouldBypassRequirements(src) then
         return true
     end
 

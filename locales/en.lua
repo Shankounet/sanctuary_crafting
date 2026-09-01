@@ -13,6 +13,7 @@ Locales['en'] = {
     ['craft_skill_required'] = 'Skill required: %s',
     ['craft_blueprint_required'] = 'Blueprint required: %s',
     ['craft_skills_unavailable'] = 'Skills system unavailable — craft refused',
+    ['craft_skills_bypass_active'] = '[TEST] Skills bypass active — level/skill gates skipped',
     ['craft_invalid'] = 'Invalid recipe',
     ['craft_wrong_bench'] = 'Wrong station for this recipe',
     ['craft_inventory_full'] = 'Inventory full',
