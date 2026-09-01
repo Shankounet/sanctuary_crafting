@@ -3594,3 +3594,215 @@ button, input { font: inherit; color: inherit; }
 @keyframes craftToastOut {
   to { opacity: 0; transform: translateY(4px); }
 }
+
+
+/* ============================================================
+   v2.2.23 — Left nav: richer charcoal depth (no pure black)
+   Hierarchy: #1b1b1b → #202020 → #242424 → #2a2a2a
+   Borders #3a332b · accent #9a8866 only. No glow / glass.
+   ============================================================ */
+
+/* Column shell — warm charcoal, layered depth */
+#app .panel-list,
+#app .family-nav,
+#app .col-nav {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 42%),
+    linear-gradient(90deg, rgba(0,0,0,0.14), transparent 22%),
+    #1b1b1b !important;
+  background-image:
+    linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 42%),
+    linear-gradient(90deg, rgba(0,0,0,0.14), transparent 22%) !important;
+  background-color: #1b1b1b !important;
+  border-color: rgba(58, 51, 43, 0.95) !important;
+  border-left-color: #3a332b !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    inset 0 -1px 0 rgba(0,0,0,0.35),
+    inset 5px 0 16px rgba(0,0,0,0.18) !important;
+}
+
+#app .panel-list .panel-band span,
+#app .family-nav .panel-band span,
+#app .col-nav .panel-band span {
+  color: rgba(154,136,102,0.28) !important;
+}
+
+#app .col-nav .nav-heading,
+#app .panel-list .nav-heading,
+#app .family-nav .nav-heading {
+  color: rgba(168,160,148,0.72) !important;
+}
+
+/* Search — softer field, readable placeholder */
+#app .col-nav .search-wrap,
+#app .panel-list .search-wrap,
+#app .family-nav .search-wrap,
+#app .col-nav .tech-field.search-wrap,
+#app .panel-list .tech-field.search-wrap {
+  background: transparent;
+}
+#app .col-nav #search,
+#app .panel-list #search,
+#app .family-nav #search,
+#app .col-nav .search-wrap #search {
+  background: #202020 !important;
+  border: 1px solid #3a332b !important;
+  color: #e4e4e4 !important;
+  box-shadow:
+    inset 0 1px 3px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.03) !important;
+}
+#app .col-nav #search::placeholder,
+#app .panel-list #search::placeholder,
+#app .family-nav #search::placeholder {
+  color: rgba(154,148,138,0.55) !important;
+}
+#app .col-nav #search:focus,
+#app .panel-list #search:focus,
+#app .family-nav #search:focus {
+  border-color: rgba(154,136,102,0.55) !important;
+  background: #242424 !important;
+  box-shadow:
+    inset 0 1px 3px rgba(0,0,0,0.4),
+    inset 0 0 0 1px rgba(154,136,102,0.12) !important;
+}
+#app .col-nav .search-wrap > i,
+#app .panel-list .search-wrap > i {
+  color: rgba(154,136,102,0.55) !important;
+  opacity: 0.85 !important;
+}
+
+/* Filters — surface hierarchy, clear hover/active */
+#app .col-nav .chip,
+#app .panel-list .chip,
+#app .family-nav .chip {
+  background: #202020 !important;
+  border-color: #3a332b !important;
+  color: rgba(220,216,208,0.82) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03) !important;
+}
+#app .col-nav .chip i,
+#app .panel-list .chip i {
+  color: rgba(154,148,138,0.65) !important;
+}
+#app .col-nav .chip:hover,
+#app .panel-list .chip:hover,
+#app .family-nav .chip:hover {
+  background: #242424 !important;
+  border-color: rgba(154,136,102,0.4) !important;
+  color: #e8e4dc !important;
+}
+#app .col-nav .chip:hover i,
+#app .panel-list .chip:hover i {
+  color: rgba(154,136,102,0.8) !important;
+}
+#app .col-nav .chip.active,
+#app .panel-list .chip.active,
+#app .family-nav .chip.active {
+  background: #2a2a2a !important;
+  border-color: #9a8866 !important;
+  color: #9a8866 !important;
+  box-shadow:
+    inset 0 -2px 0 #9a8866,
+    inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+#app .col-nav .chip.active i,
+#app .panel-list .chip.active i {
+  color: #9a8866 !important;
+}
+
+/* Categories — plates, not stacked black blocks */
+#app .col-nav .cat-list,
+#app .panel-list .cat-list,
+#app .family-nav .cat-list {
+  gap: 3px !important;
+  padding: 2px 1px 2px 0;
+}
+#app .col-nav .cat-item,
+#app .panel-list .cat-item,
+#app .family-nav .cat-item {
+  background: #202020 !important;
+  border: 1px solid rgba(58,51,43,0.75) !important;
+  border-left: 2px solid transparent !important;
+  color: rgba(220,216,208,0.88) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.035),
+    inset 0 -1px 0 rgba(0,0,0,0.25) !important;
+}
+#app .col-nav .cat-item:hover,
+#app .panel-list .cat-item:hover,
+#app .family-nav .cat-item:hover {
+  background: #242424 !important;
+  border-color: rgba(154,136,102,0.32) !important;
+  border-left-color: rgba(154,136,102,0.45) !important;
+}
+#app .col-nav .cat-item.active,
+#app .panel-list .cat-item.active,
+#app .family-nav .cat-item.active {
+  background: #2a2a2a !important;
+  border-color: rgba(154,136,102,0.4) !important;
+  border-left-color: #9a8866 !important;
+  color: #c4b396 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 3px 0 10px rgba(154,136,102,0.06) !important;
+}
+#app .col-nav .cat-item > i,
+#app .panel-list .cat-item > i {
+  color: rgba(154,148,138,0.55) !important;
+}
+#app .col-nav .cat-item:hover > i,
+#app .panel-list .cat-item:hover > i {
+  color: rgba(154,136,102,0.78) !important;
+}
+#app .col-nav .cat-item.active > i,
+#app .panel-list .cat-item.active > i {
+  color: #9a8866 !important;
+}
+#app .col-nav .cat-item .count,
+#app .panel-list .cat-item .count,
+#app .family-nav .cat-item .count {
+  background: #242424 !important;
+  border: 1px solid rgba(58,51,43,0.85) !important;
+  color: rgba(168,160,148,0.7) !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.35) !important;
+}
+#app .col-nav .cat-item.active .count,
+#app .panel-list .cat-item.active .count {
+  background: #1b1b1b !important;
+  border-color: rgba(154,136,102,0.35) !important;
+  color: rgba(154,136,102,0.85) !important;
+}
+
+/* Side console / subsystem tabs inside left column */
+#app .col-nav .side-console,
+#app .col-nav .side-tabs-wrap,
+#app .panel-list .side-console,
+#app .panel-list .side-tabs-wrap {
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.18), transparent 70%),
+    #1b1b1b !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04) !important;
+  border-top: 1px solid rgba(58,51,43,0.55) !important;
+}
+#app .col-nav .tab,
+#app .panel-list .tab {
+  background: linear-gradient(180deg, #242424 0%, #202020 100%) !important;
+  border-color: #3a332b !important;
+  color: rgba(168,160,148,0.75) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    inset 0 -2px 0 rgba(0,0,0,0.35) !important;
+}
+#app .col-nav .tab:hover,
+#app .panel-list .tab:hover {
+  background: #2a2a2a !important;
+  border-color: rgba(154,136,102,0.4) !important;
+}
+#app .col-nav .tab.active,
+#app .panel-list .tab.active {
+  background: #2a2a2a !important;
+  border-color: #9a8866 !important;
+  color: #9a8866 !important;
+}
