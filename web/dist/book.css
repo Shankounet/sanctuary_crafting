@@ -2484,7 +2484,8 @@
    MAPPING
      cover / outer / binding     tex/leather_cover.png
      left + right pages          tex/paper_aged_new.png
-     glued fiches / documents    tex/paper_dark.png
+     Accueil glued fiches        tex/paper_aged_new.png (LIGHT crop, not paper_dark)
+     Notes clips / other docs    tex/paper_dark.png
      new note leaf               tex/paper_aged_new.png (different crop)
      post-its                    tex/postit_{yellow,blue,green,pink}.png
    ============================================================ */
@@ -2492,6 +2493,7 @@
   --bookCoverTexture: url("tex/leather_cover.png");
   --mainPageTexture: url("tex/paper_aged_new.png");
   --alternatePageTexture: url("tex/paper_dark.png");
+  --lightSheetTexture: url("tex/paper_aged_new.png");
   --postitBlue: url("tex/postit_blue.png");
   --postitGreen: url("tex/postit_green.png");
   --postitPink: url("tex/postit_pink.png");
@@ -2592,7 +2594,7 @@
 }
 
 /* MAIN paper inserts: polaroid, visit cards, tabs, blueprints, index */
-#book-app .id-polaroid,
+
 #book-app .visit-card,
 #book-app .visit-card.business-card,
 #book-app .vc-card,
@@ -2968,4 +2970,95 @@
 #book-app .note-clip-del:hover {
   opacity: 1;
   transform: rotate(8deg);
+}
+
+/* v2.17.1 Accueil Situation light glued sheets */
+#book-app .id-polaroid,
+#book-app .id-polaroid.accueil-sheet,
+#book-app .scrap-note.accueil-sheet,
+#book-app .scrap-note.accueil-sheet.tint-warm,
+#book-app .scrap-note.accueil-sheet.tint-cool,
+#book-app .scrap-note.accueil-sheet.tint-rose,
+#book-app .dossier-sheet.accueil-sheet,
+#book-app .day-note.accueil-sheet {
+  background-color: #e8dcc4 !important;
+  background-image: var(--lightSheetTexture) !important;
+  background-repeat: no-repeat !important;
+  color: #2a2218 !important;
+}
+#book-app .id-polaroid,
+#book-app .accueil-hero .id-polaroid {
+  display: inline-block;
+  margin: 8px 6px 16px 2px;
+  padding: 10px 10px 22px;
+  max-width: 196px;
+  transform: rotate(-1.5deg);
+  border: 1px solid rgba(90, 70, 40, 0.22);
+  box-shadow:
+    2px 5px 11px rgba(40, 24, 10, 0.26),
+    0 1px 0 rgba(255, 250, 240, 0.35) inset !important;
+  background-size: 160% 160% !important;
+  background-position: 20% 70% !important;
+  color: #2a2218 !important;
+}
+#book-app .id-polaroid .hand-name,
+#book-app .id-polaroid .id-date,
+#book-app .id-polaroid .id-place {
+  color: #2a2218;
+}
+#book-app .id-polaroid .id-date,
+#book-app .id-polaroid .id-place.pencil {
+  color: #2a2218;
+  opacity: 0.82;
+}
+#book-app .id-polaroid .id-photo {
+  width: 136px;
+  height: 112px;
+  margin: 0 auto;
+  background: none !important;
+  background-image: none !important;
+  border: 1px solid rgba(80, 65, 45, 0.28);
+  box-shadow: inset 0 1px 7px rgba(40, 24, 10, 0.2);
+}
+#book-app .scrap-note.accueil-sheet.tint-warm,
+#book-app .scrap-note.accueil-sheet.rot-l {
+  background-size: 158% 158% !important;
+  background-position: 18% 72% !important;
+  box-shadow: 2px 4px 9px rgba(40, 24, 10, 0.22) !important;
+  color: #2a2218 !important;
+}
+#book-app .scrap-note.accueil-sheet.tint-cool,
+#book-app .scrap-note.accueil-sheet.rot-r {
+  background-size: 170% 162% !important;
+  background-position: 78% 24% !important;
+  box-shadow: 2px 4px 9px rgba(40, 24, 10, 0.22) !important;
+  color: #2a2218 !important;
+}
+#book-app .dossier-sheet.accueil-sheet {
+  background-size: 165% 165% !important;
+  background-position: 42% 88% !important;
+  transform: rotate(1.3deg);
+  margin: 14px 4px 12px;
+  box-shadow: 2px 4px 8px rgba(40, 24, 10, 0.2) !important;
+  color: #2a2218 !important;
+}
+#book-app .day-note.accueil-sheet {
+  background-size: 150% 150% !important;
+  background-position: 64% 40% !important;
+  transform: rotate(-0.8deg);
+  border-left: 0;
+  box-shadow: 1px 3px 6px rgba(40, 24, 10, 0.16);
+  color: #2a2218 !important;
+}
+#book-app .accueil-sheet .scrap-title,
+#book-app .accueil-sheet .scrap-body,
+#book-app .accueil-sheet .hand-note,
+#book-app .accueil-sheet .dossier-mark,
+#book-app .accueil-sheet h4,
+#book-app .situation-page .sit-v,
+#book-app .situation-page .sit-k {
+  color: #2a2218;
+}
+#book-app .situation-page .sit-k {
+  color: #5a4630;
 }

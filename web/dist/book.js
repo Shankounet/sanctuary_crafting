@@ -500,8 +500,15 @@
     const spec = pickSpecialization(levels);
     const discovery = almost[0] || canCraft[0] || null;
 
-    const place = (state.meta && (state.meta.place || state.meta.location)) || null;
-    const dateStr = (state.meta && (state.meta.date || state.meta.openedAt || state.meta.day)) || null;
+    const place = (d && (d.place || d.location))
+      || (state.meta && (state.meta.place || state.meta.location))
+      || null;
+    const placeLabel = place
+      || (state.meta && state.meta.subtitle)
+      || emptyPhrase('place');
+    const dateStr = (d && (d.date || d.openedAt || d.day))
+      || (state.meta && (state.meta.date || state.meta.openedAt || state.meta.day))
+      || null;
     const daily = (state.meta && (state.meta.dailyNote || state.meta.noteDuJour)) || dayNoteFromStats(st, objs);
     const mainObj = (state.meta && (state.meta.mainObjective || state.meta.objectif))
       || (objs[0] && objectiveTitle(objs[0]))
@@ -563,14 +570,13 @@
     const left = `
       <div class="accueil-hero">
         <p class="book-stamp">Carnet de terrain</p>
-        <div class="id-polaroid">
+        <div class="id-polaroid accueil-sheet">
           <span class="tape top-r extra-tape"></span>
+          <span class="paperclip"></span>
           <div class="id-photo" aria-hidden="true"><span class="id-silhouette"></span></div>
           <p class="hand-name">${esc(charName || emptyPhrase('name'))}</p>
           <p class="id-date">${esc(pencilDate(dateStr))}</p>
-          ${place
-            ? `<p class="id-place hand-note">${esc(place)}</p>`
-            : `<p class="id-place hand-note pencil">${emptyPhrase('place')}</p>`}
+          <p class="id-place hand-note${place ? '' : ' pencil'}">${esc(placeLabel)}</p>
         </div>
         <h2 class="accueil-title">${esc(String(title))}</h2>
         <div class="accueil-seal-row">
@@ -582,11 +588,12 @@
       </div>
       <h3 class="section-title">Compétences</h3>
       ${msSkillLines(levels)}
-      <div class="day-note">${esc(daily)}</div>
+      <div class="day-note accueil-sheet"><span class="tape top-l"></span>${esc(daily)}</div>
       ${faint}
       ${folio('i')}`;
 
     const right = `
+      <div class="situation-page">
       <p class="book-stamp">Feuillet du jour</p>
       <h2 class="book-page-title">Situation</h2>
       <hr class="ink-rule" />
@@ -598,7 +605,7 @@
       <p class="sit-block"><span class="sit-k">Dernière découverte</span>
       <span class="sit-v hand-note">${esc(lastDisc)}</span></p>
 
-      <div class="scrap-note rot-l tint-warm">
+      <div class="scrap-note rot-l tint-warm accueil-sheet">
         <span class="tape top-l"></span>
         <span class="tape top-r"></span>
         <span class="paperclip"></span>
@@ -611,13 +618,16 @@
         ${objLis || `<li><span class="box"></span><span class="hand-note">${emptyPhrase('objective')}</span></li>`}
       </ul>
 
-      <div class="scrap-note rot-r tint-cool" style="margin-top:14px">
+      <div class="scrap-note rot-r tint-cool accueil-sheet" style="margin-top:14px">
         <span class="tape top-l"></span>
+        <span class="paperclip"></span>
         <div class="scrap-title">Dernière découverte</div>
         ${discHtml}
       </div>
 
-      <div class="dossier-sheet">
+      <div class="dossier-sheet accueil-sheet">
+        <span class="tape top-l"></span>
+        <span class="paperclip"></span>
         <div class="dossier-mark">Prochain déblocage</div>
         ${next
           ? `<h4>${esc(next.label || displayItem(next))}</h4>
@@ -627,7 +637,8 @@
 
       ${pins.length ? `<p class="hand-note" style="margin-top:10px">Épingles : ${pins.length}.</p>` : ''}
       ${prods.length ? `<p class="hand-note">File atelier : ${prods.slice(0, 2).map((q) => esc(q.label || displayItem(q))).join(', ')}</p>` : ''}
-      ${folio('ii')}`;
+      ${folio('ii')}
+      </div>`;
 
     setPages(left, right);
     const R = rightEl();
