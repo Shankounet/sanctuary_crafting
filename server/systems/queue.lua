@@ -102,7 +102,7 @@ function CraftQueue._startQueued(src, recipeId, benchKey, batch)
     local entry = {
         craftId = craftId, recipeId = recipeId, benchKey = benchKey,
         batch = batch, ingredients = ingredients, finishAt = finishAt,
-        createdAt = os.time(), duration = duration, label = recipe.label,
+        createdAt = os.time(), duration = duration, label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(recipe)) or recipe.label,
     }
     queues[src] = queues[src] or {}
     queues[src][#queues[src] + 1] = entry

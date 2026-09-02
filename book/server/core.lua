@@ -22,12 +22,8 @@ end
 
 local function itemLabel(item)
     if not item then return nil end
-    -- Prefer ox_inventory label when available
-    local ok, data = pcall(function()
-        return exports.ox_inventory:Items(item)
-    end)
-    if ok and type(data) == 'table' and data.label then
-        return data.label
+    if OxItemCatalog and OxItemCatalog.Label then
+        return OxItemCatalog.Label(item)
     end
     return item
 end
@@ -179,7 +175,7 @@ function SurvivalBook.AddObjectiveFromRecipe(src, recipeId, opts)
     local recipe = Config.RecipeById and Config.RecipeById[recipeId]
     if not recipe then return nil, 'craft_invalid' end
     opts = type(opts) == 'table' and opts or {}
-    local obj, err = SurvivalBook.AddObjective(src, recipe.label or recipeId, 'recipe', { recipeId = recipeId })
+    local obj, err = SurvivalBook.AddObjective(src, (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(recipe)) or recipe.label or recipeId, 'recipe', { recipeId = recipeId })
     if not obj then return nil, err end
 
     -- Optional sub-objectives for missing materials (server-owned counts only)

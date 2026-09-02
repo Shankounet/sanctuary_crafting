@@ -30,12 +30,13 @@ function CraftTree.ForRecipe(recipeId, depth)
                 else
                     children[#children + 1] = {
                         type = 'raw', item = item, count = r.ingredients[i].count,
+                        label = OxItemCatalog and OxItemCatalog.Label and OxItemCatalog.Label(item) or item,
                     }
                 end
             end
         end
         return {
-            type = 'recipe', id = r.id, label = r.label,
+            type = 'recipe', id = r.id, label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or r.label,
             result = r.result, ingredients = r.ingredients, children = children,
         }
     end
