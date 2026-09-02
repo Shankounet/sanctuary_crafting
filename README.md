@@ -11,6 +11,10 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 ## Notes de version
 
+### v2.13.0 — Carnet mapping textures strict
+Couverture / cadre / reliure = `tex/leather_cover.png`. Pages gauche et droite = `tex/paper_aged_new.png` (fond PNG direct, pas de voile beige). Fiches collées (projet / découverte / documents) = `tex/paper_dark.png`. Un texture par élément ; CSS = position, ombre, tilt.
+
+
 ### v2.8.0 — Craft finalize watchdog
 Interactive crafts no longer sit at 100% / 0s / FINALISATION waiting for the client.
 
