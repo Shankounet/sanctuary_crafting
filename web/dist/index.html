@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="style.css" />
 <link rel="stylesheet" href="book.css" />
 <link rel="stylesheet" href="tracker.css" />
+<link rel="stylesheet" href="pins-hud.css" />
 <style id="book-critical">
   /* CEF hard paint — book must never stay blank when open */
   #book-app.hidden { display: none !important; }
@@ -604,8 +605,30 @@
   </div>
 </div>
 
+
+<!-- Carnet pins HUD — outside #book-app -->
+<div id="book-pins-hud" aria-live="polite" aria-label="Carnet — Épingles">
+  <div class="ph-shell">
+    <header class="ph-header">
+      <p class="ph-title">Carnet — Épingles</p>
+      <span class="ph-count" id="ph-count">0</span>
+      <button type="button" class="ph-btn" id="ph-collapse" title="Réduire" aria-label="Réduire">
+        <i class="fa-solid fa-minus" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="ph-btn" id="ph-pin" title="Garder affiché" aria-label="Épingler le widget">
+        <i class="fa-solid fa-thumbtack" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="ph-btn" id="ph-hide" title="Masquer" aria-label="Masquer">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
+    </header>
+    <div class="ph-list" id="ph-list"></div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 <script src="tracker.js"></script>
 <script src="book.js"></script>
+<script src="pins-hud.js"></script>
 </body>
 </html>

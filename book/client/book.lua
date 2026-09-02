@@ -5,6 +5,7 @@
 local bookOpen = false
 local pins = {}
 local miniHud = true
+local pushPinsHud
 
 local function bookEnabled()
     return Config.Book and Config.Book.Enabled ~= false
@@ -22,6 +23,7 @@ function CloseSurvivalBook()
     bookOpen = false
     SetNuiFocus(false, false)
     SendNUIMessage({ action = 'bookClose' })
+    pushPinsHud()
 end
 
 local function bookFallbackMeta()
@@ -76,6 +78,7 @@ function OpenSurvivalBook(page)
 
     -- Focus + repeated bookOpen (CEF often drops the first NUI message)
     bookOpen = true
+    pushPinsHud()
     SetNuiFocus(true, true)
     SetNuiFocusKeepInput(false)
     pushBookOpen(pageName, meta, lazy)
@@ -118,6 +121,7 @@ end)
 RegisterNetEvent('sanctuary_crafting:book:pinsUpdated', function(list)
     pins = list or {}
     SendNUIMessage({ action = 'bookPins', pins = pins })
+    pushPinsHud()
 end)
 
 RegisterNetEvent('sanctuary_crafting:book:resourceDiscovered', function(item, label)
@@ -158,17 +162,26 @@ RegisterNUICallback('bookAction', function(data, cb)
 end)
 
 RegisterNUICallback('bookToggleHud', function(data, cb)
-    miniHud = data.enabled ~= false
-    local prefs = lib.callback.await('sanctuary_crafting:book:action', false, 'setPrefs', {
-        prefs = { miniHud = miniHud },
-    })
+    if data and data.toggle then
+        miniHud = not miniHud
+    elseif data and data.enabled == false then
+        miniHud = false
+    else
+        miniHud = true
+    end
+    pcall(function()
+        lib.callback.await('sanctuary_crafting:book:action', false, 'setPrefs', {
+            prefs = { miniHud = miniHud },
+        })
+    end)
+    pushPinsHud()
     cb({ ok = true, miniHud = miniHud })
 end)
 
 -- Craft UI bridges: pin / objective / open book
 RegisterNUICallback('bookPinRecipe', function(data, cb)
     local r = lib.callback.await('sanctuary_crafting:book:action', false, 'pin', { recipeId = data.recipeId })
-    if r and r.pins then pins = r.pins; SendNUIMessage({ action = 'bookPins', pins = pins }) end
+    if r and r.pins then pins = r.pins; SendNUIMessage({ action = 'bookPins', pins = pins }); pushPinsHud() end
     cb(r or { ok = false })
 end)
 
@@ -188,32 +201,48 @@ RegisterNUICallback('bookOpenFromCraft', function(data, cb)
     OpenSurvivalBook(data and data.page or 'dashboard')
 end)
 
--- Mini HUD draw
+local function collectActiveCrafts()
+    if not (CraftTracker and CraftTracker.ListActive) then return {} end
+    return CraftTracker.ListActive() or {}
+end
+
+pushPinsHud = function()
+    if not pinsHudEnabled() or bookOpen or not pins or #pins == 0 then
+        SendNUIMessage({ action = 'pinsHud', visible = false, pins = {} })
+        return
+    end
+    local maxN = (Config.Book.Pins and Config.Book.Pins.HudMax) or 4
+    SendNUIMessage({
+        action = 'pinsHud',
+        visible = true,
+        pins = pins,
+        crafts = collectActiveCrafts(),
+        max = maxN,
+    })
+end
+
+local function refreshPinsFromServer()
+    local ok, pinRes = pcall(function()
+        return lib.callback.await('sanctuary_crafting:book:module', false, 'pins', {})
+    end)
+    if ok and type(pinRes) == 'table' and pinRes.ok then
+        pins = pinRes.data or pins
+    end
+end
+
+-- Mini HUD NUI (no native text overlay)
 CreateThread(function()
+    Wait(2500)
+    refreshPinsFromServer()
+    pushPinsHud()
     while true do
-        if pinsHudEnabled() and not bookOpen and #pins > 0 then
-            local y = 0.02
-            SetTextFont(4)
-            SetTextScale(0.32, 0.32)
-            SetTextColour(154, 136, 102, 220)
-            SetTextOutline()
-            BeginTextCommandDisplayText('STRING')
-            AddTextComponentSubstringPlayerName(_('book_hud_title'))
-            EndTextCommandDisplayText(0.84, y)
-            y = y + 0.018
-            for i = 1, math.min(#pins, 5) do
-                SetTextFont(4)
-                SetTextScale(0.28, 0.28)
-                SetTextColour(230, 228, 223, 200)
-                SetTextOutline()
-                BeginTextCommandDisplayText('STRING')
-                AddTextComponentSubstringPlayerName(('• %s'):format(pins[i].label or pins[i].recipeId))
-                EndTextCommandDisplayText(0.84, y)
-                y = y + 0.016
-            end
-            Wait(0)
+        if pinsHudEnabled() and not bookOpen then
+            refreshPinsFromServer()
+            pushPinsHud()
+            Wait(4000)
         else
-            Wait(500)
+            SendNUIMessage({ action = 'pinsHud', visible = false, pins = pins or {} })
+            Wait(800)
         end
     end
 end)
@@ -255,6 +284,12 @@ end)
 RegisterCommand('carnet', function()
     OpenSurvivalBook('dashboard')
 end, false)
+
+RegisterCommand('carnet_pins', function()
+    miniHud = not miniHud
+    pushPinsHud()
+end, false)
+RegisterKeyMapping('carnet_pins', 'Carnet — afficher/masquer épingles', 'keyboard', '')
 
 AddEventHandler('onResourceStop', function(res)
     if res == GetCurrentResourceName() then

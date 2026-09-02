@@ -274,6 +274,32 @@ function CraftTracker.HasActive()
     return false
 end
 
+function CraftTracker.ListActive()
+    local out = {}
+    local now = nowMs()
+    for id, e in pairs(jobs) do
+        local st = e.status
+        if st == 'active' or st == 'queued' or st == 'paused' then
+            local dur = tonumber(e.duration) or 0
+            local started = tonumber(e.startedAt) or now
+            local pct = 0
+            if dur > 0 then
+                pct = math.max(0.0, math.min(1.0, (now - started) / dur))
+            end
+            out[#out + 1] = {
+                craftId = id,
+                recipeId = e.recipeId,
+                label = e.label,
+                status = st,
+                pct = pct,
+                duration = dur,
+                startedAt = started,
+            }
+        end
+    end
+    return out
+end
+
 function CraftTracker.Get(id)
     return jobs[id]
 end
