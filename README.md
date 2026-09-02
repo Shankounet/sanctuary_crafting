@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.15.0
+# sanctuary_crafting v2.16.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,22 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.16.0 — Architecture (exports, craftadmin, snapshots, anti-dup, logs)
+Façade **16 exports** documentés (`docs/EXPORTS.md`) : `OpenStation`, `OpenRecipe`, `AddRecipe`, `RemoveRecipe` (soft-disable), `GetRecipe`, `GetRecipes`, `CanCraft`, `StartCraft`, `CancelCraft`, `GetQueue`, `FollowRecipe`, `UnfollowRecipe`, `IsRecipeKnown`, `LearnRecipe` (SERVER only), `GetRecipeMastery`, `GetStationState`. Anciens noms conservés.
+
+Anti-dup : lock joueur+station → validate → `CraftingMaterials` → **snapshot recette+version** → unlock. Client n'envoie que `recipeId` / qty / station. Finalize / queue collect utilisent **uniquement le snapshot** (admin edit n'altère pas un craft en cours). `FinalizeCraft` completing-lock **conservé**. Queue collect **idempotent** (mutex v2.15).
+
+`learnBlueprint` : trou fermé (item **ou** admin) — **pas de rename**. `CanCarry` fail-closed. Anomalies : double-complete, bad qty, unknown recipe, missing ox item, incoherent queue, bad timestamp, batch over cap.
+
+SQL overlay `sanctuary_recipes` (disabled, version, updatedAt, updatedBy) **par-dessus Config** — pas de dump des 379 imports au boot. Save admin : `version+=1`, DB, `RecipeRegistry.Rebuild`. `sanctuary_recipe_versions` + RESTORE. Auto-migrate versionné (`Config.SchemaVersion=216`).
+
+`sanctuary_admin_logs`. `Config.Discord.Webhooks` **tous OFF** par défaut (toggles: legendaryCraft, epicCraft, weaponCraft, rareBlueprint, unusualBatch, adminRecipeEdit, validationFail, suspicious). Pipeline HTTP-unaware via `AddCraftingHook`.
+
+`/craftadmin` NUI neuf (`Config.Admin.Command`). Perm ACE / ESX group / `CustomCallback`. Formulaire gauche, **live preview** `buildRecipeEntry` à droite (CSS carte/fiche réutilisée). OX selector search. TEST dry-run sans `RemoveItem` ; test réel opt-in. Validate + confirm avant save.
+
+`CraftingSkills` reste la seule source XP/niveau. Callbacks NUI joueur **verrouillés** inchangés.
+
 
 ### v2.15.0 — Stations (réservation, modules, usure, chaleur, batch, signature)
 Vague **stations** : `Config.Crafting.ReserveOnQueue=false` + `ConsumeOnStart=true` (anti-dupe, défaut). Helper unique `CraftingMaterials` pipeline+file. Si `ReserveOnQueue`, escrow 1:1 (cancel avant `finishAt` rend tout, jamais après).

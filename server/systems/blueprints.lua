@@ -62,6 +62,7 @@ function Blueprints.Learn(src, blueprintId)
     cache[id] = cache[id] or {}
     cache[id][blueprintId] = true
     CraftingCore.Emit('blueprintLearned', src, blueprintId)
+    CraftingCore.Emit('recipeLearned', src, blueprintId)
     TriggerClientEvent('ox_lib:notify', src, { type = 'success', description = _('blueprint_learned', blueprintId) })
     return true
 end
@@ -157,14 +158,27 @@ RegisterNetEvent('sanctuary_crafting:server:requestBlueprints', function()
     Blueprints.LoadPlayer(source)
 end)
 
+-- CLOSE THE HOLE: keep callback name, require item use OR admin. No client grant-any.
 lib.callback.register('sanctuary_crafting:learnBlueprint', function(src, bpId)
-    local ok, err = Blueprints.Learn(src, bpId)
-    return { ok = ok, reason = err }
+    if Validation and Validation.IsAdmin and Validation.IsAdmin(src) then
+        local ok, err = Blueprints.Learn(src, bpId)
+        return { ok = ok, reason = err }
+    end
+    if CraftingAnomaly then
+        CraftingAnomaly.Warn('learn_bypass', src, { bpId = bpId })
+    end
+    return { ok = false, reason = 'admin_denied' }
 end)
 
 lib.callback.register('sanctuary_crafting:forgetBlueprint', function(src, bpId)
-    local ok, err = Blueprints.Forget(src, bpId)
-    return { ok = ok, reason = err }
+    if Validation and Validation.IsAdmin and Validation.IsAdmin(src) then
+        local ok, err = Blueprints.Forget(src, bpId)
+        return { ok = ok, reason = err }
+    end
+    if CraftingAnomaly then
+        CraftingAnomaly.Warn('forget_bypass', src, { bpId = bpId })
+    end
+    return { ok = false, reason = 'admin_denied' }
 end)
 
 lib.callback.register('sanctuary_crafting:listBlueprints', function(src)

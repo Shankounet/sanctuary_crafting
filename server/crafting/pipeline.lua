@@ -365,7 +365,35 @@ local function validateStart(src, recipeId, benchKey, batch, opts)
     if not okRate then return nil, rateReason end
 
     local recipe = Config.RecipeById[recipeId]
-    if not recipe then return nil, 'craft_invalid' end
+    if not recipe then
+        if CraftingAnomaly then CraftingAnomaly.Warn('unknown_recipe', src, { recipeId = recipeId }) end
+        return nil, 'craft_invalid'
+    end
+    if recipe._disabled then
+        if CraftingAnomaly then CraftingAnomaly.Warn('unknown_recipe', src, { recipeId = recipeId, disabled = true }) end
+        return nil, 'craft_invalid'
+    end
+    local reqBatch = math.floor(tonumber(batch) or 1)
+    if reqBatch ~= reqBatch or reqBatch < 1 then
+        if CraftingAnomaly then CraftingAnomaly.Warn('bad_qty', src, { batch = batch, recipeId = recipeId }) end
+        return nil, 'craft_invalid'
+    end
+    local hardCap = (CraftBatch and CraftBatch.HardCap and CraftBatch.HardCap()) or 100
+    if reqBatch > hardCap then
+        if CraftingAnomaly then CraftingAnomaly.Warn('batch_over_cap', src, { batch = reqBatch, cap = hardCap, recipeId = recipeId }) end
+    end
+    if OxItemCatalog and OxItemCatalog.Get then
+        local ri = recipe.result and recipe.result.item
+        if ri and not OxItemCatalog.Get(ri) then
+            if CraftingAnomaly then CraftingAnomaly.Warn('missing_ox_item', src, { item = ri, recipeId = recipe.id }) end
+        end
+        for i = 1, #(recipe.ingredients or {}) do
+            local it = recipe.ingredients[i] and recipe.ingredients[i].item
+            if it and not OxItemCatalog.Get(it) then
+                if CraftingAnomaly then CraftingAnomaly.Warn('missing_ox_item', src, { item = it, recipeId = recipe.id }) end
+            end
+        end
+    end
 
     if recipe.dismantle and (not Config.Dismantling or not Config.Dismantling.Enabled) then
         return nil, 'dismantle_disabled'
@@ -465,7 +493,7 @@ function CraftingPipeline.ValidateStart(src, recipeId, benchKey, batch, opts)
     return validateStart(src, recipeId, benchKey, batch, opts)
 end
 
-lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, benchKey, batch)
+function CraftingPipeline._startInner(src, recipeId, benchKey, batch)
     local ctx, reason, args = validateStart(src, recipeId, benchKey, batch)
     if not ctx then return { ok = false, reason = reason, args = args } end
 
@@ -511,6 +539,17 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
         stepIndex = stepIndex, totalSteps = totalSteps,
         removedHistory = removed and { ctx.ingredients } or {},
     }
+    if RecipeSnapshot and RecipeSnapshot.Capture then
+        local snap, ver = RecipeSnapshot.Capture(recipe)
+        craft.snapshot = snap
+        craft.recipeVersion = ver or 0
+    else
+        craft.snapshot = recipe
+        craft.recipeVersion = tonumber(recipe._version) or 0
+    end
+    if type(craft.startedUnix) ~= 'number' or craft.startedUnix <= 0 then
+        if CraftingAnomaly then CraftingAnomaly.Warn('bad_timestamp', src, { recipeId = recipe.id }) end
+    end
     registerActive(src, craft)
     emitNoise(src, recipe, bench)
     CraftingCore.Emit('craftStarted', src, craft)
@@ -542,6 +581,32 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
         benchCoords = { x = bench.coords.x, y = bench.coords.y, z = bench.coords.z },
         anim = (Config.Animations and Config.Animations.Default) or nil,
     }
+end
+
+function CraftingPipeline.Start(src, recipeId, benchKey, batch)
+    if type(recipeId) ~= 'string' or type(benchKey) ~= 'string' then
+        if CraftingAnomaly then CraftingAnomaly.Warn('unknown_recipe', src, { recipeId = recipeId }) end
+        return { ok = false, reason = 'craft_invalid' }
+    end
+    local lockOk, lockErr = true, nil
+    if CraftLocks and CraftLocks.Acquire then
+        lockOk, lockErr = CraftLocks.Acquire(src, benchKey)
+        if not lockOk then return { ok = false, reason = lockErr or 'craft_busy' } end
+    end
+    local okRun, result = pcall(CraftingPipeline._startInner, src, recipeId, benchKey, batch)
+    if CraftLocks and CraftLocks.Release then
+        CraftLocks.Release(src, benchKey)
+    end
+    if not okRun then
+        print(('[sanctuary_crafting] startCraft error: %s'):format(tostring(result)))
+        return { ok = false, reason = 'craft_failed' }
+    end
+    return result
+end
+
+lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, benchKey, batch)
+    -- client sends only recipeId / qty / station
+    return CraftingPipeline.Start(src, recipeId, benchKey, batch)
 end)
 
 function CraftingPipeline.FinalizeCraft(src, craftId, opts)
@@ -560,11 +625,13 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
         return { ok = false, reason = 'craft_invalid' }
     end
 
-    -- Idempotent / double-grant protection
+    -- Idempotent / double-grant protection (KEEP completing-lock)
     if craft.state == 'completed' or craft.completed == true then
+        if CraftingAnomaly then CraftingAnomaly.Warn('double_complete', src, { craftId = craftId, state = craft.state }) end
         return { ok = true, already = true, craftId = craftId }
     end
     if craft.state == 'completing' then
+        if CraftingAnomaly then CraftingAnomaly.Warn('double_complete', src, { craftId = craftId, state = 'completing' }) end
         return { ok = true, already = true, pending = true, craftId = craftId }
     end
     if craft.state and craft.state ~= 'running' then
@@ -588,9 +655,16 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
         return { ok = false, reason = 'craft_failed' }
     end
 
-    local recipe = Config.RecipeById[craft.recipeId]
+    -- SNAPSHOT at start isolates in-flight crafts from live admin edits
+    local recipe = RecipeSnapshot and RecipeSnapshot.Of(craft) or craft.snapshot
+    if type(recipe) ~= 'table' then
+        if CraftingAnomaly then CraftingAnomaly.Warn('unknown_recipe', src, { craftId = craftId, recipeId = craft.recipeId, where = 'finalize_no_snapshot' }) end
+        craft.state = 'failed'
+        clearActive(craftId, craft.removed)
+        return { ok = false, reason = 'craft_invalid' }
+    end
     local bench = Benches and Benches.Resolve and Benches.Resolve(craft.benchKey)
-    if not recipe or not bench then
+    if not bench then
         craft.state = 'failed'
         clearActive(craftId, craft.removed)
         return { ok = false, reason = 'craft_invalid' }
@@ -939,7 +1013,7 @@ local function serializeActiveCraft(craft)
     -- finishesAt unix seconds from remaining (GetGameTimer ms)
     local finishesAt = startedUnix + math.ceil(remainingMs / 1000)
 
-    local recipe = Config.RecipeById and Config.RecipeById[craft.recipeId]
+    local recipe = (RecipeSnapshot and RecipeSnapshot.Of(craft)) or craft.snapshot or (Config.RecipeById and Config.RecipeById[craft.recipeId])
     local bench = Benches and Benches.Resolve and Benches.Resolve(craft.benchKey)
     local batch = craft.batch or 1
     local resultItem = recipe and recipe.result and recipe.result.item or nil
@@ -1674,6 +1748,10 @@ local function buildRecipeEntry(src, r, ctx)
     end
 
     return entry
+end
+
+function CraftingPipeline.BuildRecipeEntry(src, r, ctx)
+    return buildRecipeEntry(src, r, ctx)
 end
 
 --- Public helper for NUI pathHints callback

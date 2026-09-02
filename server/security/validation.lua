@@ -80,8 +80,11 @@ function Validation.CanCarry(src, item, count)
         return exports.ox_inventory:CanCarryItem(src, item, count or 1)
     end)
     if not ok then
-        -- fallback : tenter d'estimer via GetItemCount / pas de faux positif
-        return true
+        -- fail-closed: unknown CanCarry must not grant
+        if CraftingAnomaly then
+            CraftingAnomaly.Warn('missing_ox_item', src, { item = item, count = count, where = 'cancarry_pcall' })
+        end
+        return false
     end
     return can and true or false
 end
@@ -89,7 +92,13 @@ end
 ---@param src number
 ---@return boolean
 function Validation.IsAdmin(src)
-    if IsPlayerAceAllowed(src, Config.AdminAce or 'sanctuary.crafting.admin') then
+    local custom = Config.Admin and Config.Admin.CustomCallback
+    if type(custom) == 'function' then
+        local okC, resC = pcall(custom, src)
+        if okC and resC == true then return true end
+    end
+    local ace = (Config.Admin and Config.Admin.Ace) or Config.AdminAce or 'sanctuary.crafting.admin'
+    if IsPlayerAceAllowed(src, ace) then
         return true
     end
     if not ESX or not ESX.GetPlayerFromId then return false end
@@ -97,8 +106,9 @@ function Validation.IsAdmin(src)
     if not xPlayer then return false end
     local group = xPlayer.getGroup and xPlayer.getGroup() or xPlayer.group
     if not group then return false end
-    for i = 1, #(Config.AdminGroups or {}) do
-        if Config.AdminGroups[i] == group then
+    local groups = (Config.Admin and Config.Admin.Groups) or Config.AdminGroups or {}
+    for i = 1, #groups do
+        if groups[i] == group then
             return true
         end
     end

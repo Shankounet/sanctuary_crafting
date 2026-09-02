@@ -186,3 +186,45 @@ CREATE TABLE IF NOT EXISTS `sanctuary_player_skill_watch` (
     `level` INT NOT NULL DEFAULT 0,
     PRIMARY KEY (`identifier`, `category`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- v2.16 overlay (do NOT seed Config.Recipes here)
+CREATE TABLE IF NOT EXISTS `sanctuary_recipes` (
+    `recipe_id` VARCHAR(64) NOT NULL,
+    `payload` LONGTEXT NOT NULL,
+    `disabled` TINYINT(1) NOT NULL DEFAULT 0,
+    `version` INT NOT NULL DEFAULT 1,
+    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `updated_by` VARCHAR(60) NULL,
+    PRIMARY KEY (`recipe_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `sanctuary_recipe_versions` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `recipe_id` VARCHAR(64) NOT NULL,
+    `version` INT NOT NULL,
+    `payload` LONGTEXT NOT NULL,
+    `disabled` TINYINT(1) NOT NULL DEFAULT 0,
+    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_by` VARCHAR(60) NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uniq_recipe_ver` (`recipe_id`, `version`),
+    KEY `idx_recipe` (`recipe_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `sanctuary_admin_logs` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `event_type` VARCHAR(32) NOT NULL,
+    `actor` VARCHAR(60) NULL,
+    `source` INT NULL,
+    `payload` LONGTEXT NULL,
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_event_time` (`event_type`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `sanctuary_schema_version` (
+    `id` TINYINT NOT NULL PRIMARY KEY DEFAULT 1,
+    `version` INT NOT NULL,
+    `applied_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

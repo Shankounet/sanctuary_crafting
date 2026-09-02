@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="book.css" />
 <link rel="stylesheet" href="tracker.css" />
 <link rel="stylesheet" href="pins-hud.css" />
+<link rel="stylesheet" href="admin.css" />
 <style id="book-critical">
   /* CEF hard paint — book must never stay blank when open */
   #book-app.hidden { display: none !important; }
@@ -670,9 +671,119 @@
   </div>
 </div>
 
+<div id="craft-admin" class="hidden" role="dialog" aria-label="Craft Admin">
+  <div class="ca-shell">
+    <header class="ca-head">
+      <div>
+        <p class="ca-kicker">SANCTUARY</p>
+        <h1>CRAFTADMIN · v2.16</h1>
+      </div>
+      <span class="spacer"></span>
+      <span id="ca-status" class="ca-status"></span>
+      <button type="button" id="ca-close" class="ghost" title="Fermer">FERMER</button>
+    </header>
+    <div class="ca-body">
+      <aside class="ca-col">
+        <input id="ca-search" placeholder="Recherche id / label / item" />
+        <div class="ca-row">
+          <select id="ca-f-station" title="Station"></select>
+        </div>
+        <div class="ca-row">
+          <select id="ca-f-category" title="Catégorie"></select>
+          <select id="ca-f-rarity" title="Rareté"></select>
+        </div>
+        <div class="ca-row">
+          <button type="button" id="ca-new" class="primary">Nouveau</button>
+        </div>
+        <ul id="ca-list" class="ca-list"></ul>
+      </aside>
+      <section class="ca-col" id="ca-form">
+        <div class="ca-row">
+          <div class="ca-field"><label>id</label><input id="ca-id" /></div>
+          <div class="ca-field"><label>result (ox spawn)</label><input id="ca-result" /></div>
+          <div class="ca-field" style="max-width:90px"><label>qty</label><input id="ca-qty" type="number" min="1" value="1" /></div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field"><label>ox label</label><input id="ca-oxlabel" /></div>
+        </div>
+        <div class="ca-field"><label>description</label><textarea id="ca-desc"></textarea></div>
+        <div class="ca-row">
+          <div class="ca-field"><label>station</label><select id="ca-station"></select></div>
+          <div class="ca-field"><label>category</label><select id="ca-category"></select></div>
+          <div class="ca-field"><label>rarity</label><select id="ca-rarity"></select></div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field"><label>requireSpec</label><input id="ca-spec" /></div>
+          <div class="ca-field"><label>requireSkill</label><input id="ca-skill" /></div>
+          <div class="ca-field"><label>requireLevel</label><input id="ca-level" type="number" /></div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field"><label>duration (ms)</label><input id="ca-duration" type="number" min="500" /></div>
+          <div class="ca-field"><label>XP</label><input id="ca-xp" type="number" /></div>
+          <div class="ca-field"><label>XP category</label><input id="ca-xpcat" /></div>
+        </div>
+        <p class="ca-kicker">Ingrédients (item / qty / consumed / optional / alt group)</p>
+        <div id="ca-ings"></div>
+        <button type="button" id="ca-add-ing" class="ghost">+ ingrédient</button>
+        <p class="ca-kicker">Outils</p>
+        <div id="ca-tools"></div>
+        <button type="button" id="ca-add-tool" class="ghost">+ outil</button>
+        <div class="ca-row">
+          <div class="ca-field"><label>energy</label><input id="ca-energy" type="number" /></div>
+          <div class="ca-field"><label>noise</label><input id="ca-noise" type="number" /></div>
+          <div class="ca-field"><label>heat</label><input id="ca-heat" type="number" /></div>
+        </div>
+        <div class="ca-row">
+          <div class="ca-field"><label>blueprint</label><input id="ca-blueprint" /></div>
+          <div class="ca-field"><label>batchMax</label><input id="ca-batchmax" type="number" /></div>
+          <div class="ca-field"><label>signatureMode</label><select id="ca-sig"></select></div>
+        </div>
+        <div class="ca-row">
+          <label class="ca-chk"><input id="ca-teachable" type="checkbox" /> teachable</label>
+          <label class="ca-chk"><input id="ca-discovery" type="checkbox" /> discovery / requiresLearn</label>
+        </div>
+        <div id="ca-oxbox" class="ca-ox" style="margin-top:8px">
+          <label class="ca-kicker">OX selector (search bandage → label + spawn)</label>
+          <input id="ca-oxq" placeholder="chercher item ox…" />
+          <div id="ca-oxresults" class="ca-ox-results"></div>
+        </div>
+        <div class="ca-actions">
+          <button type="button" id="ca-save" class="primary">Enregistrer</button>
+          <button type="button" id="ca-create">Créer</button>
+          <button type="button" id="ca-dup">Dupliquer</button>
+          <button type="button" id="ca-disable">Désactiver</button>
+          <button type="button" id="ca-enable">Réactiver</button>
+          <button type="button" id="ca-delete" class="danger">Soft-delete</button>
+          <button type="button" id="ca-restore">RESTORE</button>
+        </div>
+        <div class="ca-row" style="margin-top:8px">
+          <div class="ca-field"><label>benchKey TEST</label><input id="ca-test-bench" placeholder="world:…" /></div>
+          <button type="button" id="ca-test">TEST dry-run</button>
+          <button type="button" id="ca-test-real" class="danger">TEST réel (opt-in)</button>
+        </div>
+      </section>
+      <aside class="ca-col ca-preview">
+        <h2>Live preview · buildRecipeEntry</h2>
+        <div id="admin-preview-app"></div>
+      </aside>
+    </div>
+  </div>
+  <div id="ca-modal" class="ca-modal hidden">
+    <div class="ca-modal-box">
+      <h2 id="ca-modal-title">Confirmer</h2>
+      <p id="ca-modal-body"></p>
+      <div class="ca-actions">
+        <button type="button" id="ca-modal-yes" class="primary">Confirmer</button>
+        <button type="button" id="ca-modal-no">Annuler</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 <script src="tracker.js"></script>
 <script src="book.js"></script>
 <script src="pins-hud.js"></script>
+<script src="admin.js"></script>
 </body>
 </html>

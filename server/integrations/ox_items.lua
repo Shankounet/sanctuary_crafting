@@ -144,6 +144,30 @@ function OxItemCatalog.IsStackable(name)
 end
 
 --- Dictionnaire { [item] = label } des items réellement utilisés par les recettes.
+--- Search cache for admin selector. Never returns the full table.
+function OxItemCatalog.Search(query, limit)
+    ensure()
+    limit = math.min(math.max(tonumber(limit) or 20, 1), 40)
+    local q = type(query) == 'string' and query:lower() or ''
+    if q == '' then return {} end
+    local out = {}
+    for name, data in pairs(cache or {}) do
+        local label = (data and data.label) or name
+        local hay = (tostring(name) .. ' ' .. tostring(label)):lower()
+        if hay:find(q, 1, true) then
+            out[#out + 1] = {
+                name = name,
+                spawn = name,
+                label = label,
+                description = data and data.description or nil,
+            }
+            if #out >= limit then break end
+        end
+    end
+    table.sort(out, function(a, b) return tostring(a.label) < tostring(b.label) end)
+    return out
+end
+
 function OxItemCatalog.UsedLabels()
     ensure()
     local out = {}

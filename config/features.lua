@@ -191,3 +191,25 @@ Config.RecentlyCrafted = {
 Config.NewlyLearned = {
     Enabled = true,
 }
+
+-- v2.16 architecture
+Config.RecipeOverlay = {
+    Enabled = true,
+    VersionHistory = true,
+}
+
+-- Discord webhooks: ALL OFF by default. Pipeline is HTTP-unaware (AddCraftingHook).
+Config.Discord = {
+    Enabled = false,
+    Webhooks = {
+        legendaryCraft  = { Enabled = false, Url = '' },
+        epicCraft       = { Enabled = false, Url = '' },
+        weaponCraft     = { Enabled = false, Url = '' },
+        rareBlueprint   = { Enabled = false, Url = '' },
+        unusualBatch    = { Enabled = false, Url = '' },
+        adminRecipeEdit = { Enabled = false, Url = '' },
+        validationFail  = { Enabled = false, Url = '' },
+        suspicious      = { Enabled = false, Url = '' },
+    },
+}
+

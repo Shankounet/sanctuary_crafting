@@ -308,8 +308,11 @@ RegisterNUICallback('notify', function(data, cb)
     cb({ ok = true })
 end)
 
-RegisterNetEvent('sanctuary_crafting:client:openBench', function(benchKey)
+RegisterNetEvent('sanctuary_crafting:client:openBench', function(benchKey, recipeId)
     OpenCraftMenu(benchKey)
+    if type(recipeId) == 'string' and recipeId ~= '' then
+        SendNUIMessage({ action = 'selectRecipe', recipeId = recipeId })
+    end
 end)
 
 RegisterNetEvent('sanctuary_crafting:client:craftCancelled', function(craftId)

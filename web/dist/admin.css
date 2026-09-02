@@ -1,0 +1,150 @@
+/* v2.16 craftadmin — NEW overlay. Player craft/book/tracker CSS untouched. */
+#craft-admin.hidden { display: none !important; }
+#craft-admin {
+  position: fixed; inset: 0; z-index: 2147482500;
+  display: grid; place-items: center;
+  background: rgba(8, 8, 8, 0.72);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color: var(--color-text, #e4e4e4);
+}
+#craft-admin .ca-shell {
+  width: min(1280px, 96vw); height: min(820px, 92vh);
+  display: grid;
+  grid-template-rows: 52px 1fr;
+  background: #1a1a1a;
+  border: 1px solid #3a332b;
+  border-top: 3px solid #9a8866;
+  box-shadow: 0 18px 48px rgba(0,0,0,0.58);
+}
+#craft-admin .ca-head {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 16px; border-bottom: 1px solid #3a3a3a;
+  background: #1f1f1f;
+}
+#craft-admin .ca-head h1 {
+  margin: 0; font-size: 1rem; letter-spacing: 0.08em; color: #9a8866;
+  font-weight: 600;
+}
+#craft-admin .ca-head .ca-kicker {
+  font-size: 0.6rem; letter-spacing: 0.16em; color: #9a9a9a; text-transform: uppercase;
+}
+#craft-admin .ca-head .spacer { flex: 1; }
+#craft-admin .ca-body {
+  display: grid;
+  grid-template-columns: 240px 1fr 340px;
+  min-height: 0;
+}
+#craft-admin .ca-col {
+  min-height: 0; overflow: auto;
+  border-right: 1px solid #2a2a2a;
+  padding: 10px;
+}
+#craft-admin .ca-col:last-child { border-right: 0; }
+#craft-admin input, #craft-admin select, #craft-admin textarea, #craft-admin button {
+  font: inherit; color: inherit;
+}
+#craft-admin input, #craft-admin select, #craft-admin textarea {
+  background: #232323; border: 1px solid #3a3a3a; padding: 6px 8px; width: 100%;
+  border-radius: 0;
+}
+#craft-admin textarea { min-height: 56px; resize: vertical; }
+#craft-admin button {
+  background: #2a2a2a; border: 1px solid #3a332b; padding: 6px 10px; cursor: pointer;
+}
+#craft-admin button.primary {
+  background: #3a332b; border-color: #9a8866; color: #e4e4e4;
+}
+#craft-admin button.danger { border-color: #7a554c; color: #c9a9a2; }
+#craft-admin button.ghost { background: transparent; }
+#craft-admin button:hover { border-color: #9a8866; }
+#craft-admin .ca-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+#craft-admin .ca-field { flex: 1; min-width: 120px; }
+#craft-admin .ca-field label {
+  display: block; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #9a9a9a; margin-bottom: 3px;
+}
+#craft-admin .ca-list { list-style: none; margin: 8px 0 0; padding: 0; }
+#craft-admin .ca-list li {
+  padding: 8px; border: 1px solid #2a2a2a; margin-bottom: 4px; cursor: pointer;
+  background: #1f1f1f;
+}
+#craft-admin .ca-list li:hover, #craft-admin .ca-list li.on {
+  border-color: #9a8866;
+}
+#craft-admin .ca-list li.disabled { opacity: 0.55; }
+#craft-admin .ca-list .id { font-size: 0.72rem; color: #9a8866; }
+#craft-admin .ca-list .lbl { font-size: 0.86rem; }
+#craft-admin .ca-list .meta { font-size: 0.7rem; color: #9a9a9a; }
+#craft-admin .ing-row, #craft-admin .tool-row {
+  display: grid; grid-template-columns: 1fr 70px 72px 72px 70px 28px;
+  gap: 4px; margin-bottom: 4px; align-items: center;
+}
+#craft-admin .ca-ox {
+  position: relative;
+}
+#craft-admin .ca-ox-results {
+  position: absolute; z-index: 5; left: 0; right: 0; top: 100%;
+  background: #1a1a1a; border: 1px solid #9a8866; max-height: 180px; overflow: auto;
+}
+#craft-admin .ca-ox-results button {
+  display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid #2a2a2a;
+}
+#craft-admin .ca-preview {
+  background: #1f1f1f;
+}
+#craft-admin .ca-preview h2 {
+  margin: 0 0 8px; font-size: 0.7rem; letter-spacing: 0.14em; color: #9a8866; text-transform: uppercase;
+}
+#admin-preview-app .recipe-card {
+  display: flex; flex-direction: column; border: 1px solid #3a332b;
+  background: #232323; margin-bottom: 12px; position: relative;
+}
+#admin-preview-app .recipe-card.selected { border-color: #9a8866; box-shadow: 0 0 0 1px rgba(154,136,102,0.28); }
+#admin-preview-app .card-img-zone {
+  height: 92px; background: #1a1a1a; display: grid; place-items: center; position: relative;
+}
+#admin-preview-app .card-img-zone img { max-height: 80px; max-width: 80px; }
+#admin-preview-app .card-body { padding: 8px 10px 10px; }
+#admin-preview-app .card-title { font-size: 0.95rem; }
+#admin-preview-app .card-meta-line { display: flex; gap: 8px; font-size: 0.7rem; color: #9a9a9a; }
+#admin-preview-app .card-state-badge {
+  position: absolute; right: 6px; bottom: 6px; font-size: 0.6rem; letter-spacing: 0.08em;
+  padding: 2px 6px; background: #2a2a2a; border: 1px solid #3a332b;
+}
+#admin-preview-app .detail-fiche {
+  border: 1px solid #3a332b; border-top: 3px solid #7a6c52; padding: 10px; background: #202020;
+}
+#admin-preview-app .fiche-hero { margin-bottom: 10px; }
+#admin-preview-app .fiche-identity { display: grid; grid-template-columns: 88px 1fr; gap: 10px; }
+#admin-preview-app .fiche-img {
+  width: 88px; height: 88px; background: #1a1a1a; display: grid; place-items: center; border: 1px solid #3a3a3a;
+}
+#admin-preview-app .fiche-img img { max-width: 80px; max-height: 80px; }
+#admin-preview-app .ing-list { list-style: none; margin: 0; padding: 0; }
+#admin-preview-app .ing-list li {
+  display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #2a2a2a;
+  font-size: 0.8rem;
+}
+#admin-preview-app .kv-row, #admin-preview-app .cluster-cell {
+  display: flex; justify-content: space-between; gap: 8px; font-size: 0.78rem; padding: 3px 0;
+}
+#admin-preview-app .fiche-section-label, #admin-preview-app .t-l3, #admin-preview-app .t-l4 {
+  font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; color: #9a8866; margin: 10px 0 4px;
+}
+#admin-preview-app .badge {
+  display: inline-block; font-size: 0.62rem; letter-spacing: 0.08em; padding: 1px 6px;
+  border: 1px solid #3a332b; color: #c4b49a; margin-right: 4px;
+}
+#craft-admin .ca-modal {
+  position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: grid; place-items: center;
+}
+#craft-admin .ca-modal.hidden { display: none; }
+#craft-admin .ca-modal-box {
+  background: #1f1f1f; border: 1px solid #9a8866; padding: 18px; width: min(420px, 90%);
+}
+#craft-admin .ca-status { font-size: 0.75rem; color: #9a9a9a; min-height: 1.2em; }
+#craft-admin .ca-status.err { color: #c9a9a2; }
+#craft-admin .ca-status.ok { color: #a3b08a; }
+#craft-admin .ca-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#craft-admin .ca-chk { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; }
+#craft-admin .ca-chk input { width: auto; }

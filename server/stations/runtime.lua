@@ -210,8 +210,13 @@ function StationRuntime.Degrade(bench, recipe, batch)
         if StationRuntime.HasModule(bench, 'reinforced_bench') then d = d * 0.7 end
         local durabilityMod = StationRuntime.Modifiers(bench).durability or 0
         d = d * math.max(0.4, 1 - durabilityMod)
-        local pct = StationRuntime.GetCondition(bench) - d
+        local prevPct = StationRuntime.GetCondition(bench)
+        local pct = prevPct - d
         if pct < 0 then pct = 0 end
+        local brokenStop = (c.BrokenStop) or 3
+        if prevPct > brokenStop and pct <= brokenStop and CraftingCore and CraftingCore.Emit then
+            CraftingCore.Emit('stationBroken', nil, bench, pct)
+        end
         if bench.kind == 'placed' then
             bench.condition = pct
             -- optional broken parts

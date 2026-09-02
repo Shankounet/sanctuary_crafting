@@ -57,6 +57,12 @@ function CraftQueue._startQueued(src, recipeId, benchKey, batch)
     if not Config.Queue or not Config.Queue.Enabled then
         return nil, 'queue_disabled'
     end
+    local lockOk, lockErr = true, nil
+    if CraftLocks and CraftLocks.Acquire then
+        lockOk, lockErr = CraftLocks.Acquire(src, benchKey)
+        if not lockOk then return nil, lockErr or 'craft_busy' end
+    end
+    local function body()
     queues[src] = queues[src] or {}
 
     -- Same clamp helper as interactive
@@ -109,25 +115,54 @@ function CraftQueue._startQueued(src, recipeId, benchKey, batch)
     if ctx.batch > 1 then duration = math.floor(duration * ctx.batch * 0.85) end
     local craftId = GenerateCraftId()
     local finishAt = os.time() + math.ceil(duration / 1000)
+    local snap, ver = nil, 0
+    if RecipeSnapshot and RecipeSnapshot.Capture then
+        snap, ver = RecipeSnapshot.Capture(recipe)
+    else
+        snap, ver = recipe, tonumber(recipe._version) or 0
+    end
+    if type(finishAt) ~= 'number' or finishAt <= os.time() then
+        if CraftingAnomaly then CraftingAnomaly.Warn('bad_timestamp', src, { recipeId = recipe.id, finishAt = finishAt }) end
+    end
     local entry = {
         craftId = craftId, recipeId = recipe.id, benchKey = bench.key,
         batch = ctx.batch, ingredients = ctx.ingredients, finishAt = finishAt,
         createdAt = os.time(), duration = duration,
         label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(recipe)) or recipe.label,
         reserved = CraftingMaterials.ReserveOnQueue() == true,
+        snapshot = snap, recipeVersion = ver or 0,
     }
     queues[src][#queues[src] + 1] = entry
 
     local id = ident(src)
     if id and Config.Queue.OfflineProgress then
-        MySQL.insert.await(
-            'INSERT INTO sanctuary_craft_queue (identifier, craft_id, recipe_id, bench_key, batch, ingredients, finish_at, created_at) VALUES (?,?,?,?,?,?,?,?)',
-            { id, craftId, recipe.id, bench.key, ctx.batch, json.encode(ctx.ingredients), finishAt, os.time() }
-        )
+        local snapJson = (RecipeSnapshot and RecipeSnapshot.Encode and RecipeSnapshot.Encode(snap)) or json.encode(snap)
+        local insOk = pcall(function()
+            MySQL.insert.await(
+                'INSERT INTO sanctuary_craft_queue (identifier, craft_id, recipe_id, bench_key, batch, ingredients, finish_at, created_at, recipe_snapshot, recipe_version) VALUES (?,?,?,?,?,?,?,?,?,?)',
+                { id, craftId, recipe.id, bench.key, ctx.batch, json.encode(ctx.ingredients), finishAt, os.time(), snapJson, ver or 0 }
+            )
+        end)
+        if not insOk then
+            MySQL.insert.await(
+                'INSERT INTO sanctuary_craft_queue (identifier, craft_id, recipe_id, bench_key, batch, ingredients, finish_at, created_at) VALUES (?,?,?,?,?,?,?,?)',
+                { id, craftId, recipe.id, bench.key, ctx.batch, json.encode(ctx.ingredients), finishAt, os.time() }
+            )
+        end
     end
 
     CraftingCore.Emit('craftQueued', src, entry)
     return entry
+    end
+    local okRun, a, b, c = pcall(body)
+    if CraftLocks and CraftLocks.Release then
+        CraftLocks.Release(src, benchKey)
+    end
+    if not okRun then
+        print(('[sanctuary_crafting] queue start error: %s'):format(tostring(a)))
+        return nil, 'craft_failed'
+    end
+    return a, b, c
 end
 
 function CraftQueue.TryCollect(src, craftId)
@@ -142,11 +177,25 @@ function CraftQueue.TryCollect(src, craftId)
                 if os.time() < e.finishAt then
                     return false, 'queue_not_ready', e.finishAt - os.time()
                 end
-                local recipe = Config.RecipeById[e.recipeId]
+                local recipe = e.snapshot
+                if type(recipe) ~= 'table' and RecipeSnapshot and RecipeSnapshot.Of then
+                    recipe = RecipeSnapshot.Of(e)
+                end
+                if type(recipe) ~= 'table' then
+                    -- v2.15 rows without snapshot: live lookup + anomaly, then fail-closed if missing
+                    if CraftingAnomaly then
+                        CraftingAnomaly.Warn('incoherent_queue', src, { craftId = craftId, recipeId = e.recipeId, missing = 'snapshot' })
+                    end
+                    recipe = Config.RecipeById and Config.RecipeById[e.recipeId]
+                end
                 if not recipe then
                     table.remove(list, i)
                     MySQL.query.await('DELETE FROM sanctuary_craft_queue WHERE craft_id = ?', { craftId })
+                    if CraftingAnomaly then CraftingAnomaly.Warn('unknown_recipe', src, { craftId = craftId, where = 'queue_collect' }) end
                     return false, 'craft_invalid'
+                end
+                if type(e.finishAt) ~= 'number' or (e.createdAt and e.finishAt < e.createdAt) then
+                    if CraftingAnomaly then CraftingAnomaly.Warn('bad_timestamp', src, { craftId = craftId, finishAt = e.finishAt, createdAt = e.createdAt }) end
                 end
                 local bench = Benches and Benches.Resolve and Benches.Resolve(e.benchKey)
                 local count = CraftBatch.SafeMul(recipe.result.count or 1, e.batch or 1)
@@ -249,10 +298,18 @@ function CraftQueue.LoadOffline(src)
         local cid = r.craft_id
         if cid and not seen[cid] then
             seen[cid] = true
+            local snap = nil
+            if r.recipe_snapshot and RecipeSnapshot and RecipeSnapshot.Decode then
+                snap = RecipeSnapshot.Decode(r.recipe_snapshot)
+            elseif r.recipe_snapshot then
+                local okd, dec = pcall(json.decode, r.recipe_snapshot)
+                if okd and type(dec) == 'table' then snap = dec end
+            end
             queues[src][#queues[src] + 1] = {
                 craftId = cid, recipeId = r.recipe_id, benchKey = r.bench_key,
                 batch = r.batch, ingredients = json.decode(r.ingredients) or {},
                 finishAt = r.finish_at, createdAt = r.created_at,
+                snapshot = snap, recipeVersion = tonumber(r.recipe_version) or 0,
             }
         else
             -- drop duplicate row
