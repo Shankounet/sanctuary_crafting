@@ -82,6 +82,41 @@ function Blueprints.Forget(src, blueprintId)
     return true
 end
 
+
+--- No blueprintId → implicitly known. requiresLearn → knowledge row (recipe.id).
+function Blueprints.KnowsRecipe(src, recipe)
+    if not recipe then return false end
+    local bpId = recipe.requireBlueprint or recipe.blueprintId
+    if bpId then
+        if not Config.Blueprints or not Config.Blueprints.Enabled then
+            return true
+        end
+        return Blueprints.Has(src, bpId)
+    end
+    if recipe.requiresLearn == true then
+        return Blueprints.Has(src, recipe.id)
+    end
+    return true
+end
+
+function Blueprints.GrantKnowledge(src, recipe, source)
+    if not recipe then return false end
+    local bpId = recipe.requireBlueprint or recipe.blueprintId
+    if bpId then
+        local ok = Blueprints.Learn(src, bpId)
+        if ok and NewlyLearned and NewlyLearned.Mark then
+            NewlyLearned.Mark(src, recipe.id, source or "blueprint")
+        end
+        return ok and true or false
+    end
+    -- knowledge row stored as blueprint_id = recipe.id
+    local ok = Blueprints.Learn(src, recipe.id)
+    if ok and NewlyLearned and NewlyLearned.Mark then
+        NewlyLearned.Mark(src, recipe.id, source or "discovery")
+    end
+    return ok and true or false
+end
+
 function Blueprints.List(src)
     local id = ident(src)
     if not id then return {} end

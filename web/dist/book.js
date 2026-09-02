@@ -220,16 +220,11 @@
   }
 
   function pickSpecialization(levels) {
-    if (state.meta && state.meta.specialization) return state.meta.specialization;
-    const keys = Object.keys(levels || {});
-    if (!keys.length) return null;
-    let best = keys[0];
-    let bestLv = -1;
-    keys.forEach((k) => {
-      const lv = Number((levels[k] && levels[k].level) || 0);
-      if (lv > bestLv) { bestLv = lv; best = k; }
-    });
-    return skillLabel(best);
+    const meta = state.meta || {};
+    if (meta.playerSpec && meta.playerSpec.label) return meta.playerSpec.label;
+    if (typeof meta.specialization === 'string' && meta.specialization) return meta.specialization;
+    if (meta.specialization && meta.specialization.label) return meta.specialization.label;
+    return null;
   }
 
   function characterName() {
@@ -696,17 +691,22 @@
     if (!arr.length) {
       cards = `<p class="hand-note">${emptyPhrase('objective')}</p>`;
     } else {
-      cards = `<div id="obj-grid">${arr.map((o) => {
+      const top = arr.filter((o) => !(o.payload && o.payload.parentObjectiveId));
+      cards = `<div id="obj-grid">${top.map((o) => {
         const rid = o.payload && o.payload.recipeId;
         const pinned = rid && pinIds.has(rid);
         const kd = kindDisplay(o.kind);
         const kindLine = kd ? `<span class="hand-note">${esc(kd)}${pinned ? ' · épinglé' : ''}</span>` : (pinned ? '<span class="hand-note">épinglé</span>' : '');
+        const kids = o.children || [];
+        const checks = (kids.length ? kids : [o]).map((c) => {
+          const done = !!(c.done || c.liveDone);
+          const prog = (c.need != null && c.owned != null) ? ` ${c.owned}/${c.need}` : '';
+          return `<li class="${done ? 'done' : ''}"><span class="box ${done ? 'checked' : ''}"></span><span>${esc((c.title || objectiveTitle(c)) + prog)}</span>${done ? '<span class="check-annot">✓</span>' : ''}</li>`;
+        }).join('');
         return `<article class="sticky-note ${o.done ? 'done' : ''}" data-id="${o.id}">
           <div class="st-title">${esc(objectiveTitle(o))}</div>
           ${o.done ? '<span class="check-annot">fait — rayé</span>' : ''}
-          <ul class="checklist">
-            <li class="${o.done ? 'done' : ''}"><span class="box ${o.done ? 'checked' : ''}"></span><span>${esc(objectiveTitle(o))}</span>${o.done ? '<span class="check-annot">✓</span>' : ''}</li>
-          </ul>
+          <ul class="checklist">${checks}</ul>
           ${kindLine}
           <div class="st-actions obj-actions">
             ${!o.done ? `<button type="button" class="primary small" data-act="done">Terminer</button>` : ''}
@@ -1163,12 +1163,26 @@
     );
   }
 
+  function shopRowHtml(x) {
+    const need = x.need || x.count || 0;
+    const owned = x.owned != null ? x.owned : (x.have || 0);
+    const remaining = x.remaining != null ? x.remaining : Math.max(0, need - owned);
+    const srcs = (x.sources || []).map((s) => `${s.label || s.recipeId} ×${s.count}`).join(' · ');
+    return `<li>
+      <span>${itemLabel(x)} <span class="badge">${owned}/${need}</span></span>
+      <span class="badge">${remaining > 0 ? 'reste ' + remaining : 'ok'}</span>
+      ${srcs ? `<div class="hand-note">${esc(srcs)}</div>` : ''}
+    </li>`;
+  }
+
   async function renderShopping() {
+    const prefill = state._shopPrefill || '';
     setPages(
-      pageHead('Courses intelligentes', 'Expansion récursive, sans double-compte') + `
+      pageHead('Courses', 'Fusionnée depuis les suivis — owned soustrait une fois') + `
+        <p class="hand-note">Liste reconstruite à l'ouverture. Un schéma unique reste calculable ci-dessous.</p>
         <div class="note-editor">
           <div class="row-actions" style="margin-top:0">
-            <input id="shop-rid" type="text" placeholder="Schéma à déplier…" style="flex:1;margin-top:0" value="${esc(state._shopPrefill || '')}" />
+            <input id="shop-rid" type="text" placeholder="Schéma à déplier…" style="flex:1;margin-top:0" value="${esc(prefill)}" />
             <input id="shop-batch" type="number" min="1" value="1" style="width:70px;margin-top:0" />
             <button type="button" class="primary" id="shop-go">Calculer</button>
           </div>
@@ -1176,18 +1190,23 @@
       `<ul class="list" id="shop-out"></ul>${folio('141')}`
     );
     state._shopPrefill = '';
+    const out = $('#shop-out');
+    const paint = (list) => {
+      if (!out) return;
+      out.innerHTML = (list || []).map(shopRowHtml).join('') || '<li class="empty">Aucun suivi / rien à récupérer</li>';
+    };
+    if (!prefill) {
+      const pinsShop = await loadModule('shopping', {});
+      paint((pinsShop && pinsShop.data) || []);
+    }
     const go = $('#shop-go');
     if (go) go.onclick = async () => {
       const recipeId = (($('#shop-rid') || {}).value || '').trim();
       const batch = Number(($('#shop-batch') || {}).value) || 1;
-      const r = await loadModule('shopping', { recipeId, batch });
-      const list = (r && r.data) || [];
-      const out = $('#shop-out');
-      if (out) out.innerHTML = list.map((x) =>
-        `<li><span>${itemLabel(x)} <span class="badge">x${x.count}</span></span><span class="badge">inv ${x.have || 0}</span></li>`
-      ).join('') || '<li class="empty">Rien à récupérer / recette invalide</li>';
+      const r = await loadModule('shopping', recipeId ? { recipeId, batch } : {});
+      paint((r && r.data) || []);
     };
-    if (go && ($('#shop-rid') || {}).value) go.click();
+    if (go && prefill) go.click();
   }
 
   function treeText(node, indent) {

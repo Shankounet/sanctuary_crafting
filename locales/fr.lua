@@ -96,5 +96,21 @@ Locales['fr'] = {
     ['book_bp_logged'] = 'Schéma consigné : %s',
     ['book_maint_tool'] = 'Vérifier durabilité outil',
     ['book_maint_power'] = 'Atelier hors tension',
+    ['craft_spec_required'] = 'Spécialisation requise : %s',
+    ['craft_knowledge_required'] = 'Recette non connue',
+    ['spec_set_ok'] = 'Spécialisation définie : %s',
+    ['spec_assigned'] = 'Votre spécialisation est désormais : %s',
+    ['teach_disabled'] = 'Enseignement indisponible',
+    ['teach_not_teachable'] = 'Cette recette ne s\'enseigne pas',
+    ['teach_teacher_unknown'] = 'Vous ne connaissez pas cette recette',
+    ['teach_already_known'] = 'L\'élève connaît déjà cette recette',
+    ['teach_too_far'] = 'Trop loin pour enseigner',
+    ['teach_refused'] = 'Enseignement refusé',
+    ['teach_cancelled'] = 'Enseignement interrompu',
+    ['teach_success_teacher'] = 'Vous avez enseigné %s à %s',
+    ['teach_success_student'] = 'Vous avez appris %s auprès de %s',
+    ['teach_progress_teacher'] = 'Enseignement : %s',
+    ['teach_progress_student'] = 'Apprentissage : %s',
 }
+
 

@@ -236,6 +236,37 @@ RegisterNUICallback('bookUnpinRecipe', function(data, cb)
     cb(r or { ok = false })
 end)
 
+
+RegisterNUICallback('teachNearby', function(_, cb)
+    local r = lib.callback.await('sanctuary_crafting:teachNearby', false)
+    cb(r or { ok = false, players = {} })
+end)
+
+RegisterNUICallback('teachPreview', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:teachPreview', false, data and data.recipeId, data and data.target)
+    cb(r or { ok = false })
+end)
+
+RegisterNUICallback('teachStart', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:teachStart', false, data and data.recipeId, data and data.target)
+    cb(r or { ok = false })
+end)
+
+RegisterNUICallback('teachCancel', function(_, cb)
+    local r = lib.callback.await('sanctuary_crafting:teachCancel', false)
+    cb(r or { ok = true })
+end)
+
+RegisterNUICallback('newlyConsult', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:newlyConsult', false, data and data.recipeId)
+    cb(r or { ok = false })
+end)
+
+RegisterNUICallback('shoppingFromPins', function(_, cb)
+    local r = lib.callback.await('sanctuary_crafting:shoppingFromPins', false)
+    cb(r or { ok = false })
+end)
+
 RegisterNUICallback('notify', function(data, cb)
     local desc = data.reason or 'craft_failed'
     if data.reason == 'craft_success' and data.label then

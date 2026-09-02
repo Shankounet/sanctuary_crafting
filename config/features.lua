@@ -173,3 +173,29 @@ Config.CraftTracker = {
         OnError = true,
     },
 }
+
+Config.Teaching = {
+    Enabled = true,
+    Distance = 2.5,
+    DurationMs = 30000,
+    RequireTeacherKnown = true,
+    RequireTeacherSpec = true,
+    RequireTeacherLevel = true,
+    RequireStudentSpec = true,
+    RequireStudentLevel = false,
+    RequireTeacherMastery = 0,
+    DefaultTeachable = false,
+}
+
+Config.Follow = {
+    AutoObjectives = true,
+}
+
+Config.RecentlyCrafted = {
+    Enabled = true,
+    Max = 10,
+}
+
+Config.NewlyLearned = {
+    Enabled = true,
+}

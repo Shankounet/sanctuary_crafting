@@ -312,6 +312,29 @@ local function emitNoise(src, recipe, bench)
     TriggerClientEvent('sanctuary_crafting:client:noise', -1, level, coords)
 end
 
+
+--- Spec + knowledge (identity). NEVER skipped by BypassRequirements.
+local function checkIdentityGates(src, recipe, bench)
+    if Specializations and Specializations.CanUseStation and bench then
+        local okS, reasonS, argsS = Specializations.CanUseStation(src, bench.category or bench)
+        if not okS then return false, reasonS, argsS end
+    end
+    if Specializations and Specializations.CanCraftRecipe then
+        local okC, reasonC, argsC = Specializations.CanCraftRecipe(src, recipe)
+        if not okC then return false, reasonC, argsC end
+    end
+    if Blueprints and Blueprints.KnowsRecipe then
+        if not Blueprints.KnowsRecipe(src, recipe) then
+            local bpId = recipe.requireBlueprint or recipe.blueprintId
+            if bpId then
+                return false, 'craft_blueprint_required', { bpId }
+            end
+            return false, 'craft_knowledge_required', { recipe.id }
+        end
+    end
+    return true
+end
+
 local function validateStart(src, recipeId, benchKey, batch)
     batch = math.floor(tonumber(batch) or 1)
     if batch < 1 then batch = 1 end
@@ -362,6 +385,9 @@ local function validateStart(src, recipeId, benchKey, batch)
         okSkill, skillReason, skillArgs = CraftingSkills.CheckRecipeGates(src, recipe)
     end
     if not okSkill then return nil, skillReason, skillArgs end
+
+    local okIdent, identReason, identArgs = checkIdentityGates(src, recipe, bench)
+    if not okIdent then return nil, identReason, identArgs end
 
     if recipe.requireBlueprint or recipe.blueprintId then
         local bpId = recipe.requireBlueprint or recipe.blueprintId
@@ -554,6 +580,12 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
         clearActive(craftId, craft.removed)
         return { ok = false, reason = 'craft_failed' }
     end
+    local okIdent = checkIdentityGates(src, recipe, bench)
+    if not okIdent then
+        craft.state = 'failed'
+        clearActive(craftId, craft.removed)
+        return { ok = false, reason = 'craft_failed' }
+    end
 
     -- Lock BEFORE rewards so a second call cannot grant twice
     craft.state = 'completing'
@@ -696,6 +728,9 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
 
     if recipe.xp and recipe.xp.category and recipe.xp.amount then
         CraftingSkills.AddXP(recipe.xp.category, recipe.xp.amount * batch, src)
+        if NewlyLearned and NewlyLearned.ScanLevelUnlocks then
+            NewlyLearned.ScanLevelUnlocks(src)
+        end
     end
 
     if Config.Mastery and Config.Mastery.Enabled and Mastery then
@@ -1354,11 +1389,34 @@ local function buildRecipeEntry(src, r, ctx)
         if skillCategory and CraftingSkills.GetLevel then
             playerSkillLevel = CraftingSkills.GetLevel(skillCategory, src)
         end
-        if r.requireSkill and CraftingSkills.HasSkill then
-            hasSpecialization = CraftingSkills.HasSkill(skillCategory, r.requireSkill, src)
-        end
     elseif lockReason == 'craft_level_required' and lockArgs and lockArgs[2] ~= nil then
         playerSkillLevel = lockArgs[2]
+    end
+
+    local requireSpec = nil
+    if Specializations and Specializations.InferRequireSpec then
+        requireSpec = Specializations.InferRequireSpec(r)
+        local okSpec = Specializations.CanCraftRecipe and select(1, Specializations.CanCraftRecipe(src, r))
+        hasSpecialization = okSpec and true or false
+        if not okSpec then
+            canCraft, lockReason, lockArgs = false, 'craft_spec_required', { requireSpec }
+        end
+    end
+
+    local knownRecipe = true
+    if Blueprints and Blueprints.KnowsRecipe then
+        knownRecipe = Blueprints.KnowsRecipe(src, r) == true
+        if not knownRecipe then
+            local bpId = r.requireBlueprint or r.blueprintId
+            canCraft = false
+            lockReason = bpId and 'craft_blueprint_required' or 'craft_knowledge_required'
+            lockArgs = { bpId or r.id }
+        end
+    end
+
+    local teachable = false
+    if Teaching and Teaching.IsTeachable then
+        teachable = Teaching.IsTeachable(r) == true
     end
 
     -- Missing / almost-craftable enrichment for NUI badges
@@ -1499,6 +1557,10 @@ local function buildRecipeEntry(src, r, ctx)
         skillCategory = skillCategory,
         playerSkillLevel = playerSkillLevel,
         hasSpecialization = hasSpecialization,
+        requireSpec = requireSpec,
+        teachable = teachable,
+        known = knownRecipe,
+        teacherKnows = knownRecipe,
         missingCount = missingCount,
         primaryMissing = primaryMissing,
         toolDurability = toolDurability,
@@ -1576,6 +1638,22 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
     local favorites = {}
     if Favorites then favorites = Favorites.Get(src) end
 
+    local unreadSet = {}
+    if NewlyLearned and NewlyLearned.List then
+        for _, row in ipairs(NewlyLearned.List(src) or {}) do
+            unreadSet[row.recipeId or row] = row.source or true
+        end
+    end
+    for i = 1, #out do
+        local e = out[i]
+        if unreadSet[e.id] then
+            e.unread = true
+            e.unreadSource = unreadSet[e.id]
+            e.isNew = true
+            e.newlyUnlocked = true
+        end
+    end
+
     local pinned = {}
     if SurvivalBook and SurvivalBook.ListPins then
         local pins = SurvivalBook.ListPins(src) or {}
@@ -1609,6 +1687,11 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
         stationLevel = benchLevel, modules = bench.modules or {},
         powered = (CraftingPower and CraftingPower.HasPower and CraftingPower.HasPower(bench)) or false,
         recipes = out, favorites = favorites, pinned = pinned,
+        playerSpec = (Specializations and Specializations.Resolve and Specializations.Resolve(src)) or nil,
+        recentlyCrafted = (RecentlyCrafted and RecentlyCrafted.List and RecentlyCrafted.List(src)) or {},
+        newlyLearned = (NewlyLearned and NewlyLearned.Ids and NewlyLearned.Ids(src)) or {},
+        shoppingPins = (ShoppingList and ShoppingList.BuildFromPins and select(1, ShoppingList.BuildFromPins(src))) or nil,
+        teaching = Config.Teaching,
         itemLabels = (OxItemCatalog and OxItemCatalog.UsedLabels and OxItemCatalog.UsedLabels()) or {},
         session = session,
         ui = Config.UI, ux = ux,

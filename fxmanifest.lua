@@ -5,7 +5,7 @@ lua54 'yes'
 name 'sanctuary_crafting'
 author 'Shankounet / Sanctuary'
 description 'Plateforme de craft post-apo + Carnet de survie — ESX, ox_*, ml_skills, NUI industrielle'
-version '2.13.0'
+version '2.14.0'
 
 ui_page 'web/dist/index.html'
 
@@ -34,6 +34,7 @@ shared_scripts {
     'config/recipes_import.lua',
     'config/examples.lua', -- demos ; Config.LoadExampleRecipes = false par défaut si import actif
     'config/book.lua',
+    'config/specializations.lua',
     'shared/*.lua',
     'locales/*.lua',
 }
@@ -45,6 +46,7 @@ client_scripts {
     'client/nui.lua',
     'client/tracker.lua',
     'client/craft.lua',
+    'client/teaching.lua',
     'book/client/book.lua',
 }
 
@@ -75,6 +77,10 @@ server_scripts {
     'server/systems/shopping.lua',
     'server/systems/craft_tree.lua',
     'server/systems/dismantle.lua',
+    'server/systems/specializations.lua',
+    'server/systems/teaching.lua',
+    'server/systems/recently_crafted.lua',
+    'server/systems/newly_learned.lua',
     -- crafting pipeline last (depends on above)
     'server/crafting/pipeline.lua',
     -- survival book (after crafting systems)
