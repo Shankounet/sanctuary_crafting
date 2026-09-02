@@ -133,8 +133,6 @@
   top: 0; bottom: 0;
   width: calc(50% + 8px);
   border-radius: 4px 10px 12px 6px;
-  background:
-    linear-gradient(145deg, var(--book-leather-hi) 0%, var(--book-leather-2) 38%, var(--book-leather) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 220, 170, 0.12),
     inset 0 -8px 18px rgba(0, 0, 0, 0.35);
@@ -149,8 +147,6 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
-  background:
-    linear-gradient(180deg, #f7f0de 0%, var(--book-paper) 42%, var(--book-paper-2) 100%);
   overflow: hidden;
   box-shadow: inset 0 0 40px rgba(120, 90, 40, 0.08);
 }
@@ -228,13 +224,6 @@
 #book-app .book-binding {
   position: relative;
   z-index: 3;
-  background:
-    linear-gradient(90deg,
-      #2a1c12 0%,
-      #4a3220 18%,
-      #6b4a30 45%,
-      #4a3220 78%,
-      #2a1c12 100%);
   box-shadow:
     inset 0 0 8px rgba(0, 0, 0, 0.55),
     0 0 18px rgba(0, 0, 0, 0.35);
@@ -573,7 +562,6 @@
   position: relative;
   margin: 12px 4px 16px;
   padding: 12px 14px 14px;
-  background: #f6efd8;
   border: 1px solid rgba(120, 100, 70, 0.28);
   box-shadow: 1px 2px 4px rgba(60, 40, 20, 0.12);
   transform: rotate(-1.2deg);
@@ -735,8 +723,6 @@
   position: relative;
   margin: 10px 0;
   padding: 12px 14px 14px;
-  background:
-    linear-gradient(180deg, #f8f2e4 0%, #efe4cc 100%);
   border: 1px solid rgba(120, 100, 70, 0.3);
   border-left: 4px solid rgba(120, 90, 50, 0.45);
   box-shadow: 1px 2px 3px rgba(60, 40, 20, 0.08);
@@ -769,7 +755,6 @@
   margin: 12px 2px 18px;
   padding: 14px 14px 12px 78px;
   min-height: 72px;
-  background: #f7f1e0;
   border: 1px solid rgba(120, 100, 70, 0.32);
   box-shadow: 1px 2px 4px rgba(60, 40, 20, 0.1);
   transform: rotate(-0.6deg);
@@ -817,10 +802,6 @@
   position: relative;
   margin: 10px 0;
   padding: 12px 14px;
-  background:
-    repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(70, 100, 130, 0.08) 19px, rgba(70, 100, 130, 0.08) 20px),
-    repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(70, 100, 130, 0.06) 19px, rgba(70, 100, 130, 0.06) 20px),
-    #e8eef2;
   border: 1px solid rgba(70, 100, 130, 0.28);
   color: #2a3a48;
   box-shadow: 1px 2px 3px rgba(40, 60, 80, 0.1);
@@ -1017,15 +998,6 @@
   position: relative;
   margin: 8px 0;
   padding: 8px 12px 12px;
-  background:
-    repeating-linear-gradient(
-      180deg,
-      transparent,
-      transparent 27px,
-      rgba(120, 140, 170, 0.18) 27px,
-      rgba(120, 140, 170, 0.18) 28px
-    ),
-    #f7f2e4;
   border: 1px solid rgba(120, 100, 70, 0.22);
   box-shadow: 1px 1px 2px rgba(60, 40, 20, 0.06);
   line-height: 28px;
@@ -1065,18 +1037,15 @@
   position: relative;
   margin: 10px 4px;
   padding: 12px 12px 10px;
-  background: #f3e6b8;
   border: 1px solid rgba(160, 140, 80, 0.35);
   box-shadow: 1px 2px 3px rgba(60, 40, 20, 0.1);
   transform: rotate(-1deg);
 }
 #book-app .sticky-note:nth-child(even) {
-  background: #e8efd0;
   transform: rotate(1.2deg);
 }
 #book-app .sticky-note.done {
   opacity: 0.7;
-  background: #e0d8c4;
 }
 #book-app .sticky-note .st-title {
   font-family: var(--book-display);
@@ -1119,7 +1088,6 @@
   position: relative;
   margin: 10px 0;
   padding: 14px 14px 12px;
-  background: #f4efe0;
   border: 1px solid rgba(100, 90, 60, 0.3);
   box-shadow: 1px 2px 3px rgba(60, 40, 20, 0.08);
 }
@@ -1482,8 +1450,6 @@
   max-height: min(620px, 78vh);
   overflow: auto;
   padding: 22px 24px;
-  background:
-    linear-gradient(180deg, #f7f0de 0%, var(--book-paper) 55%, var(--book-paper-2) 100%);
   border: 1px solid rgba(90, 70, 40, 0.35);
   border-radius: 2px;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
@@ -1599,7 +1565,6 @@
 #book-app:not(.hidden) .book-page {
   opacity: 1 !important;
   visibility: visible !important;
-  background: #f2e6c8 !important;
   color: #2c2418 !important;
   min-height: 200px !important;
 }
@@ -1629,20 +1594,7 @@
 
 /* —— P0 Paper: warmer yellowed ivory, fibers, stains, edge wear —— */
 #book-app .book-page {
-  background:
-    /* fiber streaks */
-    repeating-linear-gradient(
-      92deg,
-      transparent 0 11px,
-      rgba(120, 95, 55, 0.028) 11px 12px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent 0 13px,
-      rgba(100, 80, 45, 0.018) 13px 14px
-    ),
-    /* warm ivory body */
-    linear-gradient(168deg, #f6ebc8 0%, #f0e0b6 38%, #e8d4a8 72%, #e2cc9a 100%) !important;
+  /* material: v2.13 PNG mapping (end of file) */
   box-shadow:
     inset 0 0 48px rgba(110, 80, 35, 0.1),
     inset 0 -20px 36px rgba(90, 60, 25, 0.06);
@@ -1650,11 +1602,7 @@
 
 /* Left page slightly warmer + different marks */
 #book-app .book-page-left {
-  background:
-    radial-gradient(ellipse 90px 70px at 18% 82%, rgba(140, 100, 50, 0.09) 0%, transparent 70%),
-    radial-gradient(ellipse 50px 40px at 72% 18%, rgba(120, 85, 40, 0.06) 0%, transparent 65%),
-    repeating-linear-gradient(88deg, transparent 0 14px, rgba(130, 100, 55, 0.03) 14px 15px),
-    linear-gradient(175deg, #f5e6b8 0%, #efd9a6 45%, #e6cb96 100%) !important;
+  /* material: v2.13 PNG mapping (end of file) */
   box-shadow:
     inset -22px 0 36px rgba(70, 45, 15, 0.14),
     inset 0 0 0 1px rgba(90, 70, 40, 0.14),
@@ -1664,11 +1612,7 @@
 
 /* Right page cooler ivory + different stain map */
 #book-app .book-page-right {
-  background:
-    radial-gradient(ellipse 80px 60px at 78% 70%, rgba(110, 90, 55, 0.07) 0%, transparent 70%),
-    radial-gradient(ellipse 40px 55px at 22% 12%, rgba(100, 75, 40, 0.05) 0%, transparent 60%),
-    repeating-linear-gradient(95deg, transparent 0 16px, rgba(100, 85, 50, 0.022) 16px 17px),
-    linear-gradient(185deg, #f3e9cc 0%, #ebe0c0 48%, #e4d4ae 100%) !important;
+  /* material: v2.13 PNG mapping (end of file) */
   box-shadow:
     inset 22px 0 36px rgba(70, 45, 15, 0.14),
     inset 0 0 0 1px rgba(90, 70, 40, 0.14),
@@ -1778,15 +1722,7 @@
 
 /* —— P0 Binding volume —— */
 #book-app .book-binding {
-  background:
-    linear-gradient(90deg,
-      #1a100a 0%,
-      #2e1c12 12%,
-      #4a3020 28%,
-      #6a4a30 48%,
-      #4a3020 70%,
-      #2e1c12 88%,
-      #1a100a 100%) !important;
+  /* material: v2.13 leather PNG (end of file) */
   box-shadow:
     inset 0 0 12px rgba(0, 0, 0, 0.7),
     -10px 0 22px rgba(0, 0, 0, 0.35),
@@ -1822,8 +1758,7 @@
   box-shadow: 0 0 3px rgba(0, 0, 0, 0.4);
 }
 #book-app .book-cover {
-  background:
-    linear-gradient(148deg, #8a6240 0%, var(--book-leather-hi) 22%, var(--book-leather-2) 55%, #2a1a10 100%) !important;
+  /* material: v2.13 leather PNG (end of file) */
   box-shadow:
     inset 0 1px 0 rgba(255, 220, 170, 0.14),
     inset 0 -10px 22px rgba(0, 0, 0, 0.42),
@@ -1888,15 +1823,11 @@
 }
 #book-app .book-edge-tabs button:nth-child(8) {
   max-height: 88px; padding: 11px 5px;
-  background:
-    repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.05) 3px, rgba(0,0,0,0.05) 4px),
-    linear-gradient(90deg, #3a2218 0%, var(--tab-bordeaux) 55%, #8a5a58 100%) !important;
 }
 
 /* Soften active to aged paper, not bright modern */
 #book-app .book-edge-tabs button.active:nth-child(odd),
 #book-app .book-edge-tabs button.active:nth-child(even) {
-  background: linear-gradient(90deg, #5a4830 0%, #9a8260 48%, #c4ae86 100%) !important;
   color: #2a2014 !important;
 }
 
@@ -1988,8 +1919,6 @@
 
 /* —— P1 Collaged scraps —— */
 #book-app .scrap-note {
-  background:
-    linear-gradient(175deg, #f7efd4 0%, #efe4c4 100%);
   border: 1px solid rgba(110, 90, 55, 0.32);
   box-shadow:
     2px 3px 5px rgba(50, 35, 15, 0.14),
@@ -2002,9 +1931,11 @@
     30% 98%, 20% 100%, 10% 97%, 0% 100%
   );
 }
-#book-app .scrap-note.tint-warm { background: linear-gradient(175deg, #f4e4bc 0%, #ebd4a4 100%); }
-#book-app .scrap-note.tint-cool { background: linear-gradient(175deg, #eef0de 0%, #e2e4cc 100%); }
-#book-app .scrap-note.tint-rose { background: linear-gradient(175deg, #f4e6d8 0%, #ebd6c4 100%); }
+#book-app .scrap-note.tint-warm,
+#book-app .scrap-note.tint-cool,
+#book-app .scrap-note.tint-rose {
+  /* tint = tilt/shadow only — texture from v2.13 mapping */
+}
 #book-app .tape {
   background: rgba(200, 175, 115, 0.5);
   border: 1px solid rgba(150, 125, 75, 0.28);
@@ -2035,8 +1966,6 @@
 
 /* —— P1 / P2 Artisans business-card —— */
 #book-app .visit-card.business-card {
-  background:
-    linear-gradient(180deg, #f8f2e2 0%, #efe4cc 100%);
   border: 1px solid rgba(100, 80, 50, 0.35);
   box-shadow:
     2px 3px 6px rgba(50, 35, 15, 0.14),
@@ -2050,10 +1979,6 @@
 
 /* —— P2 Blueprint technical paper —— */
 #book-app .blueprint-sheet {
-  background:
-    repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(60, 95, 125, 0.1) 18px, rgba(60, 95, 125, 0.1) 19px),
-    repeating-linear-gradient(90deg, transparent, transparent 18px, rgba(60, 95, 125, 0.07) 18px, rgba(60, 95, 125, 0.07) 19px),
-    linear-gradient(160deg, #e4ecf2 0%, #d5e2ea 100%) !important;
   border: 1px solid rgba(60, 95, 125, 0.32);
   box-shadow:
     2px 3px 5px rgba(30, 50, 70, 0.12),
@@ -2132,7 +2057,6 @@
   position: relative;
   margin: 10px 2px 14px;
   padding: 10px 12px 12px;
-  background: linear-gradient(175deg, #f5ecd4 0%, #ebe0c4 100%);
   border: 1px solid rgba(110, 90, 55, 0.28);
   box-shadow: 1px 2px 4px rgba(50, 35, 15, 0.1);
   transform: rotate(-0.5deg);
@@ -2378,7 +2302,6 @@
   display: inline-block;
   margin: 4px 0 10px;
   padding: 8px 8px 14px;
-  background: linear-gradient(180deg, #f7f1e2 0%, #efe4cc 100%);
   border: 1px solid rgba(90, 70, 40, 0.22);
   box-shadow: 2px 3px 6px rgba(40, 28, 12, 0.16);
   transform: rotate(-1.4deg);
@@ -2552,34 +2475,35 @@
   margin-bottom: 12px;
 }
 
-
 /* ============================================================
-   v2.11.0 — assets as the only materials
-   CSS = layout / shadow / rotation. No fake leather, no fake paper.
-   Replace a file in web/dist/tex/ → the Carnet follows.
+   v2.13.0 — STRICT texture mapping
+   CSS = position / size / shadow / tilt / light only.
+   ONE principal texture per element. No overlays. No gradients on PNGs.
+   NEVER transparent pages/inserts over leather.
 
    MAPPING
-     --bookCoverTexture      tex/leather.png          couverture / dos / reliure
-     --mainPageTexture       tex/paper-soft.png       pages G/D
-     --alternatePageTexture  tex/paper-worn.png       fiches / notes (sans overlay)
-     post-its                (aucun asset fourni — ne pas inventer)
+     cover / outer / binding     tex/leather_cover.png
+     left + right pages          tex/paper_aged_new.png
+     glued fiches / documents    tex/paper_dark.png
+     post-its                    main paper (no dedicated assets)
    ============================================================ */
 #book-app {
-  --bookCoverTexture: url("tex/leather.png");
-  --mainPageTexture: url("tex/paper-soft.png");
-  --alternatePageTexture: url("tex/paper-worn.png");
-  --tex-leather: var(--bookCoverTexture);
-  --tex-paper: var(--mainPageTexture);
-  --tex-worn: var(--alternatePageTexture);
+  --bookCoverTexture: url("tex/leather_cover.png");
+  --mainPageTexture: url("tex/paper_aged_new.png");
+  --alternatePageTexture: url("tex/paper_dark.png");
 }
 
-/* Couverture = le PNG cuir, cover, rien par-dessus */
-#book-app .book-cover {
-  background-color: transparent !important;
+/* ---- LEATHER only: cover, outer frame, back, central binding ---- */
+#book-app .book-cover,
+#book-app .book-cover-left,
+#book-app .book-cover-right {
+  background-color: #2a1a10 !important;
   background-image: var(--bookCoverTexture) !important;
   background-size: cover !important;
-  background-position: center !important;
   background-repeat: no-repeat !important;
+}
+#book-app .book-cover {
+  background-position: center !important;
   box-shadow:
     0 10px 28px rgba(0, 0, 0, 0.45),
     inset 0 1px 0 rgba(255, 220, 170, 0.08) !important;
@@ -2591,9 +2515,10 @@
   background-position: 82% 40% !important;
 }
 
-/* Reliure = même cuir + ombre / couture existantes (éléments HTML) */
-#book-app .book-binding {
-  background-color: transparent !important;
+#book-app .book-binding,
+#book-app.is-open .book-binding,
+#book-app:not(.hidden) .book-binding {
+  background-color: #2a1a10 !important;
   background-image: var(--bookCoverTexture) !important;
   background-size: cover !important;
   background-position: 45% 50% !important;
@@ -2604,29 +2529,45 @@
     8px 0 18px rgba(0, 0, 0, 0.28) !important;
 }
 
-/* Pages = papier vieilli, visible, pas de voile beige */
+/* ---- MAIN paper: full left AND right page backgrounds ---- */
 #book-app .book-page,
 #book-app .book-page-left,
-#book-app .book-page-right {
-  background-color: transparent !important;
+#book-app .book-page-right,
+#book-app.is-open .book-page,
+#book-app:not(.hidden) .book-page,
+#book-app.is-open .book-page-left,
+#book-app.is-open .book-page-right,
+#book-app:not(.hidden) .book-page-left,
+#book-app:not(.hidden) .book-page-right {
+  background-color: #e8dcc4 !important;
   background-image: var(--mainPageTexture) !important;
   background-size: cover !important;
   background-repeat: no-repeat !important;
+  overflow: hidden !important;
 }
-#book-app .book-page-left {
+#book-app .book-page,
+#book-app.is-open .book-page,
+#book-app:not(.hidden) .book-page {
+  background-position: center !important;
+}
+#book-app .book-page-left,
+#book-app.is-open .book-page-left,
+#book-app:not(.hidden) .book-page-left {
   background-position: 12% 50% !important;
   box-shadow:
     inset -18px 0 28px rgba(40, 22, 8, 0.14),
     inset 0 0 0 1px rgba(90, 70, 40, 0.1) !important;
 }
-#book-app .book-page-right {
+#book-app .book-page-right,
+#book-app.is-open .book-page-right,
+#book-app:not(.hidden) .book-page-right {
   background-position: 88% 50% !important;
   box-shadow:
     inset 18px 0 28px rgba(40, 22, 8, 0.14),
     inset 0 0 0 1px rgba(90, 70, 40, 0.1) !important;
 }
 
-/* Neutraliser les faux grains / taches / plis CSS qui recouvrent l'asset */
+/* Kill page-edge / stain / fold overlays that mask the PNG */
 #book-app .book-page-edge,
 #book-app .book-page-edge::before,
 #book-app .book-page-edge::after,
@@ -2645,16 +2586,55 @@
   border-width: 0 !important;
 }
 
-/* Notes / fiches = papier, asset visible, ombre + rotation seulement */
-#book-app .scrap-note,
-#book-app .dossier-sheet,
-#book-app .vc-card,
+/* MAIN paper inserts: polaroid, sticky (no post-it assets), visit cards, tabs, blueprints, index */
+#book-app .id-polaroid,
 #book-app .sticky-note,
+#book-app .sticky-note:nth-child(even),
+#book-app .sticky-note.done,
 #book-app .visit-card,
-#book-app .disc-card,
-#book-app .id-polaroid {
-  background-color: transparent !important;
+#book-app .visit-card.business-card,
+#book-app .vc-card,
+#book-app .blueprint-sheet,
+#book-app .bp-sheet,
+#book-app .book-index-sheet,
+#book-app .book-edge-tabs button,
+#book-app .book-edge-tabs button:nth-child(n),
+#book-app .book-edge-tabs button.active,
+#book-app .book-edge-tabs button.active:nth-child(odd),
+#book-app .book-edge-tabs button.active:nth-child(even),
+#book-app .book-index-tab,
+#book-app .book-index-tab.active {
+  background-color: #e8dcc4 !important;
   background-image: var(--mainPageTexture) !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+}
+#book-app .book-edge-tabs button,
+#book-app .book-edge-tabs button:nth-child(n),
+#book-app .book-edge-tabs button.active,
+#book-app .book-index-tab,
+#book-app .book-index-tab.active {
+  color: #2a2014 !important;
+}
+
+#book-app .blueprint-sheet.folded::after {
+  background: none !important;
+  border-color: transparent !important;
+}
+
+/* SECONDARY paper: glued fiches / documents — ONE texture, tints do not recolor */
+#book-app .scrap-note,
+#book-app .scrap-note.tint-warm,
+#book-app .scrap-note.tint-cool,
+#book-app .scrap-note.tint-rose,
+#book-app .dossier-sheet,
+#book-app .disc-card,
+#book-app .discovery-card,
+#book-app .tech-plan,
+#book-app .lined-paper {
+  background-color: #c4ae86 !important;
+  background-image: var(--alternatePageTexture) !important;
   background-size: cover !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
@@ -2663,23 +2643,11 @@
 #book-app .scrap-note.tint-cool { background-position: 70% 40% !important; }
 #book-app .scrap-note.tint-rose { background-position: 40% 80% !important; }
 #book-app .dossier-sheet { background-position: 55% 60% !important; }
+
 #book-app .scrap-note,
 #book-app .dossier-sheet,
 #book-app .id-polaroid {
   box-shadow: 2px 4px 8px rgba(40, 24, 10, 0.2) !important;
-}
-
-/* Blueprints: grille technique légère par-dessus le papier (pas un faux fond) */
-#book-app .blueprint-sheet,
-#book-app .bp-sheet {
-  background-color: transparent !important;
-  background-image:
-    repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(60, 95, 125, 0.08) 18px, rgba(60, 95, 125, 0.08) 19px),
-    repeating-linear-gradient(90deg, transparent, transparent 18px, rgba(60, 95, 125, 0.06) 18px, rgba(60, 95, 125, 0.06) 19px),
-    var(--mainPageTexture) !important;
-  background-size: auto, auto, cover !important;
-  background-position: 0 0, 0 0, center !important;
-  background-repeat: repeat, repeat, no-repeat !important;
 }
 
 #book-app .book-stamp,
