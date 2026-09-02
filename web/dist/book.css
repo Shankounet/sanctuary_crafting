@@ -2554,7 +2554,7 @@
 
 
 /* ============================================================
-   v2.9.0 — real material layers (leather + paper textures)
+   v2.9.1 — leather = cover/binding only; inserts = light paper-soft
    CEF-safe: no mix-blend, no feTurbulence, no Google Fonts.
    Paths relative to web/dist/book.css → tex/*.png
    ============================================================ */
@@ -2643,35 +2643,67 @@
   opacity: 0.7 !important;
 }
 
-/* —— Inserts: worn paper, not the same as the page —— */
+/* —— Inserts: LIGHT paper only. Leather NEVER behind text. ——
+   Projet / découverte / déblocage = papier beige clair (paper-soft).
+   paper-worn reserved for rare aged fragments, never as a dark fill. */
 #book-app .scrap-note,
 #book-app .dossier-sheet,
 #book-app .vc-card,
-#book-app .bp-sheet,
-#book-app .disc-card,
-#book-app .sticky-note {
-  background-color: #e8d4a8 !important;
+#book-app .sticky-note,
+#book-app .visit-card,
+#book-app .disc-card {
+  background-color: #f6efd8 !important;
   background-image:
-    linear-gradient(180deg, rgba(255,248,230,0.18) 0%, transparent 30%, rgba(80,45,18,0.08) 100%),
-    var(--tex-worn) !important;
-  background-size: auto, 340px 340px !important;
-  background-repeat: no-repeat, no-repeat !important;
-  background-position: 0 0, 30% 20% !important;
+    linear-gradient(175deg, rgba(255,252,240,0.72) 0%, rgba(246,236,210,0.42) 100%),
+    var(--tex-paper) !important;
+  background-size: auto, 320px 320px !important;
+  background-repeat: no-repeat, repeat !important;
+  background-position: 0 0, 18% 12% !important;
   box-shadow:
-    2px 4px 10px rgba(40, 24, 10, 0.22),
-    inset 0 1px 0 rgba(255, 245, 220, 0.25) !important;
-  border: 1px solid rgba(90, 60, 30, 0.22) !important;
+    2px 3px 6px rgba(50, 35, 15, 0.16),
+    inset 0 1px 0 rgba(255, 255, 245, 0.45) !important;
+  border: 1px solid rgba(110, 90, 55, 0.28) !important;
 }
-#book-app .scrap-note.tint-warm,
-#book-app .scrap-note.tint-cool,
-#book-app .scrap-note.tint-rose {
+/* Projet principal — pale yellow scrap */
+#book-app .scrap-note.tint-warm {
+  background-color: #f4e6bc !important;
   background-image:
-    linear-gradient(180deg, rgba(255,248,230,0.12) 0%, transparent 40%),
-    var(--tex-worn) !important;
-  background-size: auto, 360px 360px !important;
+    linear-gradient(175deg, rgba(255,246,214,0.78) 0%, rgba(240,220,164,0.48) 100%),
+    var(--tex-paper) !important;
+  background-position: 0 0, 12% 22% !important;
 }
-#book-app .scrap-note.tint-cool { background-position: 0 0, 70% 40% !important; }
-#book-app .scrap-note.tint-rose { background-position: 0 0, 15% 70% !important; }
+/* Dernière découverte — pale green/beige */
+#book-app .scrap-note.tint-cool {
+  background-color: #eef0de !important;
+  background-image:
+    linear-gradient(175deg, rgba(240,246,220,0.8) 0%, rgba(214,222,186,0.5) 100%),
+    var(--tex-paper) !important;
+  background-position: 0 0, 68% 28% !important;
+}
+#book-app .scrap-note.tint-rose {
+  background-color: #f4e6d8 !important;
+  background-image:
+    linear-gradient(175deg, rgba(252,238,226,0.78) 0%, rgba(236,214,196,0.48) 100%),
+    var(--tex-paper) !important;
+}
+/* Prochain déblocage — light dossier, not worn, not leather */
+#book-app .dossier-sheet {
+  background-color: #f3ead4 !important;
+  background-image:
+    linear-gradient(180deg, rgba(255,250,236,0.75) 0%, rgba(242,230,204,0.5) 100%),
+    var(--tex-paper) !important;
+  background-position: 0 0, 42% 58% !important;
+}
+/* Blueprints keep their own technical paper — do not paint leather/worn */
+#book-app .blueprint-sheet,
+#book-app .bp-sheet {
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(60, 95, 125, 0.1) 18px, rgba(60, 95, 125, 0.1) 19px),
+    repeating-linear-gradient(90deg, transparent, transparent 18px, rgba(60, 95, 125, 0.07) 18px, rgba(60, 95, 125, 0.07) 19px),
+    linear-gradient(160deg, rgba(228,236,242,0.72) 0%, rgba(213,226,234,0.55) 100%),
+    var(--tex-paper) !important;
+  background-size: auto, auto, auto, 280px 280px !important;
+}
 
 /* polaroid: blank photo paper, taped */
 #book-app .id-polaroid {
@@ -2691,28 +2723,7 @@
   background-image: none;
 }
 
-/* tabs: cardboard + hint of leather grain */
-#book-app .book-edge-tabs button {
-  background-image:
-    linear-gradient(90deg, rgba(0,0,0,0.22) 0%, transparent 28%, rgba(255,230,190,0.08) 100%),
-    var(--tex-leather) !important;
-  background-size: auto, 80px 140px !important;
-  background-position: 0 0, 40% 10% !important;
-  background-repeat: no-repeat, repeat !important;
-}
-#book-app .book-edge-tabs button.active {
-  background-image:
-    linear-gradient(90deg, rgba(40,28,14,0.15) 0%, rgba(210,190,150,0.35) 55%, rgba(230,214,178,0.5) 100%),
-    var(--tex-paper) !important;
-  background-size: auto, 120px 160px !important;
-  color: #2a2014 !important;
-}
-#book-app .book-index-tab {
-  background-image:
-    linear-gradient(270deg, rgba(0,0,0,0.2), transparent 40%),
-    var(--tex-leather) !important;
-  background-size: auto, 90px 160px !important;
-}
+/* tabs: no leather — labels must sit on cardboard, not hide */
 
 /* micro page-turn (CEF-safe, no opacity stuck at 0) */
 #book-app .book-page-inner.page-turn {
