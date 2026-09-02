@@ -17,11 +17,14 @@ end
 ---@param ... any
 function CraftingCore.Emit(name, ...)
     local list = CraftingCore.Hooks[name]
-    if not list then return end
-    for i = 1, #list do
-        local ok, err = pcall(list[i], ...)
-        if not ok then
-            DebugPrint('hook error', name, err)
+    if list then
+        for i = 1, #list do
+            local ok, err = pcall(list[i], ...)
+            if not ok then
+                DebugPrint('hook error', name, err)
+            end
         end
     end
+    -- Public resource events (pipeline stays HTTP-unaware)
+    TriggerEvent('sanctuary_crafting:' .. tostring(name), ...)
 end

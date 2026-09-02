@@ -121,6 +121,7 @@ Locales['en'] = {
     ['station_upgraded'] = 'Station upgraded (level %s)',
     ['module_installed'] = 'Module installed: %s',
     ['queue_cancelled'] = 'Craft removed from queue',
+    ['admin_confirm_required'] = 'Confirmation required to save',
+    ['admin_id_exists'] = 'This recipe id already exists',
+    ['admin_command_hint'] = 'Opens the craftadmin editor',
 }
-
-

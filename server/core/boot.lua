@@ -104,6 +104,28 @@ local function autoMigrate()
     pcall(function() MySQL.query.await('ALTER TABLE sanctuary_placed_benches ADD COLUMN condition_pct FLOAT NOT NULL DEFAULT 100') end)
     pcall(function() MySQL.query.await('ALTER TABLE sanctuary_placed_benches ADD COLUMN heat FLOAT NOT NULL DEFAULT 20') end)
     pcall(function() MySQL.query.await('ALTER TABLE sanctuary_placed_benches ADD COLUMN broken_parts LONGTEXT NULL') end)
+
+    -- v2.16 schema version + overlay/logs (overlay ONLY — never dump Config.Recipes)
+    MySQL.query.await([[CREATE TABLE IF NOT EXISTS `sanctuary_schema_version` (
+        `id` TINYINT NOT NULL PRIMARY KEY DEFAULT 1,
+        `version` INT NOT NULL,
+        `applied_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci]])
+    if RecipeOverlay and RecipeOverlay.EnsureTables then RecipeOverlay.EnsureTables() end
+    if AdminLogs and AdminLogs.EnsureTable then AdminLogs.EnsureTable() end
+    pcall(function() MySQL.query.await('ALTER TABLE sanctuary_craft_queue ADD COLUMN recipe_snapshot LONGTEXT NULL') end)
+    pcall(function() MySQL.query.await('ALTER TABLE sanctuary_craft_queue ADD COLUMN recipe_version INT NULL') end)
+    local target = (Config.SchemaVersion or 216)
+    local cur = 0
+    local row = MySQL.query.await('SELECT version FROM sanctuary_schema_version WHERE id = 1')
+    if row and row[1] then cur = tonumber(row[1].version) or 0 end
+    if cur < target then
+        MySQL.query.await([[
+            INSERT INTO sanctuary_schema_version (id, version) VALUES (1, ?)
+            ON DUPLICATE KEY UPDATE version = VALUES(version)
+        ]], { target })
+        print(('[sanctuary_crafting] schema migrated %s → %s'):format(tostring(cur), tostring(target)))
+    end
 end
 
 CreateThread(function()

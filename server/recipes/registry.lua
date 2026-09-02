@@ -80,10 +80,21 @@ end
 
 function RecipeRegistry.Rebuild()
     Config.RecipeById = {}
-    local okCount, bad = 0, 0
+    local working = {}
     for i = 1, #(Config.Recipes or {}) do
-        local r = Config.Recipes[i]
-        if RecipeRegistry.Validate(r) then
+        local src = Config.Recipes[i]
+        local clone = (RecipeSnapshot and RecipeSnapshot.Clone and RecipeSnapshot.Clone(src)) or src
+        working[#working + 1] = clone
+    end
+    if RecipeOverlay and RecipeOverlay.MergeInto then
+        RecipeOverlay.MergeInto(working)
+    end
+    local okCount, bad, skipped = 0, 0, 0
+    for i = 1, #working do
+        local r = working[i]
+        if r and r._disabled then
+            skipped = skipped + 1
+        elseif RecipeRegistry.Validate(r) then
             if Config.RecipeById[r.id] then
                 print(('[^3sanctuary_crafting^0] id dupliqué: %s'):format(r.id))
             end
@@ -94,7 +105,7 @@ function RecipeRegistry.Rebuild()
         end
     end
     validated = true
-    DebugPrint('RecipeRegistry:', okCount, 'ok,', bad, 'bad')
+    DebugPrint('RecipeRegistry:', okCount, 'ok,', bad, 'bad, skipped', skipped)
     return okCount
 end
 
@@ -103,9 +114,8 @@ end
 --- Recettes pour un banc : match recipe.station (import) OU recipe.category (exemples legacy)
 function GetRecipesForCategory(category)
     local list = {}
-    for i = 1, #(Config.Recipes or {}) do
-        local r = Config.Recipes[i]
-        if Config.RecipeById[r.id] then
+    for _, r in pairs(Config.RecipeById or {}) do
+        if r and not r._disabled then
             local station = r.station or r.category
             if station == category or r.category == category then
                 list[#list + 1] = r

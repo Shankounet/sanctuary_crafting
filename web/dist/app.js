@@ -2487,7 +2487,10 @@
 
   window.addEventListener('message', (event) => {
     const msg = event.data || {};
-    if (msg.action === 'open') {
+    if (msg.action === 'selectRecipe' && msg.recipeId) {
+      const r = (state.recipes || []).find((x) => x.id === msg.recipeId);
+      if (r && typeof selectRecipe === 'function') selectRecipe(r);
+    } else if (msg.action === 'open') {
       app.classList.remove('hidden');
       try { state.lastCraft = localStorage.getItem(LAST_CRAFT_KEY); } catch (_) { /* ignore */ }
       applyMenu(msg.data || {});

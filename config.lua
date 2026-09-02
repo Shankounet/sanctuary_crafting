@@ -45,7 +45,7 @@ Config = {}
 
 Config.Locale = 'fr'
 Config.Debug = false
-Config.Version = '2.15.0'
+Config.Version = '2.16.0'
 
 --------------------------------------------------------------------------------
 -- Feature flags (Phase 2–7) — stubs uniquement, aucun comportement Phase 1
@@ -100,6 +100,15 @@ Config.Crafting = {
 --------------------------------------------------------------------------------
 Config.AdminAce = 'sanctuary.crafting.admin'
 Config.AdminGroups = { 'admin', 'superadmin' }
+
+Config.Admin = {
+    Command = 'craftadmin',
+    Ace = 'sanctuary.crafting.admin',
+    Groups = { 'admin', 'superadmin' },
+    CustomCallback = nil, -- optional function(src) -> boolean (OR with ACE / ESX group)
+}
+
+Config.SchemaVersion = 216
 
 Config.EnableWorldBenchCommand = true
 Config.WorldBenchCommand = 'placeworldbench'

@@ -55,6 +55,10 @@ function Mastery.Add(src, recipeId, amount)
         INSERT INTO sanctuary_recipe_mastery (identifier, recipe_id, xp) VALUES (?, ?, ?)
         ON DUPLICATE KEY UPDATE xp = VALUES(xp)
     ]], { id, recipeId, nxt })
+    local threshold = (Config.Mastery and (Config.Mastery.MasteredThreshold or Config.Mastery.MaxMastery)) or 100
+    if cur < threshold and nxt >= threshold and CraftingCore and CraftingCore.Emit then
+        CraftingCore.Emit('recipeMastered', src, recipeId, nxt)
+    end
     return nxt
 end
 

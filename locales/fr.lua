@@ -121,7 +121,7 @@ Locales['fr'] = {
     ['station_upgraded'] = 'Station améliorée (niveau %s)',
     ['module_installed'] = 'Module installé : %s',
     ['queue_cancelled'] = 'Fabrication retirée de la file',
+    ['admin_confirm_required'] = 'Confirmation requise pour enregistrer',
+    ['admin_id_exists'] = 'Cet id de recette existe déjà',
+    ['admin_command_hint'] = 'Ouvre l\'éditeur craftadmin',
 }
-
-
-
