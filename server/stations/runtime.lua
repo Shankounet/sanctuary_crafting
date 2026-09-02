@@ -185,16 +185,22 @@ function StationRuntime.GetVentilation(bench)
     return v
 end
 
+--- Persist only fields that must survive restart (level/modules/condition/broken_parts).
+--- Heat is RAM-only (C): cools to ambient on restart. CoolTick must NEVER SQL.
 local function persistPlaced(bench)
     if not bench or bench.kind ~= 'placed' or not bench.id then return end
+    local mods = bench.modules
+    local modsJson = nil
+    if type(mods) == 'table' and next(mods) ~= nil then
+        modsJson = json.encode(mods)
+    end
     pcall(function()
         MySQL.update.await(
-            'UPDATE sanctuary_placed_benches SET station_level = ?, modules = ?, condition_pct = ?, heat = ?, broken_parts = ? WHERE id = ?',
+            'UPDATE sanctuary_placed_benches SET station_level = ?, modules = ?, condition_pct = ?, broken_parts = ? WHERE id = ?',
             {
                 bench.stationLevel or 1,
-                json.encode(bench.modules or {}),
+                modsJson,
                 tonumber(bench.condition) or 100,
-                tonumber(bench.heat) or 20,
                 json.encode(bench.brokenParts or {}),
                 bench.id,
             }
@@ -259,7 +265,7 @@ function StationRuntime.Degrade(bench, recipe, batch)
         if temp > 120 then temp = 120 end
         if bench.kind == 'placed' then
             bench.heat = temp
-            persistPlaced(bench)
+            -- heat is RAM; do not SQL on craft heat rise
         else
             worldHeat[bench.key] = { temp = temp, updated = os.time() }
         end
@@ -285,7 +291,7 @@ function StationRuntime.CoolTick()
                 if t < ambient then t = ambient end
                 if bench.kind == 'placed' then
                     bench.heat = t
-                    persistPlaced(bench)
+                    -- CoolTick: RAM only. Heat does not survive restart (resets to ambient).
                 else
                     worldHeat[bench.key] = { temp = t, updated = os.time() }
                 end

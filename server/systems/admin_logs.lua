@@ -5,6 +5,24 @@
 
 AdminLogs = AdminLogs or {}
 
+local function craftHistoryOn()
+    local ch = Config.CraftHistory
+    if ch == true then return true end
+    if type(ch) == 'table' then return ch.Enabled == true end
+    return false
+end
+
+function AdminLogs.PurgeOld()
+    if not MySQL or not MySQL.query or not MySQL.query.await then return end
+    local days = math.floor((Config.AdminLogs and tonumber(Config.AdminLogs.RetentionDays)) or 14)
+    if days < 1 then return end
+    pcall(function()
+        MySQL.query.await(
+            ('DELETE FROM sanctuary_admin_logs WHERE created_at < (NOW() - INTERVAL %d DAY)'):format(days)
+        )
+    end)
+end
+
 function AdminLogs.EnsureTable()
     if not MySQL or not MySQL.query or not MySQL.query.await then return end
     MySQL.query.await([[
@@ -101,7 +119,10 @@ local function hookCompleted(src, craft, given)
         given = given,
         version = craft and craft.recipeVersion,
     }
-    AdminLogs.Record('craftCompleted', src, payload)
+    -- skip unbounded every-craft rows when CraftHistory is off; keep rare/suspicious
+    if craftHistoryOn() then
+        AdminLogs.Record('craftCompleted', src, payload)
+    end
     if rarity == 'legendary' then
         AdminLogs.Record('legendaryCraft', src, payload)
     elseif rarity == 'epic' then
@@ -144,6 +165,13 @@ CreateThread(function()
     if MySQL and MySQL.ready then
         MySQL.ready.await()
         AdminLogs.EnsureTable()
+        AdminLogs.PurgeOld()
     end
     registerHooks()
+    local interval = (Config.AdminLogs and tonumber(Config.AdminLogs.PurgeIntervalMs)) or 21600000
+    if interval < 60000 then interval = 21600000 end
+    while true do
+        Wait(interval)
+        AdminLogs.PurgeOld()
+    end
 end)

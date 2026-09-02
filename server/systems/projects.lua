@@ -26,6 +26,20 @@ end
 
 local function ident(src) return GetPlayerIdentifierSafe(src) end
 
+--- Rebuild required ingredients from live recipe. Never persist a copy.
+local function requiredOf(recipeId)
+    local recipe = Config.RecipeById and Config.RecipeById[recipeId]
+    if not recipe then return {} end
+    local required = {}
+    for i = 1, #(recipe.ingredients or {}) do
+        local ing = recipe.ingredients[i]
+        if ing and ing.item then
+            required[#required + 1] = { item = ing.item, count = ing.count or 1 }
+        end
+    end
+    return required
+end
+
 function Projects.Create(src, recipeId, benchKey)
     if not Config.Projects or not Config.Projects.Enabled then
         return nil, 'projects_disabled'
@@ -33,10 +47,7 @@ function Projects.Create(src, recipeId, benchKey)
     local recipe = Config.RecipeById[recipeId]
     if not recipe then return nil, 'craft_invalid' end
     local uid = GenerateCraftId()
-    local required = {}
-    for i = 1, #recipe.ingredients do
-        required[i] = { item = recipe.ingredients[i].item, count = recipe.ingredients[i].count }
-    end
+    local required = requiredOf(recipeId)
     local owner = ident(src)
     local data = {
         projectUid = uid, recipeId = recipeId, benchKey = benchKey,
@@ -45,9 +56,10 @@ function Projects.Create(src, recipeId, benchKey)
     }
     for i = 1, #required do data.deposited[required[i].item] = 0 end
     projects[uid] = data
+    -- required column kept NOT NULL for old schema; persist empty — rebuilt from recipe at load
     MySQL.insert.await(
         'INSERT INTO sanctuary_projects (project_uid, recipe_id, bench_key, owner, contributors, deposited, required, status) VALUES (?,?,?,?,?,?,?,?)',
-        { uid, recipeId, benchKey, owner, json.encode(data.contributors), json.encode(data.deposited), json.encode(required), 'open' }
+        { uid, recipeId, benchKey, owner, json.encode(data.contributors), json.encode(data.deposited), '[]', 'open' }
     )
     CraftingCore.Emit('projectCreated', src, data)
     return data
@@ -108,21 +120,47 @@ function Projects.Finish(src, projectUid)
         CraftingSkills.AddXP(recipe.xp.category, recipe.xp.amount or 0, src)
     end
     p.status = 'done'
-    MySQL.update.await('UPDATE sanctuary_projects SET status=? WHERE project_uid=?', { 'done', projectUid })
+    projects[projectUid] = nil
+    MySQL.query.await('DELETE FROM sanctuary_projects WHERE project_uid=?', { projectUid })
     CraftingCore.Emit('projectFinished', src, p)
     return true, recipe
+end
+
+function Projects.ListOpenFor(identifier)
+    local out = {}
+    if not identifier then return out end
+    for _, p in pairs(projects) do
+        if p.status == 'open' then
+            local hit = p.owner == identifier
+            if not hit then
+                for _, c in ipairs(p.contributors or {}) do
+                    if c == identifier then hit = true break end
+                end
+            end
+            if hit then out[#out + 1] = p end
+        end
+    end
+    return out
 end
 
 CreateThread(function()
     MySQL.ready.await()
     Projects.EnsureTable()
+    pcall(function()
+        MySQL.query.await("DELETE FROM sanctuary_projects WHERE status='done'")
+    end)
     local rows = MySQL.query.await("SELECT * FROM sanctuary_projects WHERE status='open'") or {}
     for i = 1, #rows do
         local r = rows[i]
+        local required = requiredOf(r.recipe_id)
+        -- ignore persisted required (D copy of recipe.ingredients)
+        if #required == 0 then
+            required = json.decode(r.required) or {}
+        end
         projects[r.project_uid] = {
             projectUid = r.project_uid, recipeId = r.recipe_id, benchKey = r.bench_key,
             owner = r.owner, contributors = json.decode(r.contributors) or {},
-            deposited = json.decode(r.deposited) or {}, required = json.decode(r.required) or {},
+            deposited = json.decode(r.deposited) or {}, required = required,
             status = r.status,
         }
     end

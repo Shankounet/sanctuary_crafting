@@ -237,6 +237,10 @@ function CraftQueue.TryCollect(src, craftId)
                 if StationRuntime and StationRuntime.Degrade then
                     StationRuntime.Degrade(bench, recipe, e.batch or 1)
                 end
+                if not recipe.label then
+                    recipe.label = (RecipeSnapshot and RecipeSnapshot.FacingLabel and RecipeSnapshot.FacingLabel(recipe))
+                        or e.label or e.recipeId
+                end
                 table.remove(list, i)
                 local id = ident(src)
                 if id then
@@ -305,11 +309,15 @@ function CraftQueue.LoadOffline(src)
                 local okd, dec = pcall(json.decode, r.recipe_snapshot)
                 if okd and type(dec) == 'table' then snap = dec end
             end
+            local live = Config.RecipeById and Config.RecipeById[r.recipe_id]
+            local lab = (RecipeSnapshot and RecipeSnapshot.FacingLabel and RecipeSnapshot.FacingLabel(snap))
+                or (live and live.label) or r.recipe_id
             queues[src][#queues[src] + 1] = {
                 craftId = cid, recipeId = r.recipe_id, benchKey = r.bench_key,
                 batch = r.batch, ingredients = json.decode(r.ingredients) or {},
                 finishAt = r.finish_at, createdAt = r.created_at,
                 snapshot = snap, recipeVersion = tonumber(r.recipe_version) or 0,
+                label = lab,
             }
         else
             -- drop duplicate row

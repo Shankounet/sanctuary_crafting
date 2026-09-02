@@ -16,6 +16,17 @@ local function ident(src)
     return GetPlayerIdentifierSafe(src)
 end
 
+local function currentLevels(src)
+    local cats = (Config.Skills and Config.Skills.categories) or {}
+    local out = {}
+    if not CraftingSkills or not CraftingSkills.GetLevel then return out end
+    for i = 1, #cats do
+        local cat = cats[i]
+        out[cat] = CraftingSkills.GetLevel(cat, src) or 0
+    end
+    return out
+end
+
 function NewlyLearned.EnsureTable()
     MySQL.query.await([[
         CREATE TABLE IF NOT EXISTS `sanctuary_player_recipe_unread` (
@@ -25,14 +36,6 @@ function NewlyLearned.EnsureTable()
             `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`identifier`, `recipe_id`),
             KEY `idx_ident` (`identifier`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    ]])
-    MySQL.query.await([[
-        CREATE TABLE IF NOT EXISTS `sanctuary_player_skill_watch` (
-            `identifier` VARCHAR(60) NOT NULL,
-            `category` VARCHAR(32) NOT NULL,
-            `level` INT NOT NULL DEFAULT 0,
-            PRIMARY KEY (`identifier`, `category`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     ]])
 end
@@ -47,13 +50,9 @@ function NewlyLearned.Load(src)
     for i = 1, #rows do
         cache[id][rows[i].recipe_id] = rows[i].source
     end
-    levelSnap[id] = {}
-    local lv = MySQL.query.await(
-        "SELECT category, level FROM sanctuary_player_skill_watch WHERE identifier = ?", { id }
-    ) or {}
-    for i = 1, #lv do
-        levelSnap[id][lv[i].category] = tonumber(lv[i].level) or 0
-    end
+    -- last-seen levels: RAM only (ml_skills is the sole XP source).
+    -- Restart may miss unread level-unlock badges until the first post-restart craft.
+    levelSnap[id] = currentLevels(src)
 end
 
 function NewlyLearned.List(src)
@@ -111,25 +110,8 @@ function NewlyLearned.Consult(src, recipeId)
     return true
 end
 
-local function currentLevels(src)
-    local cats = (Config.Skills and Config.Skills.categories) or {}
-    local out = {}
-    if not CraftingSkills or not CraftingSkills.GetLevel then return out end
-    for i = 1, #cats do
-        local cat = cats[i]
-        out[cat] = CraftingSkills.GetLevel(cat, src) or 0
-    end
-    return out
-end
-
 local function saveSnap(id, levels)
     levelSnap[id] = levels
-    for cat, lv in pairs(levels) do
-        MySQL.query.await([[
-            INSERT INTO sanctuary_player_skill_watch (identifier, category, level) VALUES (?,?,?)
-            ON DUPLICATE KEY UPDATE level = VALUES(level)
-        ]], { id, cat, lv })
-    end
 end
 
 --- Compare getMenu / AddXP snapshot → mark recipes whose requireLevel is newly met
@@ -167,6 +149,14 @@ end)
 AddEventHandler("esx:playerLoaded", function(playerId)
     local src = type(playerId) == "number" and playerId or source
     if src then NewlyLearned.Load(src) end
+end)
+
+AddEventHandler("playerDropped", function()
+    local id = ident(source)
+    if id then
+        cache[id] = nil
+        levelSnap[id] = nil
+    end
 end)
 
 CraftingCore.On("blueprintLearned", function(src, blueprintId)
