@@ -24,23 +24,53 @@
   line-height: 1.35;
   pointer-events: none;
   user-select: none;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-6px);
-  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
-}
-
-#craft-tracker.is-visible {
   opacity: 1;
   visibility: visible;
   transform: none;
+}
+
+#craft-tracker.is-visible:not(.mode-hidden) {
+  display: block;
   pointer-events: auto;
 }
 
+/* Real disappear — never opacity:0 leftover 292px box (CEF black square) */
+#craft-tracker:not(.is-visible),
+#craft-tracker.mode-hidden,
 #craft-tracker.hidden-panel {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  max-width: 0 !important;
+  min-width: 0 !important;
+}
+#craft-tracker:not(.is-visible)::before,
+#craft-tracker:not(.is-visible)::after,
+#craft-tracker.mode-hidden::before,
+#craft-tracker.mode-hidden::after,
+#craft-tracker.hidden-panel::before,
+#craft-tracker.hidden-panel::after {
+  content: none !important;
+  display: none !important;
+}
+#craft-tracker:not(.is-visible) .ct-shell,
+#craft-tracker.mode-hidden .ct-shell,
+#craft-tracker.hidden-panel .ct-shell {
+  display: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
 }
 
 #craft-tracker .ct-shell {
@@ -63,10 +93,19 @@
   padding: 8px 10px;
   border-bottom: 1px solid var(--ct-line);
   background: linear-gradient(180deg, #242424, #1b1b1b);
-  cursor: grab;
 }
 
-#craft-tracker .ct-header:active { cursor: grabbing; }
+#craft-tracker .ct-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  color: var(--ct-muted);
+  cursor: grab;
+  flex-shrink: 0;
+}
+#craft-tracker .ct-grip:active { cursor: grabbing; }
+#craft-tracker.mode-minimal .ct-grip { display: none; }
 
 #craft-tracker .ct-title {
   flex: 1;
@@ -262,32 +301,56 @@
 #craft-tracker .ct-dismiss:hover { color: var(--ct-text); }
 
 /* Modes */
-#craft-tracker.mode-compact { width: 240px; }
+#craft-tracker.mode-normal,
+#craft-tracker.mode-expanded { width: 292px; }
+#craft-tracker.mode-compact { width: 240px; cursor: pointer; }
 #craft-tracker.mode-compact .ct-job { padding: 8px; grid-template-columns: 32px 1fr; }
 #craft-tracker.mode-compact .ct-thumb { width: 32px; height: 32px; }
 #craft-tracker.mode-compact .ct-phase { display: none; }
 #craft-tracker.mode-compact .ct-meta .ct-pct { display: none; }
+#craft-tracker.mode-compact .ct-btn-reset { display: none; }
+#craft-tracker .ct-btn-expand { display: none; }
+#craft-tracker.mode-compact .ct-btn-expand {
+  display: inline-flex;
+  color: var(--ct-accent);
+}
+#craft-tracker.mode-compact .ct-btn-expand .ct-expand-ico {
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 700;
+}
 
 #craft-tracker.mode-minimal {
   width: auto;
   min-width: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+#craft-tracker.mode-minimal.is-visible {
+  pointer-events: auto;
 }
 #craft-tracker.mode-minimal .ct-shell {
   background: rgba(26, 26, 26, 0.92);
+  pointer-events: auto;
+  cursor: pointer;
 }
 #craft-tracker.mode-minimal .ct-header {
-  padding: 8px 10px;
-  border-bottom: 0;
-  gap: 6px;
+  display: none;
 }
 #craft-tracker.mode-minimal .ct-title,
 #craft-tracker.mode-minimal .ct-btn-mode,
+#craft-tracker.mode-minimal .ct-btn-expand,
+#craft-tracker.mode-minimal .ct-btn-hide,
 #craft-tracker.mode-minimal .ct-list,
-#craft-tracker.mode-minimal .ct-btn-reset {
+#craft-tracker.mode-minimal .ct-btn-reset,
+#craft-tracker.mode-minimal .ct-btn,
+#craft-tracker.mode-minimal .ct-count {
   display: none;
 }
 #craft-tracker.mode-minimal.is-visible .ct-minimal {
   display: inline-flex;
+  pointer-events: auto;
+  cursor: pointer;
 }
 #craft-tracker .ct-minimal {
   display: none;
@@ -298,8 +361,103 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   font-size: 11px;
+  pointer-events: auto;
 }
 #craft-tracker .ct-minimal i { font-size: 14px; }
+
+/* Compact overlay — Paramètres HUD (not a layout rewrite) */
+#hud-settings {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483200;
+  display: none;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 56px 18px 18px;
+  background: rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+}
+#hud-settings.is-open { display: flex; }
+#hud-settings.hidden { display: none !important; }
+#hud-settings .hud-settings-panel {
+  width: 280px;
+  max-width: calc(100vw - 36px);
+  background: linear-gradient(180deg, #242424, #1b1b1b);
+  border: 1px solid #2c2c2c;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  color: #d8d2c6;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-size: 12px;
+  padding: 10px 12px 12px;
+}
+#hud-settings .hud-settings-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(154, 136, 102, 0.28);
+  padding-bottom: 8px;
+}
+#hud-settings .hud-settings-head p {
+  flex: 1;
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9a8866;
+  font-weight: 700;
+}
+#hud-settings .hud-set-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  cursor: pointer;
+  color: #d8d2c6;
+}
+#hud-settings .hud-set-row input { accent-color: #9a8866; }
+#hud-settings .hud-set-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0 12px;
+}
+#hud-settings .hud-set-mode span {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a8478;
+}
+#hud-settings .hud-set-mode select {
+  background: #222;
+  color: #d8d2c6;
+  border: 1px solid #2c2c2c;
+  border-radius: 3px;
+  padding: 5px 8px;
+}
+#hud-settings #hud-set-reset {
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 8px;
+  border: 1px solid #9a8866;
+  background: rgba(154, 136, 102, 0.12);
+  color: #9a8866;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  border-radius: 3px;
+}
+#hud-settings #hud-set-reset:hover { background: rgba(154, 136, 102, 0.22); }
+#hud-settings #hud-settings-close {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  color: #8a8478;
+  cursor: pointer;
+}
 
 #craft-tracker .ct-empty {
   padding: 14px 12px;

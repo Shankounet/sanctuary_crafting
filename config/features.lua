@@ -142,9 +142,10 @@ end
 Config.CraftTracker = {
     Enabled = true,
     DefaultPosition = { top = 24, right = 24 }, -- px
-    DefaultMode = 'normal', -- normal | compact | minimal
+    DefaultMode = 'expanded', -- expanded | compact | minimal | hidden ('normal' alias of expanded)
     AutoShowOnStart = true,
     HideWithMenuIfUnpinned = true,
+    ShowOnNewCraftIfHidden = true, -- G: new active craft while hidden → compact
     PersistPin = true,
     PersistMode = true,
     PersistPosition = true,

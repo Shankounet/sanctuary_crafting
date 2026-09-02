@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.16.0
+# sanctuary_crafting v2.16.1
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,9 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.16.1 — HUD widgets: états restaurables
+Pins + tracker: plus de cul-de-sac (minimal sans expand, hide qui cuit `miniHud=false`, carré noir CEF). États `expanded|compact|minimal|hidden` / `pinsVisible`. Clic compact/minimal → expand, chevron ↗, hide = `display:none`. Restore via Paramètres HUD (Craft + Carnet). LS `sanctuary_hud.*`. SQL pins intactes. Callbacks NUI joueur inchangés (`hudSettings*` / `hudReset` ajoutés).
 
 ### v2.16.0 — Architecture (exports, craftadmin, snapshots, anti-dup, logs)
 Façade **16 exports** documentés (`docs/EXPORTS.md`) : `OpenStation`, `OpenRecipe`, `AddRecipe`, `RemoveRecipe` (soft-disable), `GetRecipe`, `GetRecipes`, `CanCraft`, `StartCraft`, `CancelCraft`, `GetQueue`, `FollowRecipe`, `UnfollowRecipe`, `IsRecipeKnown`, `LearnRecipe` (SERVER only), `GetRecipeMastery`, `GetStationState`. Anciens noms conservés.

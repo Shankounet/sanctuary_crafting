@@ -2204,6 +2204,13 @@
   // events — null-safe so a missing craft control never kills the NUI page (book.js needs the page alive)
   const bindUi = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
   bindUi('#btn-close', 'click', () => post('close', {}));
+  bindUi('#btn-hud', 'click', () => {
+    const hud = window.SanctuaryHud;
+    if (!hud) return;
+    const panel = document.getElementById('hud-settings');
+    if (panel && panel.classList.contains('is-open') && hud.close) hud.close();
+    else if (hud.open) hud.open();
+  });
   bindUi('#btn-compact', 'click', () => {
     state.compact = !state.compact;
     app.dataset.compact = state.compact ? '1' : '0';

@@ -114,6 +114,9 @@
 
     <div class="ctrl-actions">
       <span class="ctrl-actions-label" aria-hidden="true">SYS</span>
+      <button type="button" id="btn-hud" class="icon-btn" title="Paramètres HUD" aria-label="Paramètres HUD">
+        <i class="fa-solid fa-gear" aria-hidden="true"></i>
+      </button>
       <button type="button" id="btn-compact" class="icon-btn" title="Mode compact" aria-label="Compact">
         <i class="fa-solid fa-compress" aria-hidden="true"></i>
       </button>
@@ -607,19 +610,26 @@
 
 
 <!-- Craft Tracker v2.6.0 — floating productions HUD (outside #app / #book-app) -->
-<div id="craft-tracker" class="mode-normal" aria-live="polite" aria-label="Suivi des productions">
+<div id="craft-tracker" class="mode-expanded" aria-live="polite" aria-label="Suivi des productions">
   <div class="ct-shell">
     <header class="ct-header" id="ct-header">
+      <span class="ct-grip" id="ct-grip" title="Déplacer" aria-hidden="true"><i class="fa-solid fa-grip-vertical"></i></span>
       <p class="ct-title">Productions</p>
       <span class="ct-count" id="ct-count">0</span>
       <button type="button" class="ct-btn" id="ct-pin" title="Épingler" aria-label="Épingler le tracker" aria-pressed="false">
         <i class="fa-solid fa-thumbtack" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="ct-btn ct-btn-expand" id="ct-expand" title="Agrandir" aria-label="Agrandir">
+        <span class="ct-expand-ico" aria-hidden="true">↗</span>
       </button>
       <button type="button" class="ct-btn ct-btn-mode" id="ct-mode" title="Mode d'affichage" aria-label="Changer le mode">
         <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
       </button>
       <button type="button" class="ct-btn ct-btn-reset" id="ct-reset" title="Réinitialiser la position" aria-label="Réinitialiser la position">
         <i class="fa-solid fa-crosshairs" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="ct-btn ct-btn-hide" id="ct-hide" title="Masquer" aria-label="Masquer le tracker">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
       </button>
     </header>
     <div class="ct-minimal" id="ct-minimal" aria-hidden="true">
@@ -780,6 +790,35 @@
   </div>
 </div>
 
+<div id="hud-settings" class="hud-settings hidden" role="dialog" aria-label="Paramètres HUD" aria-hidden="true">
+  <div class="hud-settings-panel">
+    <div class="hud-settings-head">
+      <p>Paramètres HUD</p>
+      <button type="button" id="hud-settings-close" title="Fermer" aria-label="Fermer">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
+    </div>
+    <label class="hud-set-row">
+      <input type="checkbox" id="hud-set-pins" />
+      Afficher les épingles
+    </label>
+    <label class="hud-set-row">
+      <input type="checkbox" id="hud-set-tracker" />
+      Afficher le tracker
+    </label>
+    <label class="hud-set-mode">
+      <span>Mode tracker</span>
+      <select id="hud-set-tracker-mode" aria-label="Mode tracker">
+        <option value="expanded">Étendu</option>
+        <option value="compact">Compact</option>
+        <option value="minimal">Minimal</option>
+      </select>
+    </label>
+    <button type="button" id="hud-set-reset">RÉINITIALISER LES WIDGETS</button>
+  </div>
+</div>
+
+<script src="hud-settings.js"></script>
 <script src="app.js"></script>
 <script src="tracker.js"></script>
 <script src="book.js"></script>
