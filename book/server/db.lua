@@ -44,7 +44,6 @@ function BookDB.Ensure()
     MySQL.query.await([[CREATE TABLE IF NOT EXISTS `sanctuary_book_discovered_resources` (
         `identifier` VARCHAR(60) NOT NULL,
         `item` VARCHAR(64) NOT NULL,
-        `label` VARCHAR(128) NULL,
         `discovered_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (`identifier`, `item`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci]])

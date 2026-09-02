@@ -119,7 +119,8 @@ local function rowToBench(row)
         stationLevel = tonumber(row.station_level) or 1,
         modules = decodeJson(row.modules, {}),
         condition = tonumber(row.condition_pct) or 100,
-        heat = tonumber(row.heat) or 20,
+        -- heat is RAM-only (v2.17): ignore SQL leftover, start at ambient
+        heat = (Config.Stations and Config.Stations.Heat and Config.Stations.Heat.Ambient) or 20,
         brokenParts = decodeJson(row.broken_parts, {}),
     }
 end
@@ -144,9 +145,13 @@ function Benches.InsertPlaced(owner, category, modelHash, coords, heading, stati
     local modelName = PROP_NAMES[category] or tostring(modelHash)
     local level = stationLevel or (Config.Stations and Config.Stations.DefaultLevel) or 1
     local mods = modules or {}
+    local modsJson = nil
+    if type(mods) == 'table' and next(mods) ~= nil then
+        modsJson = json.encode(mods)
+    end
     local insertId = MySQL.insert.await(
         'INSERT INTO sanctuary_placed_benches (owner, category, model, x, y, z, heading, station_level, modules) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        { owner, category, modelName, coords.x, coords.y, coords.z, heading, level, json.encode(mods) }
+        { owner, category, modelName, coords.x, coords.y, coords.z, heading, level, modsJson }
     )
     if not insertId then return nil end
     local b = {

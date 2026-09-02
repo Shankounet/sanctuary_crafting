@@ -133,6 +133,8 @@ Config.Stations = {
     },
     Heat = {
         Enabled = true,
+        -- Heat is RAM-only (v2.17). CoolTick never SQL. On resource restart, heat
+        -- resets to Ambient — it does not survive restart. Condition/modules/level do.
         Particles = false,
         Ambient = 20,
         RisePerCraft = 8,

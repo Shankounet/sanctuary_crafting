@@ -181,7 +181,26 @@ Config.Teaching = {
 }
 
 Config.Follow = {
+    -- true: pin/follow inserts a SINGLE parent recipe objective (kind='recipe').
+    -- Gather / skill / blueprint children are reconstructed LIVE (inventory + ml_skills)
+    -- and NEVER persisted. Shopping list is RAM-only from pins + followed projects.
     AutoObjectives = true,
+}
+
+-- Full craft history in sanctuary_book_history. Default OFF (sparse).
+-- sanctuary_player_recent (≤10 catalogue « récemment ») stays regardless.
+-- If Enabled=true, optional RetentionDays prunes craft_completed rows (book MaxHistory still caps).
+Config.CraftHistory = {
+    Enabled = false,
+    RetentionDays = 7,
+}
+
+-- sanctuary_admin_logs retention. Purge on boot + every PurgeIntervalMs (not every frame).
+-- craftCompleted rows are NOT written when CraftHistory.Enabled is false
+-- (legendary / epic / weapon / unusualBatch / suspicious / anomaly / admin edits stay).
+Config.AdminLogs = {
+    RetentionDays = 14,
+    PurgeIntervalMs = 21600000, -- 6h
 }
 
 Config.RecentlyCrafted = {

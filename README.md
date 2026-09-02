@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.16.3
+# sanctuary_crafting v2.17.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,17 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.17.0 — SQL sparse (no derived rows, slim snapshots, history off)
+Persistence pass. **New player first connect / getMenu / carnet = 0 INSERTs** (already true; unchanged). No dense player×recipe seed. Table names stay `sanctuary_*`.
+
+Cut: fat queue `recipe_snapshot` (label/description/image/category/rarity/steps UI/heat); derived objective SQL (`gather`/`skill`/`blueprint` — reconstruct live from recipe + ox_inventory + ml_skills); `sanctuary_player_skill_watch` (RAM last-seen vs ml_skills); `discovered_resources.label` (ox label at read); projects `required` JSON copy + accumulating `status=done`; CoolTick heat SQL every 15s (heat is RAM, ambient on restart); `craft_completed` book history + unbounded admin_logs every craft; 8 COUNT roundtrips on dashboard; artisans/orders SELECT every getMenu.
+
+Kept: knowledge/mastery/favorites/queue/placed_benches/pins/notes; player-placed bench row even at 100% wear; world benches 0 SQL; `sanctuary_player_recent` ≤10; ml_skills sole XP source.
+
+Config: `CraftHistory.Enabled=false`, `AdminLogs.RetentionDays=14` (purge 6h), `Follow.AutoObjectives` = parent recipe objective only. Schema **217** auto-migrates at boot.
+
+Accepted risks: station heat does not survive restart; unread level-unlock badges may miss until first post-restart craft.
 
 ### v2.16.3 — Carnet Notes: feuille papier, écriture diégétique, checklist
 Notes: nouvelle note sur une feuille `paper_aged_new` (crop distinct de la page), plus de bloc `lined-paper` / `paper_dark`. Titre souligné, date du jour (Europe/Paris), corps ligné, checklist par rangées (plus de `|`). Cachet ENREGISTRER. Droite: fiches `paper_dark` ou carnet vide immersif. Post-its réels `tex/postit_{blue,green,pink,yellow}.png` (fond transparent) pour tâches, indice vide, et `.sticky-note`. Callbacks `saveNote` / `deleteNote` inchangés.
@@ -30,7 +41,7 @@ Anti-dup : lock joueur+station → validate → `CraftingMaterials` → **snapsh
 
 `learnBlueprint` : trou fermé (item **ou** admin) — **pas de rename**. `CanCarry` fail-closed. Anomalies : double-complete, bad qty, unknown recipe, missing ox item, incoherent queue, bad timestamp, batch over cap.
 
-SQL overlay `sanctuary_recipes` (disabled, version, updatedAt, updatedBy) **par-dessus Config** — pas de dump des 379 imports au boot. Save admin : `version+=1`, DB, `RecipeRegistry.Rebuild`. `sanctuary_recipe_versions` + RESTORE. Auto-migrate versionné (`Config.SchemaVersion=216`).
+SQL overlay `sanctuary_recipes` (disabled, version, updatedAt, updatedBy) **par-dessus Config** — pas de dump des 379 imports au boot. Save admin : `version+=1`, DB, `RecipeRegistry.Rebuild`. `sanctuary_recipe_versions` + RESTORE. Auto-migrate versionné (`Config.SchemaVersion=217`).
 
 `sanctuary_admin_logs`. `Config.Discord.Webhooks` **tous OFF** par défaut (toggles: legendaryCraft, epicCraft, weaponCraft, rareBlueprint, unusualBatch, adminRecipeEdit, validationFail, suspicious). Pipeline HTTP-unaware via `AddCraftingHook`.
 

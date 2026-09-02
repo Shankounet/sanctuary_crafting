@@ -90,12 +90,6 @@ local function autoMigrate()
             PRIMARY KEY (`identifier`, `recipe_id`),
             KEY `idx_ident` (`identifier`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci]],
-        [[CREATE TABLE IF NOT EXISTS `sanctuary_player_skill_watch` (
-            `identifier` VARCHAR(60) NOT NULL,
-            `category` VARCHAR(32) NOT NULL,
-            `level` INT NOT NULL DEFAULT 0,
-            PRIMARY KEY (`identifier`, `category`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci]],
     }
     for i = 1, #statements do
         MySQL.query.await(statements[i])
@@ -115,10 +109,39 @@ local function autoMigrate()
     if AdminLogs and AdminLogs.EnsureTable then AdminLogs.EnsureTable() end
     pcall(function() MySQL.query.await('ALTER TABLE sanctuary_craft_queue ADD COLUMN recipe_snapshot LONGTEXT NULL') end)
     pcall(function() MySQL.query.await('ALTER TABLE sanctuary_craft_queue ADD COLUMN recipe_version INT NULL') end)
-    local target = (Config.SchemaVersion or 216)
+    local target = (Config.SchemaVersion or 217)
     local cur = 0
     local row = MySQL.query.await('SELECT version FROM sanctuary_schema_version WHERE id = 1')
     if row and row[1] then cur = tonumber(row[1].version) or 0 end
+
+    -- v2.17 sparse SQL: no derived objective rows, no skill_watch, no resource labels,
+    -- prune done projects + craft_completed history (CraftHistory default false).
+    -- Do NOT INSERT any recipe×player rows. Do NOT DROP knowledge/mastery/favorites/queue/pins/notes.
+    if cur < 217 then
+        pcall(function()
+            MySQL.query.await("DELETE FROM sanctuary_book_objectives WHERE kind IN ('gather','skill','blueprint')")
+        end)
+        pcall(function()
+            MySQL.query.await('DROP TABLE IF EXISTS sanctuary_player_skill_watch')
+        end)
+        pcall(function()
+            MySQL.query.await('ALTER TABLE sanctuary_book_discovered_resources DROP COLUMN label')
+        end)
+        pcall(function()
+            MySQL.query.await("DELETE FROM sanctuary_projects WHERE status='done'")
+        end)
+        pcall(function()
+            MySQL.query.await("DELETE FROM sanctuary_book_history WHERE event_type='craft_completed'")
+        end)
+        local days = math.floor((Config.AdminLogs and tonumber(Config.AdminLogs.RetentionDays)) or 14)
+        if days < 1 then days = 14 end
+        pcall(function()
+            MySQL.query.await(
+                ('DELETE FROM sanctuary_admin_logs WHERE created_at < (NOW() - INTERVAL %d DAY)'):format(days)
+            )
+        end)
+    end
+
     if cur < target then
         MySQL.query.await([[
             INSERT INTO sanctuary_schema_version (id, version) VALUES (1, ?)

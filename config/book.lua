@@ -44,6 +44,6 @@ Config.Book = {
     Maintenance   = { Enabled = true },
     Productions   = { Enabled = true }, -- queues
     Notifications = { Enabled = true, CooldownMs = 8000 },
-    History       = { Enabled = true },
+    History       = { Enabled = true }, -- blueprint_learned / artisan_met / etc. craft_completed gated by Config.CraftHistory
     Stats         = { Enabled = true }, -- counts only
 }

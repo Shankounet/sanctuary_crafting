@@ -391,20 +391,18 @@ function SurvivalBook.Productions(src)
     end
     local projects = {}
     if Projects and BookDB.Mod('Projects') then
-        -- List open projects where player is owner/contributor (no other inventories)
+        -- RAM open projects (no JSON LIKE on contributors)
         local id = BookDB.Ident(src)
-        local rows = MySQL.query.await(
-            "SELECT project_uid, recipe_id, status, owner FROM sanctuary_projects WHERE status = 'open' AND (owner = ? OR contributors LIKE ?)",
-            { id, '%' .. (id or '') .. '%' }
-        ) or {}
-        for i = 1, #rows do
-            local r = Config.RecipeById and Config.RecipeById[rows[i].recipe_id]
+        local list = (Projects.ListOpenFor and Projects.ListOpenFor(id)) or {}
+        for i = 1, #list do
+            local row = list[i]
+            local r = Config.RecipeById and Config.RecipeById[row.recipeId]
             projects[#projects + 1] = {
-                projectUid = rows[i].project_uid,
-                recipeId = rows[i].recipe_id,
-                label = (r and OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or (r and r.label) or rows[i].recipe_id,
-                status = rows[i].status,
-                isOwner = rows[i].owner == id,
+                projectUid = row.projectUid,
+                recipeId = row.recipeId,
+                label = (r and OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or (r and r.label) or row.recipeId,
+                status = row.status,
+                isOwner = row.owner == id,
             }
         end
     end
@@ -424,22 +422,9 @@ end
 
 function SurvivalBook.Stats(src)
     if not BookDB.Mod('Stats') then return {} end
-    local id = BookDB.Ident(src)
-    if not id then return {} end
-    local function count(sql, ...)
-        return MySQL.scalar.await(sql, { ... }) or 0
-    end
-    return {
-        resources = count('SELECT COUNT(*) FROM sanctuary_book_discovered_resources WHERE identifier = ?', id),
-        objectivesOpen = count('SELECT COUNT(*) FROM sanctuary_book_objectives WHERE identifier = ? AND done = 0', id),
-        objectivesDone = count('SELECT COUNT(*) FROM sanctuary_book_objectives WHERE identifier = ? AND done = 1', id),
-        pins = count('SELECT COUNT(*) FROM sanctuary_book_pins WHERE identifier = ?', id),
-        notes = count('SELECT COUNT(*) FROM sanctuary_book_notes WHERE identifier = ?', id),
-        artisans = count('SELECT COUNT(*) FROM sanctuary_book_artisans WHERE identifier = ?', id),
-        orders = count('SELECT COUNT(*) FROM sanctuary_book_orders WHERE owner = ?', id),
-        blueprints = #(SurvivalBook.ListBlueprints(src) or {}),
-        history = count('SELECT COUNT(*) FROM sanctuary_book_history WHERE identifier = ?', id),
-    }
+    local sizes = SurvivalBook.CacheSizes and SurvivalBook.CacheSizes(src) or {}
+    sizes.blueprints = #(SurvivalBook.ListBlueprints(src) or {})
+    return sizes
 end
 
 function SurvivalBook.Search(src, query)

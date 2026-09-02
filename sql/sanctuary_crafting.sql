@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS `sanctuary_projects` (
     `owner` VARCHAR(60) NOT NULL,
     `contributors` LONGTEXT NOT NULL,
     `deposited` LONGTEXT NOT NULL,
-    `required` LONGTEXT NOT NULL,
+    `required` LONGTEXT NOT NULL, -- unused since v2.17 (rebuilt from recipe; persist '[]')
     `status` VARCHAR(16) NOT NULL DEFAULT 'open',
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
@@ -113,7 +113,6 @@ CREATE TABLE IF NOT EXISTS `sanctuary_book_notes` (
 CREATE TABLE IF NOT EXISTS `sanctuary_book_discovered_resources` (
     `identifier` VARCHAR(60) NOT NULL,
     `item` VARCHAR(64) NOT NULL,
-    `label` VARCHAR(128) NULL,
     `discovered_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`identifier`, `item`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -180,12 +179,7 @@ CREATE TABLE IF NOT EXISTS `sanctuary_player_recipe_unread` (
     KEY `idx_ident` (`identifier`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS `sanctuary_player_skill_watch` (
-    `identifier` VARCHAR(60) NOT NULL,
-    `category` VARCHAR(32) NOT NULL,
-    `level` INT NOT NULL DEFAULT 0,
-    PRIMARY KEY (`identifier`, `category`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- sanctuary_player_skill_watch dropped in schema 217 (RAM last-seen vs ml_skills)
 
 
 -- v2.16 overlay (do NOT seed Config.Recipes here)
@@ -228,3 +222,9 @@ CREATE TABLE IF NOT EXISTS `sanctuary_schema_version` (
     `version` INT NOT NULL,
     `applied_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- v2.17 (217) applied automatically at boot (server/core/boot.lua):
+--   DELETE gather/skill/blueprint objectives; DROP skill_watch;
+--   DROP discovered_resources.label; DELETE done projects;
+--   DELETE craft_completed history; purge admin_logs older than RetentionDays.
+-- Live ALTER — tables are NOT renamed sanctuary_* → craft_*.

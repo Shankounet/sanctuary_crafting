@@ -5,9 +5,21 @@
 
 SurvivalBook = SurvivalBook or {}
 
-local discoveredCache = {} -- [ident] = { [item]=true }
+local discoveredCache = {} -- [ident] = { [item]=ts }
 local pinCache = {}        -- [ident] = { recipeId, ... }
+local artisanCache = {}    -- [ident] = { contact, ... }
+local orderCache = {}      -- [ident] = { order, ... }
+local noteCache = {}       -- [ident] = { note, ... }
+local objectiveCache = {}  -- [ident] = { sql objective rows, ... }
+local historyCount = {}    -- [ident] = number
 local notifCooldown = {}     -- [src] = lastMs
+
+local function craftHistoryOn()
+    local ch = Config.CraftHistory
+    if ch == true then return true end
+    if type(ch) == 'table' then return ch.Enabled == true end
+    return false
+end
 
 local function jdec(s, fb)
     if not s or s == '' then return fb end
@@ -46,10 +58,14 @@ end
 
 function SurvivalBook.PushHistory(ident, eventType, payload)
     if not BookDB.Mod('History') and not BookDB.Mod('Discoveries') then return end
+    if eventType == 'craft_completed' and not craftHistoryOn() then
+        return
+    end
     MySQL.insert.await(
         'INSERT INTO sanctuary_book_history (identifier, event_type, payload) VALUES (?,?,?)',
         { ident, eventType, jenc(payload) }
     )
+    historyCount[ident] = (historyCount[ident] or 0) + 1
     local maxH = (Config.Book and Config.Book.MaxHistory) or 120
     MySQL.query.await([[
         DELETE FROM sanctuary_book_history WHERE identifier = ? AND id NOT IN (
@@ -88,10 +104,10 @@ function SurvivalBook.LoadDiscoveries(src)
     if not id then return end
     discoveredCache[id] = {}
     local rows = MySQL.query.await(
-        'SELECT item FROM sanctuary_book_discovered_resources WHERE identifier = ?', { id }
+        'SELECT item, UNIX_TIMESTAMP(discovered_at) AS ts FROM sanctuary_book_discovered_resources WHERE identifier = ?', { id }
     ) or {}
     for i = 1, #rows do
-        discoveredCache[id][rows[i].item] = true
+        discoveredCache[id][rows[i].item] = tonumber(rows[i].ts) or 0
     end
 end
 
@@ -100,7 +116,7 @@ function SurvivalBook.HasDiscoveredResource(src, item)
     local id = BookDB.Ident(src)
     if not id then return false end
     if not discoveredCache[id] then SurvivalBook.LoadDiscoveries(src) end
-    return discoveredCache[id] and discoveredCache[id][item] == true
+    return discoveredCache[id] and discoveredCache[id][item] ~= nil
 end
 
 function SurvivalBook.DiscoverResource(src, item, label, reason)
@@ -113,12 +129,12 @@ function SurvivalBook.DiscoverResource(src, item, label, reason)
     if not discoveredCache[id] then SurvivalBook.LoadDiscoveries(src) end
     if discoveredCache[id][item] then return true, 'already' end
 
-    local lab = label or itemLabel(item)
+    local lab = itemLabel(item)
     MySQL.insert.await(
-        'INSERT IGNORE INTO sanctuary_book_discovered_resources (identifier, item, label) VALUES (?,?,?)',
-        { id, item, lab }
+        'INSERT IGNORE INTO sanctuary_book_discovered_resources (identifier, item) VALUES (?,?)',
+        { id, item }
     )
-    discoveredCache[id][item] = true
+    discoveredCache[id][item] = os.time()
     SurvivalBook.PushHistory(id, 'resource_discovered', { item = item, label = lab, reason = reason })
     TriggerClientEvent('sanctuary_crafting:book:resourceDiscovered', src, item, lab)
     TriggerEvent('sanctuary_crafting:book:resourceDiscovered', src, item, lab)
@@ -129,14 +145,12 @@ end
 function SurvivalBook.ListResources(src)
     local id = BookDB.Ident(src)
     if not id then return {} end
-    local rows = MySQL.query.await(
-        'SELECT item, label, UNIX_TIMESTAMP(discovered_at) AS ts FROM sanctuary_book_discovered_resources WHERE identifier = ? ORDER BY discovered_at DESC',
-        { id }
-    ) or {}
+    if not discoveredCache[id] then SurvivalBook.LoadDiscoveries(src) end
     local out = {}
-    for i = 1, #rows do
-        out[i] = { item = rows[i].item, label = rows[i].label or rows[i].item, discoveredAt = rows[i].ts }
+    for item, ts in pairs(discoveredCache[id] or {}) do
+        out[#out + 1] = { item = item, label = itemLabel(item), discoveredAt = ts }
     end
+    table.sort(out, function(a, b) return (a.discoveredAt or 0) > (b.discoveredAt or 0) end)
     return out
 end
 
@@ -158,167 +172,157 @@ function SurvivalBook.AddObjective(src, title, kind, payload)
     if not id or type(title) ~= 'string' or title == '' then return nil, 'craft_invalid' end
     title = title:sub(1, 128)
     kind = kind or 'manual'
+    if kind == 'gather' or kind == 'skill' or kind == 'blueprint' then
+        kind = 'manual'
+    end
     local maxO = (Config.Book and Config.Book.MaxObjectives) or 24
-    local count = MySQL.scalar.await(
-        'SELECT COUNT(*) FROM sanctuary_book_objectives WHERE identifier = ? AND done = 0', { id }
-    ) or 0
+    if not objectiveCache[id] then SurvivalBook.LoadObjectives(src) end
+    local count = 0
+    for _, o in ipairs(objectiveCache[id] or {}) do
+        if not o.done then count = count + 1 end
+    end
     if count >= maxO then return nil, 'book_objectives_full' end
     local insertId = MySQL.insert.await(
         'INSERT INTO sanctuary_book_objectives (identifier, kind, title, payload, done) VALUES (?,?,?,?,0)',
         { id, kind, title, jenc(payload or {}) }
     )
+    local obj = { id = insertId, title = title, kind = kind, done = false, payload = payload or {}, createdAt = os.time() }
+    objectiveCache[id][#objectiveCache[id] + 1] = obj
     SurvivalBook.PushHistory(id, 'objective_added', { id = insertId, title = title, kind = kind })
-    return { id = insertId, title = title, kind = kind, done = false, payload = payload or {} }
+    return obj
+end
+
+--- Live gather/skill/blueprint children — RAM only, never persisted.
+function SurvivalBook.LiveObjectiveChildren(src, recipeId, parentId)
+    local recipe = Config.RecipeById and Config.RecipeById[recipeId]
+    if not recipe then return {} end
+    local function invCount(item)
+        if GetResourceState('ox_inventory') ~= 'started' then return 0 end
+        return exports.ox_inventory:GetItemCount(src, item) or 0
+    end
+    local children = {}
+    local ings = recipe.ingredients or {}
+    if type(recipe.steps) == 'table' and #recipe.steps > 0 then
+        ings = {}
+        for _, step in ipairs(recipe.steps) do
+            for _, ing in ipairs(step.ingredients or {}) do
+                ings[#ings + 1] = ing
+            end
+        end
+    end
+    for i = 1, #ings do
+        local ing = ings[i]
+        if ing and ing.item then
+            local need = ing.count or 1
+            local owned = invCount(ing.item)
+            local lab = (OxItemCatalog and OxItemCatalog.Label and OxItemCatalog.Label(ing.item)) or ing.item
+            children[#children + 1] = {
+                id = nil, kind = 'gather', live = true,
+                title = string.format('Récupérer %s', lab),
+                payload = { recipeId = recipeId, item = ing.item, need = need, count = need, parentObjectiveId = parentId },
+                done = owned >= need, liveDone = owned >= need,
+                need = need, owned = owned, remaining = math.max(0, need - owned),
+            }
+        end
+    end
+    if recipe.requireLevel then
+        local cat = CraftingSkills and CraftingSkills.LevelCategoryForRecipe and CraftingSkills.LevelCategoryForRecipe(recipe)
+        local cur = 0
+        if CraftingSkills and CraftingSkills.GetLevel then
+            cur = CraftingSkills.GetLevel(cat, src) or 0
+        end
+        local need = tonumber(recipe.requireLevel) or 0
+        children[#children + 1] = {
+            id = nil, kind = 'skill', live = true,
+            title = string.format('Atteindre le niveau %s', tostring(need)),
+            payload = { recipeId = recipeId, category = cat, requireLevel = need, parentObjectiveId = parentId },
+            done = cur >= need, liveDone = cur >= need,
+            need = need, owned = cur, playerSkillLevel = cur,
+        }
+    end
+    local bpId = recipe.requireBlueprint or recipe.blueprintId
+    if bpId then
+        local has = true
+        if Blueprints and Blueprints.Has then
+            has = Blueprints.Has(src, bpId) == true
+        end
+        children[#children + 1] = {
+            id = nil, kind = 'blueprint', live = true,
+            title = 'Obtenir le plan technique',
+            payload = { recipeId = recipeId, blueprintId = bpId, parentObjectiveId = parentId },
+            done = has, liveDone = has, owned = has and 1 or 0, need = 1,
+        }
+    end
+    return children
 end
 
 function SurvivalBook.AddObjectiveFromRecipe(src, recipeId, opts)
     local recipe = Config.RecipeById and Config.RecipeById[recipeId]
     if not recipe then return nil, 'craft_invalid' end
     opts = type(opts) == 'table' and opts or {}
-    -- idempotent: reuse open recipe objective
+    -- idempotent: reuse open recipe objective (parent only — no gather/skill/blueprint SQL)
     local existing = SurvivalBook.ListObjectives(src, { skipLive = true }) or {}
     for _, o in ipairs(existing) do
         if not o.done and o.kind == 'recipe' and o.payload and o.payload.recipeId == recipeId then
             o.already = true
+            o.subObjectives = SurvivalBook.LiveObjectiveChildren(src, recipeId, o.id)
+            o.children = o.subObjectives
             return o
         end
     end
     local facing = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(recipe)) or recipe.label or recipeId
     local obj, err = SurvivalBook.AddObjective(src, facing, 'recipe', { recipeId = recipeId })
     if not obj then return nil, err end
-
-    -- Optional sub-objectives for missing materials (server-owned counts only)
-    local subs = {}
-    if opts.withMissing ~= false then
-        local ings = recipe.ingredients or {}
-        for i = 1, #ings do
-            local ing = ings[i]
-            if ing and ing.item then
-                local need = ing.count or 1
-                local owned = 0
-                if GetResourceState('ox_inventory') == 'started' then
-                    owned = exports.ox_inventory:GetItemCount(src, ing.item) or 0
-                end
-                local lab = (OxItemCatalog and OxItemCatalog.Label and OxItemCatalog.Label(ing.item)) or ing.item
-                local title = string.format('Récupérer %s', lab)
-                local sub, serr = SurvivalBook.AddObjective(src, title, 'gather', {
-                    recipeId = recipeId,
-                    item = ing.item,
-                    need = need,
-                    count = need,
-                    parentObjectiveId = obj.id,
-                })
-                if sub then
-                    subs[#subs + 1] = sub
-                elseif serr == 'book_objectives_full' then
-                    break
-                end
-            end
-        end
-    end
-    -- skill sub
-    if recipe.requireLevel and CraftingSkills then
-        local cat = CraftingSkills.LevelCategoryForRecipe and CraftingSkills.LevelCategoryForRecipe(recipe)
-        local title = string.format('Atteindre le niveau %s', tostring(recipe.requireLevel))
-        local sub = SurvivalBook.AddObjective(src, title, 'skill', {
-            recipeId = recipeId,
-            category = cat,
-            requireLevel = recipe.requireLevel,
-            parentObjectiveId = obj.id,
-        })
-        if sub then subs[#subs + 1] = sub end
-    end
-    local bpId = recipe.requireBlueprint or recipe.blueprintId
-    if bpId then
-        local sub = SurvivalBook.AddObjective(src, 'Obtenir le plan technique', 'blueprint', {
-            recipeId = recipeId,
-            blueprintId = bpId,
-            parentObjectiveId = obj.id,
-        })
-        if sub then subs[#subs + 1] = sub end
-    end
-
-    obj.subObjectives = subs
+    -- withMissing ignored for SQL: shopping / gather reconstructed live
+    obj.subObjectives = SurvivalBook.LiveObjectiveChildren(src, recipeId, obj.id)
+    obj.children = obj.subObjectives
     return obj
 end
 
-function SurvivalBook.ListObjectives(src, opts)
+function SurvivalBook.LoadObjectives(src)
     local id = BookDB.Ident(src)
-    if not id then return {} end
-    opts = type(opts) == 'table' and opts or {}
+    if not id then return end
     local rows = MySQL.query.await(
         'SELECT id, kind, title, payload, done, UNIX_TIMESTAMP(created_at) AS ts FROM sanctuary_book_objectives WHERE identifier = ? ORDER BY done ASC, id DESC',
         { id }
     ) or {}
     local out = {}
     for i = 1, #rows do
+        local kind = rows[i].kind
+        -- leftover pre-217 derived rows: ignore (migration deletes them)
+        if kind ~= 'gather' and kind ~= 'skill' and kind ~= 'blueprint' then
+            out[#out + 1] = {
+                id = rows[i].id, kind = kind, title = rows[i].title,
+                payload = jdec(rows[i].payload, {}), done = rows[i].done == 1,
+                createdAt = rows[i].ts,
+            }
+        end
+    end
+    objectiveCache[id] = out
+end
+
+function SurvivalBook.ListObjectives(src, opts)
+    local id = BookDB.Ident(src)
+    if not id then return {} end
+    opts = type(opts) == 'table' and opts or {}
+    if not objectiveCache[id] then SurvivalBook.LoadObjectives(src) end
+    local out = {}
+    for i, row in ipairs(objectiveCache[id] or {}) do
         out[i] = {
-            id = rows[i].id, kind = rows[i].kind, title = rows[i].title,
-            payload = jdec(rows[i].payload, {}), done = rows[i].done == 1,
-            createdAt = rows[i].ts,
+            id = row.id, kind = row.kind, title = row.title,
+            payload = row.payload or {}, done = row.done and true or false,
+            createdAt = row.createdAt,
         }
     end
     if opts.skipLive then return out end
 
-    local function invCount(item)
-        if GetResourceState('ox_inventory') ~= 'started' then return 0 end
-        return exports.ox_inventory:GetItemCount(src, item) or 0
-    end
-
+    -- Reconstruct gather/skill/blueprint LIVE. Do NOT UPDATE SQL on dashboard paint.
     for i = 1, #out do
         local o = out[i]
-        local pl = o.payload or {}
-        if o.kind == 'gather' and pl.item then
-            local need = tonumber(pl.need or pl.count) or 1
-            local owned = invCount(pl.item)
-            o.need = need
-            o.owned = owned
-            o.remaining = math.max(0, need - owned)
-            o.liveDone = owned >= need
-            local lab = (OxItemCatalog and OxItemCatalog.Label and OxItemCatalog.Label(pl.item)) or pl.item
-            o.title = string.format('Récupérer %s', lab)
-            if o.liveDone and not o.done then
-                SurvivalBook.CompleteObjective(src, o.id)
-                o.done = true
-            end
-        elseif o.kind == 'skill' then
-            local cat = pl.category
-            local need = tonumber(pl.requireLevel) or 0
-            local cur = 0
-            if CraftingSkills and CraftingSkills.GetLevel then
-                cur = CraftingSkills.GetLevel(cat, src) or 0
-            end
-            o.need = need
-            o.owned = cur
-            o.playerSkillLevel = cur
-            o.liveDone = cur >= need
-            if o.liveDone and not o.done then
-                SurvivalBook.CompleteObjective(src, o.id)
-                o.done = true
-            end
-        elseif o.kind == 'blueprint' then
-            local bpId = pl.blueprintId
-            local has = true
-            if bpId and Blueprints and Blueprints.Has then
-                has = Blueprints.Has(src, bpId) == true
-            end
-            o.liveDone = has
-            o.owned = has and 1 or 0
-            o.need = 1
-            if o.liveDone and not o.done then
-                SurvivalBook.CompleteObjective(src, o.id)
-                o.done = true
-            end
-        end
-    end
-    local byId = {}
-    for i = 1, #out do byId[out[i].id] = out[i] end
-    for i = 1, #out do
-        local o = out[i]
-        local pid = o.payload and o.payload.parentObjectiveId
-        if pid and byId[pid] then
-            byId[pid].children = byId[pid].children or {}
-            byId[pid].children[#byId[pid].children + 1] = o
+        if o.kind == 'recipe' and o.payload and o.payload.recipeId then
+            local kids = SurvivalBook.LiveObjectiveChildren(src, o.payload.recipeId, o.id)
+            o.children = kids
+            o.subObjectives = kids
         end
     end
     return out
@@ -334,6 +338,11 @@ function SurvivalBook.CompleteObjective(src, objId)
         { objId, id }
     )
     if aff and aff > 0 then
+        if objectiveCache[id] then
+            for _, o in ipairs(objectiveCache[id]) do
+                if o.id == objId then o.done = true break end
+            end
+        end
         SurvivalBook.PushHistory(id, 'objective_completed', { id = objId })
         TriggerClientEvent('sanctuary_crafting:book:objectiveCompleted', src, objId)
         TriggerEvent('sanctuary_crafting:book:objectiveCompleted', src, objId)
@@ -347,6 +356,14 @@ function SurvivalBook.RemoveObjective(src, objId)
     local id = BookDB.Ident(src)
     if not id then return false end
     MySQL.query.await('DELETE FROM sanctuary_book_objectives WHERE id = ? AND identifier = ?', { tonumber(objId), id })
+    if objectiveCache[id] then
+        local nid = tonumber(objId)
+        local kept = {}
+        for _, o in ipairs(objectiveCache[id]) do
+            if o.id ~= nid then kept[#kept + 1] = o end
+        end
+        objectiveCache[id] = kept
+    end
     return true
 end
 
@@ -416,10 +433,9 @@ end
 --------------------------------------------------------------------------------
 -- Notes
 --------------------------------------------------------------------------------
-function SurvivalBook.ListNotes(src)
-    if not BookDB.Mod('Notes') then return {} end
+function SurvivalBook.LoadNotes(src)
     local id = BookDB.Ident(src)
-    if not id then return {} end
+    if not id then return end
     local rows = MySQL.query.await(
         'SELECT id, title, body, checklist, UNIX_TIMESTAMP(updated_at) AS ts FROM sanctuary_book_notes WHERE identifier = ? ORDER BY updated_at DESC',
         { id }
@@ -431,7 +447,15 @@ function SurvivalBook.ListNotes(src)
             checklist = jdec(rows[i].checklist, {}), updatedAt = rows[i].ts,
         }
     end
-    return out
+    noteCache[id] = out
+end
+
+function SurvivalBook.ListNotes(src)
+    if not BookDB.Mod('Notes') then return {} end
+    local id = BookDB.Ident(src)
+    if not id then return {} end
+    if not noteCache[id] then SurvivalBook.LoadNotes(src) end
+    return noteCache[id] or {}
 end
 
 function SurvivalBook.SaveNote(src, data)
@@ -441,27 +465,41 @@ function SurvivalBook.SaveNote(src, data)
     local title = tostring(data.title or 'Note'):sub(1, 128)
     local body = tostring(data.body or ''):sub(1, 8000)
     local checklist = type(data.checklist) == 'table' and data.checklist or {}
+    if not noteCache[id] then SurvivalBook.LoadNotes(src) end
     if data.id then
         MySQL.update.await(
             'UPDATE sanctuary_book_notes SET title=?, body=?, checklist=? WHERE id=? AND identifier=?',
             { title, body, jenc(checklist), tonumber(data.id), id }
         )
-        return { id = tonumber(data.id), title = title, body = body, checklist = checklist }
+        local note = { id = tonumber(data.id), title = title, body = body, checklist = checklist, updatedAt = os.time() }
+        for i, n in ipairs(noteCache[id] or {}) do
+            if n.id == note.id then noteCache[id][i] = note break end
+        end
+        return note
     end
     local maxN = (Config.Book and Config.Book.MaxNotes) or 64
-    local count = MySQL.scalar.await('SELECT COUNT(*) FROM sanctuary_book_notes WHERE identifier = ?', { id }) or 0
-    if count >= maxN then return nil, 'book_notes_full' end
+    if #(noteCache[id] or {}) >= maxN then return nil, 'book_notes_full' end
     local nid = MySQL.insert.await(
         'INSERT INTO sanctuary_book_notes (identifier, title, body, checklist) VALUES (?,?,?,?)',
         { id, title, body, jenc(checklist) }
     )
-    return { id = nid, title = title, body = body, checklist = checklist }
+    local note = { id = nid, title = title, body = body, checklist = checklist, updatedAt = os.time() }
+    table.insert(noteCache[id], 1, note)
+    return note
 end
 
 function SurvivalBook.DeleteNote(src, noteId)
     local id = BookDB.Ident(src)
     if not id then return false end
     MySQL.query.await('DELETE FROM sanctuary_book_notes WHERE id = ? AND identifier = ?', { tonumber(noteId), id })
+    if noteCache[id] then
+        local nid = tonumber(noteId)
+        local kept = {}
+        for _, n in ipairs(noteCache[id]) do
+            if n.id ~= nid then kept[#kept + 1] = n end
+        end
+        noteCache[id] = kept
+    end
     return true
 end
 
@@ -493,15 +531,16 @@ function SurvivalBook.AddArtisanContact(src, contact)
             tier=COALESCE(VALUES(tier), tier), source=VALUES(source), meta=VALUES(meta)
     ]], { id, contactId, displayName, specialty, tier, source, jenc(meta) })
     SurvivalBook.PushHistory(id, 'artisan_met', { contactId = contactId, name = displayName, specialty = specialty, tier = tier })
+    artisanCache[id] = nil -- invalidate; next List reloads
     TriggerClientEvent('sanctuary_crafting:book:artisanMet', src, contactId, displayName)
     TriggerEvent('sanctuary_crafting:book:artisanMet', src, contactId, displayName)
     SurvivalBook.Notify(src, 'book_artisan_met', 'inform', { displayName })
     return true
 end
 
-function SurvivalBook.ListArtisans(src)
+function SurvivalBook.LoadArtisans(src)
     local id = BookDB.Ident(src)
-    if not id then return {} end
+    if not id then return end
     local rows = MySQL.query.await(
         'SELECT contact_id, display_name, specialty, tier, source, meta, UNIX_TIMESTAMP(met_at) AS ts FROM sanctuary_book_artisans WHERE identifier = ? ORDER BY met_at DESC',
         { id }
@@ -518,7 +557,14 @@ function SurvivalBook.ListArtisans(src)
             metAt = rows[i].ts,
         }
     end
-    return out
+    artisanCache[id] = out
+end
+
+function SurvivalBook.ListArtisans(src)
+    local id = BookDB.Ident(src)
+    if not id then return {} end
+    if not artisanCache[id] then SurvivalBook.LoadArtisans(src) end
+    return artisanCache[id] or {}
 end
 
 function SurvivalBook.NetworkBySpecialty(src)
@@ -546,9 +592,11 @@ function SurvivalBook.CreateOrder(src, data)
     local id = BookDB.Ident(src)
     if not id or type(data) ~= 'table' then return nil, 'craft_invalid' end
     local maxO = (Config.Book and Config.Book.MaxOrders) or 20
-    local count = MySQL.scalar.await(
-        "SELECT COUNT(*) FROM sanctuary_book_orders WHERE owner = ? AND status = 'open'", { id }
-    ) or 0
+    if not orderCache[id] then SurvivalBook.LoadOrders(src) end
+    local count = 0
+    for _, o in ipairs(orderCache[id] or {}) do
+        if o.status == 'open' then count = count + 1 end
+    end
     if count >= maxO then return nil, 'book_orders_full' end
     local uid = GenerateCraftId()
     local items = type(data.items) == 'table' and data.items or {}
@@ -561,12 +609,14 @@ function SurvivalBook.CreateOrder(src, data)
         { uid, id, data.targetContact, recipeId, jenc(items), 'open', data.note and tostring(data.note):sub(1, 255) or nil }
     )
     SurvivalBook.PushHistory(id, 'order_created', { orderUid = uid, recipeId = recipeId })
-    return { orderUid = uid, status = 'open', items = items, recipeId = recipeId, targetContact = data.targetContact, note = data.note }
+    local order = { orderUid = uid, status = 'open', items = items, recipeId = recipeId, targetContact = data.targetContact, note = data.note, createdAt = os.time(), teleport = false }
+    if orderCache[id] then table.insert(orderCache[id], 1, order) end
+    return order
 end
 
-function SurvivalBook.ListOrders(src)
+function SurvivalBook.LoadOrders(src)
     local id = BookDB.Ident(src)
-    if not id then return {} end
+    if not id then return end
     local rows = MySQL.query.await(
         'SELECT order_uid, target_contact, recipe_id, items, status, note, UNIX_TIMESTAMP(created_at) AS ts FROM sanctuary_book_orders WHERE owner = ? ORDER BY id DESC LIMIT 40',
         { id }
@@ -581,10 +631,17 @@ function SurvivalBook.ListOrders(src)
             status = rows[i].status,
             note = rows[i].note,
             createdAt = rows[i].ts,
-            teleport = false, -- always false
+            teleport = false,
         }
     end
-    return out
+    orderCache[id] = out
+end
+
+function SurvivalBook.ListOrders(src)
+    local id = BookDB.Ident(src)
+    if not id then return {} end
+    if not orderCache[id] then SurvivalBook.LoadOrders(src) end
+    return orderCache[id] or {}
 end
 
 function SurvivalBook.SetOrderStatus(src, orderUid, status)
@@ -595,12 +652,32 @@ function SurvivalBook.SetOrderStatus(src, orderUid, status)
         'UPDATE sanctuary_book_orders SET status = ? WHERE order_uid = ? AND owner = ?',
         { status, orderUid, id }
     )
+    if orderCache[id] then
+        for _, o in ipairs(orderCache[id]) do
+            if o.orderUid == orderUid then o.status = status break end
+        end
+    end
     return true
 end
 
 --------------------------------------------------------------------------------
 -- History / Discoveries timeline
 --------------------------------------------------------------------------------
+function SurvivalBook.LoadHistoryCount(src)
+    local id = BookDB.Ident(src)
+    if not id then return end
+    historyCount[id] = MySQL.scalar.await(
+        'SELECT COUNT(*) FROM sanctuary_book_history WHERE identifier = ?', { id }
+    ) or 0
+end
+
+function SurvivalBook.HistoryCount(src)
+    local id = BookDB.Ident(src)
+    if not id then return 0 end
+    if historyCount[id] == nil then SurvivalBook.LoadHistoryCount(src) end
+    return historyCount[id] or 0
+end
+
 function SurvivalBook.ListHistory(src, limit)
     local id = BookDB.Ident(src)
     if not id then return {} end
@@ -621,15 +698,63 @@ function SurvivalBook.ListHistory(src, limit)
     return out
 end
 
+function SurvivalBook.WarmCaches(src)
+    SurvivalBook.LoadDiscoveries(src)
+    SurvivalBook.LoadPins(src)
+    SurvivalBook.LoadArtisans(src)
+    SurvivalBook.LoadOrders(src)
+    SurvivalBook.LoadNotes(src)
+    SurvivalBook.LoadObjectives(src)
+    SurvivalBook.LoadHistoryCount(src)
+end
+
+function SurvivalBook.CacheSizes(src)
+    local id = BookDB.Ident(src)
+    if not id then
+        return { resources = 0, objectivesOpen = 0, objectivesDone = 0, pins = 0, notes = 0, artisans = 0, orders = 0, history = 0 }
+    end
+    if not discoveredCache[id] then SurvivalBook.LoadDiscoveries(src) end
+    if not pinCache[id] then SurvivalBook.LoadPins(src) end
+    if not artisanCache[id] then SurvivalBook.LoadArtisans(src) end
+    if not orderCache[id] then SurvivalBook.LoadOrders(src) end
+    if not noteCache[id] then SurvivalBook.LoadNotes(src) end
+    if not objectiveCache[id] then SurvivalBook.LoadObjectives(src) end
+    if historyCount[id] == nil then SurvivalBook.LoadHistoryCount(src) end
+    local open, done = 0, 0
+    for _, o in ipairs(objectiveCache[id] or {}) do
+        if o.done then done = done + 1 else open = open + 1 end
+    end
+    local resources = 0
+    for _ in pairs(discoveredCache[id] or {}) do resources = resources + 1 end
+    return {
+        resources = resources,
+        objectivesOpen = open,
+        objectivesDone = done,
+        pins = #(pinCache[id] or {}),
+        notes = #(noteCache[id] or {}),
+        artisans = #(artisanCache[id] or {}),
+        orders = #(orderCache[id] or {}),
+        history = historyCount[id] or 0,
+    }
+end
+
 AddEventHandler('playerDropped', function()
     local src = source
     notifCooldown[src] = nil
+    local id = BookDB.Ident(src)
+    if not id then return end
+    discoveredCache[id] = nil
+    pinCache[id] = nil
+    artisanCache[id] = nil
+    orderCache[id] = nil
+    noteCache[id] = nil
+    objectiveCache[id] = nil
+    historyCount[id] = nil
 end)
 
 AddEventHandler('esx:playerLoaded', function(playerId)
     local src = type(playerId) == 'number' and playerId or source
-    SurvivalBook.LoadDiscoveries(src)
-    SurvivalBook.LoadPins(src)
+    SurvivalBook.WarmCaches(src)
 end)
 
 AddEventHandler('onResourceStart', function(res)
@@ -637,8 +762,7 @@ AddEventHandler('onResourceStart', function(res)
     for _, sid in ipairs(GetPlayers()) do
         local src = tonumber(sid)
         if src then
-            SurvivalBook.LoadDiscoveries(src)
-            SurvivalBook.LoadPins(src)
+            SurvivalBook.WarmCaches(src)
         end
     end
 end)
