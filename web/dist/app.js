@@ -494,6 +494,31 @@
     return `<span class="card-knowledge-mark kn-${kn}" title="${m.title}"><i class="fa-solid ${m.ico}" aria-hidden="true"></i></span>`;
   }
 
+  function almostMissingTip(r) {
+    if (!r) return 'Une seule condition mineure manque';
+    const pm = r.primaryMissing;
+    if (pm && (pm.item || pm.label)) {
+      const label = itemDisplayName(pm.item, pm.label);
+      const need = Math.max(1, (Number(pm.count) || 1) - (Number(pm.owned) || 0));
+      return `Il manque uniquement ${label} x${need}`;
+    }
+    const ings = r.ingredients || [];
+    const miss = ings.find((ing) => typeof ing.owned === 'number' && ing.owned < (ing.count || 1));
+    if (miss) {
+      const label = itemDisplayName(miss.item, miss.label);
+      const need = Math.max(1, (Number(miss.count) || 1) - (Number(miss.owned) || 0));
+      return `Il manque uniquement ${label} x${need}`;
+    }
+    const hints = Array.isArray(r.pathHints) ? r.pathHints : [];
+    if (hints.length) {
+      const h = hints[0];
+      const txt = typeof h === 'string' ? h : (h && (h.label || h.text || h.reason || h.message));
+      if (txt) return String(txt);
+    }
+    const reason = primaryBadgeReason(r);
+    return reason ? `Presque — ${reason}` : 'Une seule condition mineure manque';
+  }
+
   function cardStatus(r) {
     if (r.canCraft) {
       const bits = ['Prêt à fabriquer'];
@@ -504,7 +529,7 @@
     const almostEnabled = uxOn('almostCraftable', true);
     const reason = primaryBadgeReason(r);
     if (almostEnabled && computeAlmost(r)) {
-      return { text: 'PRESQUE', cls: 'almost', tip: reason ? `Presque — ${reason}` : 'Une seule condition mineure manque' };
+      return { text: 'PRESQUE', cls: 'almost', tip: almostMissingTip(r) };
     }
     return { text: 'NON FAISABLE', cls: 'bad', tip: reason || 'Conditions non remplies' };
   }
@@ -767,6 +792,44 @@
       recipes.forEach((r) => grid.appendChild(makeCard(r)));
     };
 
+    const appendRecentStrip = (recipes) => {
+      if (!recipes.length) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'recent-strip';
+      const h = document.createElement('h3');
+      h.className = 'catalog-group-title';
+      h.textContent = 'RÉCEMMENT FABRIQUÉS';
+      wrap.appendChild(h);
+      const row = document.createElement('div');
+      row.className = 'recent-row';
+      recipes.slice(0, 5).forEach((r) => {
+        const qty = (r.result && r.result.count) || r.qty || 1;
+        const resultItem = (r.result && r.result.item) || r.id;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'recent-mini';
+        if (state.selected && state.selected.id === r.id) btn.classList.add('selected');
+        btn.title = r.label || '';
+        btn.innerHTML = `
+          <span class="recent-img">
+            <span class="ph" aria-hidden="true"><i class="fa-solid fa-cube"></i></span>
+            <img alt="" />
+          </span>
+          <span class="recent-meta">
+            <span class="recent-name">${escapeHtml(r.label || '')}</span>
+            <span class="recent-qty">×${escapeHtml(qty)}</span>
+          </span>
+        `;
+        const img = btn.querySelector('img');
+        const ph = btn.querySelector('.ph');
+        bindItemImg(img, resultItem, ph);
+        btn.addEventListener('click', () => selectRecipe(r));
+        row.appendChild(btn);
+      });
+      wrap.appendChild(row);
+      grid.appendChild(wrap);
+    };
+
     const byId = {};
     list.forEach((r) => { byId[r.id] = r; });
     const showGroups = state.filter === 'all' && !state.search;
@@ -779,7 +842,7 @@
       (state.recentlyCrafted || []).forEach((id) => {
         if (byId[id] && !used.has(id)) recents.push(byId[id]);
       });
-      appendGroup('RÉCEMMENT FABRIQUÉS', recents);
+      appendRecentStrip(recents);
       recents.forEach((r) => used.add(r.id));
       const news = list.filter((r) => isNewRecipe(r) && !used.has(r.id));
       appendGroup('NOUVEAUX', news);
@@ -1407,11 +1470,27 @@
     return n;
   }
 
+  function syncLotSeg(batch) {
+    const presets = $('#batch-presets');
+    if (!presets) return;
+    const cap = Math.max(1, batchCap(state.selected) || 1);
+    const n = Number(batch) || 1;
+    presets.querySelectorAll('[data-batch]').forEach((btn) => {
+      const v = btn.getAttribute('data-batch');
+      let on = false;
+      if (v === 'max') on = n === cap && n !== 1 && n !== 5 && n !== 10;
+      else on = n === Number(v);
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
   function updateActionBar(r) {
 
     const recipe = r || state.selected;
     const batchEl = $('#batch');
     const batch = clampBatchInput(recipe);
+    syncLotSeg(batch);
 
     const lotEl = $('#fab-ready-lot');
     if (lotEl) lotEl.textContent = `×${batch}`;
@@ -1522,6 +1601,36 @@
         try { return localStorage.getItem(LAST_CRAFT_KEY); } catch (_) { return null; }
       })();
       lastEl.textContent = last || '—';
+    }
+    const meta = state.menuMeta || {};
+    const sleep = $('#fab-idle-sleep');
+    const led = $('#fab-idle-led');
+    const busy = n > 0 || !!state.crafting;
+    if (sleep) sleep.classList.toggle('hidden', busy);
+    if (led) {
+      led.classList.toggle('ok', !busy && meta.powered !== false);
+      led.classList.toggle('warn', busy);
+      led.classList.toggle('off', meta.powered === false);
+    }
+    const tempLine = $('#fab-idle-temp-line');
+    const tempVal = $('#fab-idle-temp');
+    if (tempLine && tempVal) {
+      const hasTemp = meta.heatEnabled && meta.temp != null;
+      tempLine.classList.toggle('hidden', !hasTemp);
+      if (hasTemp) {
+        const temp = Number(meta.temp);
+        tempVal.textContent = Number.isNaN(temp) ? String(meta.temp) : `${Math.round(temp)}°`;
+      }
+    }
+    const energyLine = $('#fab-idle-energy-line');
+    const energyVal = $('#fab-idle-energy');
+    if (energyLine && energyVal) {
+      const hasEnergy = meta.energy != null || meta.powered != null;
+      energyLine.classList.toggle('hidden', !hasEnergy);
+      if (hasEnergy) {
+        if (meta.energy != null) energyVal.textContent = String(meta.energy);
+        else energyVal.textContent = meta.powered === false ? 'Off' : 'OK';
+      }
     }
   }
 
@@ -2020,6 +2129,7 @@
     if (app) {
       app.dataset.uxSel = uxOn('selectionTransition', true) ? '1' : '0';
     }
+    if (typeof syncFiltersMore === 'function') syncFiltersMore();
     rebuildSearchIndex(state.recipes);
     updateStationHeader(data);
     renderCategories();
@@ -2217,12 +2327,20 @@
   });
   bindUi('#search', 'input', (e) => { state.search = e.target.value; renderList(); });
 
-  $$('#filters .chip').forEach((btn) => {
+  function syncFiltersMore() {
+    const more = $('#filters-more');
+    if (!more) return;
+    const secondaryOn = state.filter === 'locked' || state.filter === 'plans' || (state.rarityFilter && state.rarityFilter !== 'all');
+    if (secondaryOn) more.setAttribute('open', '');
+  }
+
+  $$('#filters [data-filter]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      $$('#filters .chip').forEach((b) => b.classList.remove('active'));
+      $$('#filters [data-filter]').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       state.filter = btn.dataset.filter;
       playTick();
+      syncFiltersMore();
       renderList();
     });
   });
@@ -2237,6 +2355,7 @@
         btn.classList.add('active');
         state.rarityFilter = btn.dataset.rarity || 'all';
         playTick();
+        syncFiltersMore();
         renderList();
       });
     });

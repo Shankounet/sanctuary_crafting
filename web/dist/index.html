@@ -139,25 +139,32 @@
       <div class="nav-section nav-filters">
         <h2 class="t-l3 nav-heading">Filtres</h2>
         <nav class="filters" id="filters" aria-label="Filtres">
-          <button type="button" class="chip active" data-filter="all"><i class="fa-solid fa-border-all"></i><span>Tous</span></button>
-          <button type="button" class="chip" data-filter="craftable"><i class="fa-solid fa-check"></i><span>Faisables</span></button>
-          <button type="button" class="chip" data-filter="almost"><i class="fa-solid fa-hourglass-half"></i><span>Presque</span></button>
-          <button type="button" class="chip" data-filter="favorites"><i class="fa-solid fa-star"></i><span>Favoris</span></button>
-          <button type="button" class="chip" data-filter="locked"><i class="fa-solid fa-lock"></i><span>Verrouillés</span></button>
-          <button type="button" class="chip" data-filter="new"><i class="fa-solid fa-certificate"></i><span>Nouveaux</span></button>
-          <button type="button" class="chip" data-filter="plans"><i class="fa-solid fa-scroll"></i><span>Plans</span></button>
+          <div class="filters-primary">
+            <button type="button" class="chip active" data-filter="all"><i class="fa-solid fa-border-all"></i><span>Tous</span></button>
+            <button type="button" class="chip" data-filter="craftable"><i class="fa-solid fa-check"></i><span>Faisables</span></button>
+            <button type="button" class="chip" data-filter="almost"><i class="fa-solid fa-hourglass-half"></i><span>Presque</span></button>
+            <button type="button" class="chip" data-filter="favorites"><i class="fa-solid fa-star"></i><span>Favoris</span></button>
+            <button type="button" class="chip" data-filter="new"><i class="fa-solid fa-certificate"></i><span>Nouveaux</span></button>
+          </div>
+          <details class="filters-more" id="filters-more">
+            <summary class="filters-more-toggle" title="Filtres secondaires">Plus</summary>
+            <div class="filters-secondary">
+              <button type="button" class="chip" data-filter="locked"><i class="fa-solid fa-lock"></i><span>Verrouillés</span></button>
+              <button type="button" class="chip" data-filter="plans"><i class="fa-solid fa-scroll"></i><span>Plans</span></button>
+            </div>
+            <div class="nav-section nav-rarity" id="rarity-filters" hidden>
+              <h2 class="t-l3 nav-heading">Rareté</h2>
+              <nav class="filters rarity-filters" aria-label="Filtres rareté">
+                <button type="button" class="chip active" data-rarity="all"><span>Toutes</span></button>
+                <button type="button" class="chip" data-rarity="common"><span>Commun</span></button>
+                <button type="button" class="chip" data-rarity="uncommon"><span>Peu com.</span></button>
+                <button type="button" class="chip" data-rarity="rare"><span>Rare</span></button>
+                <button type="button" class="chip" data-rarity="epic"><span>Épique</span></button>
+                <button type="button" class="chip" data-rarity="legendary"><span>Légend.</span></button>
+              </nav>
+            </div>
+          </details>
         </nav>
-        <div class="nav-section nav-rarity" id="rarity-filters" hidden>
-          <h2 class="t-l3 nav-heading">Rareté</h2>
-          <nav class="filters rarity-filters" aria-label="Filtres rareté">
-            <button type="button" class="chip active" data-rarity="all"><span>Toutes</span></button>
-            <button type="button" class="chip" data-rarity="common"><span>Commun</span></button>
-            <button type="button" class="chip" data-rarity="uncommon"><span>Peu com.</span></button>
-            <button type="button" class="chip" data-rarity="rare"><span>Rare</span></button>
-            <button type="button" class="chip" data-rarity="epic"><span>Épique</span></button>
-            <button type="button" class="chip" data-rarity="legendary"><span>Légend.</span></button>
-          </nav>
-        </div>
       </div>
 
       <div class="nav-section flex-grow nav-cats">
@@ -249,9 +256,10 @@
         <span class="empty-hint">Identité, paramètres et fabrication s’affichent ici</span>
       </div>
       <div id="detail" class="detail-fiche hidden">
-        <!-- L1 Identity hero -->
+        <!-- SECTION 1 IDENTITÉ RECETTE -->
+        <section class="fiche-sec fiche-sec-id" aria-label="Identité recette">
         <div class="fiche-hero">
-          <p class="fiche-l1-label">Fiche · Identité</p>
+          <p class="fiche-l1-label">Identité recette</p>
           <div class="fiche-identity identity-block">
             <div class="fiche-img tech-frame detail-img-wrap">
               <img id="d-image" alt="" />
@@ -273,9 +281,12 @@
           </div>
         </div>
 
-        <!-- L2 Requirements — instrument cluster -->
-        <p class="fiche-section-label">Paramètres · Station</p>
-        <div class="instr-cluster detail-meta-grid" aria-label="Paramètres techniques">
+        </section>
+
+        <!-- SECTION 2 PARAMÈTRES DE FABRICATION -->
+        <section class="fiche-sec fiche-sec-params" aria-label="Paramètres de fabrication">
+        <p class="fiche-section-label">Paramètres de fabrication</p>
+        <div class="instr-cluster detail-meta-grid" aria-label="Paramètres de fabrication">
           <div class="cluster-cell">
             <span class="t-l4">Qualité</span>
             <span class="t-l5" id="d-quality">—</span>
@@ -297,6 +308,12 @@
           </div>
         </div>
 
+        </section>
+
+        <!-- SECTION 3 EXIGENCES -->
+        <section class="fiche-sec fiche-sec-req" aria-label="Exigences">
+        <p class="fiche-section-label">Exigences</p>
+        <div class="fiche-req-body">
         <div class="block block-skill" id="block-skill">
           <h3 class="t-l3"><i class="fa-solid fa-brain"></i> Compétence</h3>
           <div class="skill-head">
@@ -362,11 +379,6 @@
           <p id="d-bp" class="block-text">—</p>
         </div>
 
-        <div class="block" id="block-xp">
-          <div class="kv-row" id="row-xp"><span>XP</span><span id="d-xp">—</span></div>
-          <div class="kv-row" id="row-mastery"><span>Maîtrise</span><span id="d-mastery">—</span></div>
-        </div>
-
         <div class="block block-knowledge-source hidden" id="block-knowledge-source">
           <h3 class="t-l3"><i class="fa-solid fa-drafting-compass"></i> Source de connaissance</h3>
           <p id="d-knowledge-source" class="block-text knowledge-source-text">—</p>
@@ -403,14 +415,25 @@
           </button>
         </details>
 
-        <!-- PANEL ACTION — module fabrication (ready / active / done) -->
+        </div>
+        </section>
+
+        <!-- SECTION 4 PRODUCTION -->
+        <section class="fiche-sec fiche-sec-prod" aria-label="Production">
+        <p class="fiche-section-label">Production</p>
+        <div class="block block-xp" id="block-xp">
+          <div class="kv-row" id="row-xp"><span>XP</span><span id="d-xp">—</span></div>
+          <div class="kv-row" id="row-mastery"><span>Maîtrise</span><span id="d-mastery">—</span></div>
+        </div>
         <div class="panel-action actions" id="fab-module" data-fab-state="ready">
           <div id="fab-ready" class="fab-panel fab-ready">
             <div id="fab-idle-console" class="fab-idle-console" aria-label="Console atelier">
-              <div class="fab-idle-line fab-idle-ready"><span class="fab-idle-k">STATION READY</span></div>
+              <div class="fab-idle-line fab-idle-ready"><span class="led-dot ok" id="fab-idle-led" aria-hidden="true"></span><span class="fab-idle-k">STATION READY</span></div>
               <div class="fab-idle-line"><span class="fab-idle-k">File</span> <span class="fab-idle-v" id="fab-idle-queue">0/5</span></div>
               <div class="fab-idle-line"><span class="fab-idle-k">Dernier craft</span> <span class="fab-idle-v" id="fab-idle-last">—</span></div>
-              <div class="fab-idle-line fab-idle-sleep"><span class="fab-idle-k">État veille</span></div>
+              <div class="fab-idle-line fab-idle-sleep" id="fab-idle-sleep"><span class="fab-idle-k">État veille</span></div>
+              <div class="fab-idle-line fab-idle-sensor hidden" id="fab-idle-temp-line"><span class="fab-idle-k">Temp.</span> <span class="fab-idle-v" id="fab-idle-temp">—</span></div>
+              <div class="fab-idle-line fab-idle-sensor hidden" id="fab-idle-energy-line"><span class="fab-idle-k">Énergie</span> <span class="fab-idle-v" id="fab-idle-energy">—</span></div>
             </div>
             <div class="fab-readouts" aria-label="Résumé fabrication">
               <div class="fab-chip" id="fab-chip-lot">
@@ -443,13 +466,14 @@
               </div>
             </div>
             <div class="action-primary-row">
-              <label class="batch" id="batch-wrap">Lot
-                <input id="batch" type="number" min="1" max="50" value="1" />
-                <span class="batch-presets" id="batch-presets" role="group" aria-label="Préréglages lot">
-                  <button type="button" class="ghost compact batch-pre" data-batch="1">x1</button>
-                  <button type="button" class="ghost compact batch-pre" data-batch="5">x5</button>
-                  <button type="button" class="ghost compact batch-pre" data-batch="10">x10</button>
-                  <button type="button" class="ghost compact batch-pre" data-batch="max">MAX</button>
+              <label class="batch lot-rail-wrap" id="batch-wrap">
+                <span class="lot-k">LOT</span>
+                <input id="batch" class="lot-input" type="number" min="1" max="50" value="1" aria-label="Quantité du lot" />
+                <span class="batch-presets lot-seg" id="batch-presets" role="group" aria-label="Préréglages lot">
+                  <button type="button" class="lot-seg-btn active" data-batch="1" aria-pressed="true">1</button>
+                  <button type="button" class="lot-seg-btn" data-batch="5" aria-pressed="false">5</button>
+                  <button type="button" class="lot-seg-btn" data-batch="10" aria-pressed="false">10</button>
+                  <button type="button" class="lot-seg-btn" data-batch="max" aria-pressed="false">MAX</button>
                 </span>
               </label>
               <button type="button" id="btn-craft" class="primary craft-engage" title="Lancer la fabrication">
@@ -457,7 +481,7 @@
                   <i class="fa-solid fa-hammer craft-engage-ico" aria-hidden="true"></i>
                   <span class="craft-engage-label">FABRIQUER</span>
                 </span>
-                <span class="craft-engage-screws" aria-hidden="true"><i></i><i></i></span>
+                <span class="craft-engage-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
               </button>
             </div>
             <div class="action-secondary-row">
@@ -538,6 +562,7 @@
           </div>
         </div>
         <p id="craft-why" class="craft-why panel-alert hidden"></p>
+        </section>
       </div>
     </section>
   </main>

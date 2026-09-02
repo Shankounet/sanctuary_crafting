@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.18.2
+# sanctuary_crafting v2.19.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,10 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.19.0 — Craft UI: polish console premium (composition, pas de refonte)
+Atelier `#app` only. Structure 3 colonnes inchangée. Fiche droite regroupée en 4 sections visuelles (Identité / Paramètres / Exigences / Production) sans nouveaux champs. LOT en rail segmenté industriel. FABRIQUER plaque commande (icon+texte même face, acier mat, `#9a8866` liseré). Récents = bandeau mini 3–5, plus des cartes catalogue. Carte active plus lisible, PRESQUE ochre + tooltip raison principale, rareté en liseré discret, header console continue, filtres secondaires repliés. Callbacks NUI inchangés. Carnet / tracker / SQL intacts.
+
 
 ### v2.18.2 — Tracker Productions: pin, réduire, drag
 Header PRODUCTIONS: uniquement **Épingler** + **Réduire/Agrandir** + drag sur la zone vide (plus de X / mode / reset / poignée). Pin = rester visible hors menu (`sc_tracker_pin` + KVP). Réduire bascule expanded ↔ compact (`[−]` / `[+]`), jamais hidden. Position NUI `localStorage.craftTrackerPosition` = `{x,y}`, clamp viewport, défaut haut-droite si invalide. Callbacks NUI inchangés.
