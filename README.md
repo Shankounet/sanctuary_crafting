@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.17.1
+# sanctuary_crafting v2.17.2
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,9 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.17.2 -- Table de Survie: nouvelles coords monde
+Banc monde `survie_crafting` (station/category `survie`) déplacé vers vec3(-1149.496948, 4944.349609, 222.219696). Heading inchangé. Autres stations inchangées.
 
 ### v2.17.1 -- Carnet Situation: fiches papier clair
 Accueil / Situation content blocks (identity polaroid, Projet principal, Derniere decouverte, Prochain deblocage, day note) now use paper_aged_new with a crop distinct from the page. paper_dark is no longer the writing surface for these Accueil fiches. Leather remains cover / frame / binding only. Notes page (v2.16.3) unchanged. NUI callbacks unchanged.
