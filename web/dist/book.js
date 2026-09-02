@@ -1011,49 +1011,136 @@
   }
 
 
+  const POSTIT_CYCLE = ['yellow', 'blue', 'green', 'pink'];
+
+  function parisDateParts(ts) {
+    const d = (ts != null && ts !== '')
+      ? new Date((Number(ts) < 1e12 ? Number(ts) * 1000 : Number(ts)))
+      : new Date();
+    if (Number.isNaN(d.getTime())) return null;
+    try {
+      const parts = new Intl.DateTimeFormat('fr-FR', {
+        timeZone: 'Europe/Paris',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }).formatToParts(d);
+      const get = (t) => ((parts.find((p) => p.type === t) || {}).value || '');
+      return { day: get('day'), month: get('month'), year: get('year') };
+    } catch (_) {
+      return {
+        day: String(d.getDate()).padStart(2, '0'),
+        month: String(d.getMonth() + 1).padStart(2, '0'),
+        year: String(d.getFullYear()),
+      };
+    }
+  }
+
+  function notesTodayFr() {
+    const p = parisDateParts();
+    if (!p) return '';
+    return p.day + '/' + p.month + '/' + p.year;
+  }
+
+  const FR_MONTHS = ['JANVIER', 'FÉVRIER', 'MARS', 'AVRIL', 'MAI', 'JUIN', 'JUILLET', 'AOÛT', 'SEPTEMBRE', 'OCTOBRE', 'NOVEMBRE', 'DÉCEMBRE'];
+
+  function noteClipDate(ts) {
+    const p = parisDateParts(ts);
+    if (!p) return '';
+    const name = FR_MONTHS[Number(p.month) - 1] || '';
+    return (p.day + ' ' + name).trim();
+  }
+
+  function noteTaskRow(index) {
+    const wrap = document.createElement('div');
+    wrap.className = 'note-task postit postit-' + POSTIT_CYCLE[(index || 0) % 4];
+    wrap.innerHTML = '<span class="note-check-box" aria-hidden="true">\u2610</span>'
+      + '<input type="text" class="note-task-input" />'
+      + '<button type="button" class="note-task-remove" data-act="remove-task" aria-label="retirer">\u00d7</button>';
+    return wrap;
+  }
+
   /* ========== NOTES ========== */
   async function renderNotes() {
     const r = await loadModule('notes');
     const arr = (r && r.data) || [];
+    const today = notesTodayFr();
     const left = `
-      <p class="book-stamp">Pages libres</p>
-      <h2 class="book-page-title">Notes</h2>
-      <p class="hand-note">Papier ligné — observations de terrain.</p>
-      <hr class="ink-rule" />
-      <div class="note-editor lined-paper" style="line-height:1.45;padding-left:12px">
-        <div class="editor-label">Nouvelle page</div>
-        <input id="note-title" type="text" placeholder="Titre" />
-        <textarea id="note-body" placeholder="Contenu, rappels, observations de terrain…"></textarea>
-        <input id="note-check" type="text" placeholder="Checklist (items séparés par | )" />
-        <div class="row-actions"><button type="button" class="primary" id="note-save">Enregistrer</button></div>
+      <div class="note-leaf-wrap">
+        <span class="tape top-l"></span>
+        <span class="paperclip"></span>
+        <div class="note-leaf">
+          <p class="note-leaf-head">NOUVELLE NOTE</p>
+          <input id="note-title" type="text" placeholder="Titre" autocomplete="off" />
+          <p class="note-date" id="note-date">Date : ${esc(today)}</p>
+          <textarea id="note-body" rows="4"></textarea>
+          <div class="note-tasks" id="note-tasks"></div>
+          <button type="button" class="note-add-task" id="note-add-task">+ Ajouter une t\u00e2che</button>
+          <button type="button" class="note-stamp" id="note-save">ENREGISTRER</button>
+        </div>
       </div>${folio('80')}`;
 
     let listHtml;
     if (!arr.length) {
-      listHtml = emptyBox('fa-pen-to-square', 'Carnet vide', 'Vos notes personnelles s\'accumulent ici.');
-    } else {
-      listHtml = `<div id="note-list">${arr.map((n) => {
-        const checks = Array.isArray(n.checklist) ? n.checklist : [];
-        return `<article class="lined-paper" data-id="${n.id}">
-          <div class="note-title">${esc(n.title)}
-            <button type="button" class="ghost small" data-act="del" style="float:right;line-height:1.2">Retirer</button>
+      listHtml = `
+        <div class="notes-empty">
+          <h2 class="notes-empty-title">Carnet vide</h2>
+          <p class="hand-note">Les pens\u00e9es s\u2019effacent vite. Mieux vaut les coucher sur papier.</p>
+          <span class="ink-sketch tool" aria-hidden="true"></span>
+          <div class="postit postit-yellow notes-empty-cue">
+            <button type="button" class="note-stamp" id="note-empty-write">\u00c9crire une premi\u00e8re note</button>
           </div>
-          <div class="note-body">${esc((n.body || '').slice(0, 320))}${(n.body || '').length > 320 ? '…' : ''}</div>
-          ${checks.length ? `<ul class="checklist" style="padding-left:32px;line-height:1.4">${checks.map((c) => {
-            const text = typeof c === 'string' ? c : (c && c.text) || '';
-            const done = typeof c === 'object' && c && c.done;
-            return `<li class="${done ? 'done' : ''}"><span class="box ${done ? 'checked' : ''}"></span><span>${esc(text)}</span></li>`;
-          }).join('')}</ul>` : ''}
-          <div class="note-foot">${fmtTime(n.updatedAt)}</div>
+        </div>`;
+    } else {
+      listHtml = `<div id="note-list">${arr.map((n, idx) => {
+        const checks = Array.isArray(n.checklist) ? n.checklist : [];
+        const body = String(n.body || '');
+        const excerpt = body
+          ? `\u00ab ${esc(body.slice(0, 180))}${body.length > 180 ? '\u2026' : ''} \u00bb`
+          : '';
+        const checkHtml = checks.length ? `<ul class="note-clip-checks">${checks.map((c) => {
+          const text = typeof c === 'string' ? c : (c && c.text) || '';
+          if (!text) return '';
+          const done = typeof c === 'object' && c && c.done;
+          return `<li class="${done ? 'done' : ''}"><span class="note-check-box">${done ? '\u2611' : '\u2610'}</span><span>${esc(text)}</span></li>`;
+        }).join('')}</ul>` : '';
+        const rot = idx % 2 === 0 ? 'rot-l' : 'rot-r';
+        return `<article class="note-clip ${rot}" data-id="${n.id}">
+          <span class="tape top-l"></span>
+          <span class="paperclip"></span>
+          <button type="button" class="note-clip-del" data-act="del" aria-label="retirer">retirer</button>
+          <p class="note-clip-date">${esc(noteClipDate(n.updatedAt || n.createdAt))}</p>
+          <h3 class="note-clip-title">${esc(n.title || '')}</h3>
+          ${excerpt ? `<p class="note-clip-excerpt">${excerpt}</p>` : ''}
+          ${checkHtml}
         </article>`;
       }).join('')}</div>`;
     }
     setPages(left, listHtml + folio('81'));
 
+    const tasksEl = $('#note-tasks');
+    const addTask = $('#note-add-task');
+    if (addTask && tasksEl) {
+      addTask.onclick = () => {
+        tasksEl.appendChild(noteTaskRow(tasksEl.querySelectorAll('.note-task').length));
+        const inp = tasksEl.querySelector('.note-task:last-child .note-task-input');
+        if (inp) inp.focus();
+      };
+      tasksEl.onclick = (ev) => {
+        const rm = ev.target.closest('[data-act="remove-task"]');
+        if (!rm) return;
+        const row = rm.closest('.note-task');
+        if (row) row.remove();
+      };
+    }
+
     const save = $('#note-save');
     if (save) save.onclick = async () => {
-      const raw = (($('#note-check') || {}).value || '').trim();
-      const checklist = raw ? raw.split('|').map((t) => ({ text: t.trim(), done: false })).filter((x) => x.text) : [];
+      const checklist = [];
+      document.querySelectorAll('#note-tasks .note-task-input').forEach((inp) => {
+        const text = (inp.value || '').trim();
+        if (text) checklist.push({ text, done: false });
+      });
       await post('bookAction', {
         action: 'saveNote',
         payload: {
@@ -1064,12 +1151,21 @@
       });
       navigate('notes');
     };
+
     const list = $('#note-list');
     if (list) list.onclick = async (ev) => {
-      const btn = ev.target.closest('button[data-act="del"]');
+      const btn = ev.target.closest('[data-act="del"]');
       if (!btn) return;
-      await post('bookAction', { action: 'deleteNote', payload: { id: Number(btn.closest('[data-id]').dataset.id) } });
+      const host = btn.closest('[data-id]');
+      if (!host) return;
+      await post('bookAction', { action: 'deleteNote', payload: { id: Number(host.dataset.id) } });
       navigate('notes');
+    };
+
+    const emptyWrite = $('#note-empty-write');
+    if (emptyWrite) emptyWrite.onclick = () => {
+      const t = $('#note-title');
+      if (t) t.focus();
     };
   }
 

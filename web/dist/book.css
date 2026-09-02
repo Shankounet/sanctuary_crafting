@@ -2485,12 +2485,17 @@
      cover / outer / binding     tex/leather_cover.png
      left + right pages          tex/paper_aged_new.png
      glued fiches / documents    tex/paper_dark.png
-     post-its                    main paper (no dedicated assets)
+     new note leaf               tex/paper_aged_new.png (different crop)
+     post-its                    tex/postit_{yellow,blue,green,pink}.png
    ============================================================ */
 #book-app {
   --bookCoverTexture: url("tex/leather_cover.png");
   --mainPageTexture: url("tex/paper_aged_new.png");
   --alternatePageTexture: url("tex/paper_dark.png");
+  --postitBlue: url("tex/postit_blue.png");
+  --postitGreen: url("tex/postit_green.png");
+  --postitPink: url("tex/postit_pink.png");
+  --postitYellow: url("tex/postit_yellow.png");
 }
 
 /* ---- LEATHER only: cover, outer frame, back, central binding ---- */
@@ -2586,11 +2591,8 @@
   border-width: 0 !important;
 }
 
-/* MAIN paper inserts: polaroid, sticky (no post-it assets), visit cards, tabs, blueprints, index */
+/* MAIN paper inserts: polaroid, visit cards, tabs, blueprints, index */
 #book-app .id-polaroid,
-#book-app .sticky-note,
-#book-app .sticky-note:nth-child(even),
-#book-app .sticky-note.done,
 #book-app .visit-card,
 #book-app .visit-card.business-card,
 #book-app .vc-card,
@@ -2632,7 +2634,7 @@
 #book-app .disc-card,
 #book-app .discovery-card,
 #book-app .tech-plan,
-#book-app .lined-paper {
+#book-app .note-clip {
   background-color: #c4ae86 !important;
   background-image: var(--alternatePageTexture) !important;
   background-size: cover !important;
@@ -2667,4 +2669,303 @@
 
 #book-app .book-page-inner {
   color: #2a2218;
+}
+
+/* ============================================================
+   v2.16.3 — Notes: paper leaf + real post-it PNGs
+   CSS = position / size / shadow / tilt only on textures.
+   ============================================================ */
+
+#book-app .note-leaf-wrap {
+  position: relative;
+  margin: 6px 2px 18px;
+  transform: rotate(-1.5deg);
+}
+#book-app .note-leaf {
+  position: relative;
+  padding: 16px 16px 18px 18px;
+  box-shadow: 2px 5px 12px rgba(40, 24, 10, 0.24);
+  clip-path: polygon(
+    0.7% 1.6%, 14% 0.3%, 42% 1.2%, 73% 0.2%, 99.1% 1.8%,
+    100% 28%, 99.3% 63%, 100% 97.4%,
+    76% 99.5%, 39% 98.7%, 1.8% 100%,
+    0% 68%, 0.9% 31%
+  );
+  background-color: #e8dcc4 !important;
+  background-image: var(--mainPageTexture) !important;
+  background-repeat: no-repeat !important;
+  background-size: 170% 170% !important;
+  background-position: 74% 18% !important;
+  color: #2a2218;
+}
+#book-app .note-leaf-head {
+  font-family: var(--book-hand);
+  font-size: 20px;
+  margin: 0 0 8px;
+  color: #2a2218;
+  letter-spacing: 0.03em;
+}
+#book-app .note-date {
+  font-family: var(--book-hand);
+  font-size: 14px;
+  color: #2a2218;
+  margin: 8px 0 10px;
+}
+#book-app .note-leaf input,
+#book-app .note-leaf textarea {
+  background: transparent;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  resize: none;
+  color: #2a2218;
+  font-family: var(--book-hand);
+  width: 100%;
+  caret-color: #2a2218;
+}
+#book-app .note-leaf input,
+#book-app .note-leaf textarea,
+#book-app .note-leaf input:focus,
+#book-app .note-leaf textarea:focus {
+  outline: none;
+  box-shadow: none;
+}
+#book-app .note-leaf #note-title {
+  border-bottom: 1px solid rgba(42, 34, 24, 0.38);
+  padding: 2px 0 4px;
+  margin-top: 2px;
+  font-size: 17px;
+  background: transparent !important;
+}
+#book-app .note-leaf #note-title:focus {
+  outline: none;
+  border-bottom-color: rgba(42, 34, 24, 0.62);
+}
+#book-app .note-leaf #note-body {
+  background-color: transparent !important;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 27px,
+    rgba(42, 34, 24, 0.2) 27px,
+    rgba(42, 34, 24, 0.2) 28px
+  );
+  min-height: 112px;
+  line-height: 28px;
+  padding: 0;
+  margin-top: 4px;
+  border: 0 !important;
+  overflow: auto;
+}
+#book-app .note-add-task {
+  display: inline-block;
+  margin: 10px 0 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--book-hand);
+  font-size: 15px;
+  color: #2a2218;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+#book-app .note-add-task:hover {
+  transform: rotate(-1deg);
+}
+#book-app .note-stamp {
+  display: inline-block;
+  margin: 12px 4px 4px;
+  padding: 8px 14px;
+  border: 2px solid rgba(140, 80, 50, 0.78);
+  color: rgba(140, 80, 50, 0.9);
+  font-family: var(--book-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: transparent;
+  cursor: pointer;
+  transform: rotate(-3deg);
+  line-height: 1.2;
+  border-radius: 2px;
+}
+#book-app .note-stamp:hover {
+  transform: rotate(-6deg) scale(1.05);
+}
+#book-app .note-stamp:active {
+  transform: rotate(-2deg) translateY(1px);
+}
+
+#book-app .note-tasks {
+  margin-top: 8px;
+}
+#book-app .note-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 94%;
+  min-height: 52px;
+  margin: 8px 4px;
+  padding: 18px 12px 12px 14px;
+  box-shadow: 1px 3px 6px rgba(40, 24, 10, 0.22);
+}
+#book-app .note-task:nth-child(odd) { transform: rotate(-1.8deg); }
+#book-app .note-task:nth-child(even) { transform: rotate(1.6deg); }
+#book-app .note-task .note-task-input {
+  flex: 1;
+  background: transparent !important;
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  color: #2a2218;
+  font-family: var(--book-hand);
+  font-size: 14px;
+  padding: 0;
+  margin: 0;
+}
+#book-app .note-task-remove {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 0;
+  font-family: var(--book-hand);
+  font-size: 16px;
+  color: #2a2218;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0.7;
+}
+#book-app .note-check-box {
+  flex: 0 0 auto;
+  font-size: 14px;
+  color: #2a2218;
+  line-height: 1;
+}
+
+/* Real post-it PNGs — one texture, no fill, no mix-blend */
+#book-app .postit,
+#book-app .sticky-note,
+#book-app .sticky-note:nth-child(even),
+#book-app .sticky-note.done {
+  background-color: transparent !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% 100% !important;
+  background-position: center !important;
+  border: 0 !important;
+}
+#book-app .postit-yellow,
+#book-app .sticky-note:nth-child(4n+1) {
+  background-image: var(--postitYellow) !important;
+}
+#book-app .postit-blue,
+#book-app .sticky-note:nth-child(4n+2) {
+  background-image: var(--postitBlue) !important;
+}
+#book-app .postit-green,
+#book-app .sticky-note:nth-child(4n+3) {
+  background-image: var(--postitGreen) !important;
+}
+#book-app .postit-pink,
+#book-app .sticky-note:nth-child(4n+4) {
+  background-image: var(--postitPink) !important;
+}
+#book-app .sticky-note {
+  padding: 22px 14px 14px;
+  box-shadow: 1px 3px 7px rgba(40, 24, 10, 0.22);
+}
+
+#book-app .notes-empty {
+  padding: 12px 8px 8px;
+  text-align: left;
+}
+#book-app .notes-empty-title {
+  font-family: var(--book-hand);
+  font-size: 26px;
+  font-weight: 400;
+  color: #2a2218;
+  margin: 8px 0 10px;
+}
+#book-app .notes-empty-cue {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 28px 18px 20px;
+  min-width: 168px;
+  min-height: 92px;
+  transform: rotate(2.2deg);
+  box-shadow: 1px 3px 6px rgba(40, 24, 10, 0.2);
+  text-align: center;
+}
+#book-app .notes-empty-cue .note-stamp {
+  margin: 8px 0 0;
+}
+
+#book-app .note-clip {
+  position: relative;
+  margin: 14px 6px 18px;
+  padding: 16px 16px 14px;
+  color: #2a2218;
+  box-shadow: 2px 4px 8px rgba(40, 24, 10, 0.22);
+}
+#book-app .note-clip.rot-l { transform: rotate(-1.3deg); background-position: 28% 36% !important; }
+#book-app .note-clip.rot-r { transform: rotate(1.5deg); background-position: 72% 62% !important; }
+#book-app .note-clip-date {
+  font-family: var(--book-hand);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  margin: 0 28px 6px 0;
+  color: #2a2218;
+}
+#book-app .note-clip-title {
+  font-family: var(--book-hand);
+  font-size: 18px;
+  font-weight: 400;
+  margin: 0 28px 8px 0;
+  color: #2a2218;
+}
+#book-app .note-clip-excerpt {
+  font-family: var(--book-hand);
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 0 0 8px;
+  color: #2a2218;
+}
+#book-app .note-clip-checks {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+#book-app .note-clip-checks li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-family: var(--book-hand);
+  font-size: 13px;
+  color: #2a2218;
+  padding: 2px 0;
+}
+#book-app .note-clip-checks li.done {
+  text-decoration: line-through;
+  opacity: 0.72;
+}
+#book-app .note-clip-del {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 2;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-family: var(--book-hand);
+  font-size: 13px;
+  color: #2a2218;
+  cursor: pointer;
+  opacity: 0.72;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+#book-app .note-clip-del:hover {
+  opacity: 1;
+  transform: rotate(8deg);
 }

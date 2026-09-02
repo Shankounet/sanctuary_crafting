@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.16.2
+# sanctuary_crafting v2.16.3
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,10 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.16.3 — Carnet Notes: feuille papier, écriture diégétique, checklist
+Notes: nouvelle note sur une feuille `paper_aged_new` (crop distinct de la page), plus de bloc `lined-paper` / `paper_dark`. Titre souligné, date du jour (Europe/Paris), corps ligné, checklist par rangées (plus de `|`). Cachet ENREGISTRER. Droite: fiches `paper_dark` ou carnet vide immersif. Post-its réels `tex/postit_{blue,green,pink,yellow}.png` (fond transparent) pour tâches, indice vide, et `.sticky-note`. Callbacks `saveNote` / `deleteNote` inchangés.
+
 
 ### v2.16.2 — Carnet Accueil non bloquant + finition HUD épingles
 Accueil: `navigate` ne vide plus les pages sur « Chargement… ». `bookDashboard` (et `bookModule`) répondent tout de suite `pending` puis `SendNUIMessage` — plus de NUI cb bloquant (CEF stallait les timers). `SurvivalBook.Dashboard` = paint léger (progression, pins, objectifs ≤5, stats, productions, chaque section en pcall). CanCraftNow / Suggestions / NextUnlocks / MaintenanceHints partent en `bookDashboardExtra`. JS peint Accueil depuis ShellMeta à 2s si rien. Pas de `loadModule('artisans')` sur l'accueil.
