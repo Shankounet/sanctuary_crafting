@@ -55,6 +55,7 @@ function OxItemCatalog.Refresh()
                 description = desc,
                 image = image,
                 weight = data.weight,
+                stack = data.stack ~= false,
             }
             n = n + 1
         end
@@ -133,6 +134,13 @@ function OxItemCatalog.Slim(name, extra)
         image = (data and data.image) or ((name or 'item') .. '.png'),
         weight = extra.weight or (data and data.weight) or nil,
     }
+end
+
+function OxItemCatalog.IsStackable(name)
+    local data = OxItemCatalog.Get(name)
+    if not data then return true end
+    if data.stack == false then return false end
+    return true
 end
 
 --- Dictionnaire { [item] = label } des items réellement utilisés par les recettes.

@@ -94,6 +94,11 @@
             <span class="t-l5" id="stat-eff">—</span>
             <div class="seg-gauge eff" aria-hidden="true"><i class="gauge-fill" id="gauge-eff"></i></div>
           </div>
+          <div class="instr-plate instr-primary instr-temp hidden" id="plate-temp">
+            <span class="t-l4">Temp.</span>
+            <span class="t-l5" id="stat-temp">—</span>
+            <div class="seg-gauge" aria-hidden="true"><i class="gauge-fill" id="gauge-temp"></i></div>
+          </div>
           <div class="instr-plate instr-primary instr-energy hidden" id="stat-energy-wrap">
             <span class="t-l4"><i class="fa-solid fa-bolt led" id="led-power" aria-hidden="true"></i> Énergie</span>
             <span class="t-l5" id="stat-energy">—</span>
@@ -312,6 +317,16 @@
           <h3 class="t-l3"><i class="fa-solid fa-warehouse"></i> Atelier</h3>
           <div class="kv-row" id="row-station"><span>Station</span><span id="d-station">—</span></div>
           <div class="kv-row" id="row-station-lvl"><span>Niveau requis</span><span id="d-station-lvl">—</span></div>
+          <div class="kv-row" id="row-station-vent"><span>Ventilation</span><span id="d-station-vent">—</span></div>
+          <div class="kv-row" id="row-station-queue"><span>File</span><span id="d-station-queue">—</span></div>
+          <div id="station-ops" class="station-ops hidden">
+            <div class="station-ops-row">
+              <button type="button" id="btn-maintain" class="ghost compact" title="Entretenir la station">MAINTENIR</button>
+              <button type="button" id="btn-repair" class="ghost compact" title="Réparer la station">RÉPARER</button>
+              <button type="button" id="btn-upgrade" class="ghost compact hidden" title="Améliorer la station">NIVEAU +</button>
+            </div>
+            <ul id="station-modules" class="station-mod-list" aria-label="Modules station"></ul>
+          </div>
         </div>
 
         <div class="block block-ings" id="block-ings">
@@ -418,10 +433,20 @@
                 <span class="fab-chip-k">Énergie</span>
                 <span class="fab-chip-v" id="fab-ready-energy">—</span>
               </div>
+              <div class="fab-chip" id="fab-chip-mats">
+                <span class="fab-chip-k">Matériaux</span>
+                <span class="fab-chip-v" id="fab-ready-mats">—</span>
+              </div>
             </div>
             <div class="action-primary-row">
               <label class="batch" id="batch-wrap">Lot
-                <input id="batch" type="number" min="1" max="10" value="1" />
+                <input id="batch" type="number" min="1" max="50" value="1" />
+                <span class="batch-presets" id="batch-presets" role="group" aria-label="Préréglages lot">
+                  <button type="button" class="ghost compact batch-pre" data-batch="1">x1</button>
+                  <button type="button" class="ghost compact batch-pre" data-batch="5">x5</button>
+                  <button type="button" class="ghost compact batch-pre" data-batch="10">x10</button>
+                  <button type="button" class="ghost compact batch-pre" data-batch="max">MAX</button>
+                </span>
               </label>
               <button type="button" id="btn-craft" class="primary craft-engage" title="Lancer la fabrication">
                 <span class="craft-engage-face">

@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS `sanctuary_placed_benches` (
     `heading` FLOAT NOT NULL DEFAULT 0,
     `station_level` INT NOT NULL DEFAULT 1,
     `modules` LONGTEXT NULL,
+    `condition_pct` FLOAT NOT NULL DEFAULT 100,
+    `heat` FLOAT NOT NULL DEFAULT 20,
+    `broken_parts` LONGTEXT NULL,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_owner` (`owner`)

@@ -45,7 +45,7 @@ Config = {}
 
 Config.Locale = 'fr'
 Config.Debug = false
-Config.Version = '2.14.0'
+Config.Version = '2.15.0'
 
 --------------------------------------------------------------------------------
 -- Feature flags (Phase 2–7) — stubs uniquement, aucun comportement Phase 1
@@ -78,6 +78,9 @@ Config.MaxConcurrentCrafts = 1
 Config.Crafting = {
     --- Retire les ingrédients au start (après validation complète) ; sinon au complete
     RemoveIngredientsOnStart = true,
+    ConsumeOnStart = true,
+    --- File: false = consume-on-enqueue (anti-dupe, défaut). true = escrow/lock 1:1.
+    ReserveOnQueue = false,
     --- Rembourse les ingrédients si retirés et craft annulé
     RefundOnCancel = true,
     --- Rembourse à la déconnexion (si ingrédients déjà retirés)

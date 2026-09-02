@@ -14,6 +14,21 @@ end
 function Benches.GetWorld(id) return worldEntities[id] end
 function Benches.GetPlaced(id) return placedBenches[id] end
 
+function Benches.ForEach(fn)
+    for _, b in pairs(worldEntities) do fn(b) end
+    for _, b in pairs(placedBenches) do fn(b) end
+end
+
+function Benches.CountQueueCap(bench)
+    if not bench then return (Config.Queue and Config.Queue.MaxQueuePerPlayer) or 5 end
+    local extra = 0
+    if StationRuntime and StationRuntime.Modifiers then
+        extra = tonumber(StationRuntime.Modifiers(bench).queueSize) or 0
+    end
+    local cap = bench.queueSize or ((Config.Queue and Config.Queue.MaxQueuePerPlayer) or 5)
+    return math.max(1, (tonumber(cap) or 5) + extra)
+end
+
 ---@param key string
 ---@return table|nil
 function Benches.Resolve(key)
@@ -37,6 +52,7 @@ function Benches.GetAllForClient()
             type = b.type, spawnProp = b.spawnProp, queueSize = b.queueSize, blip = b.blip,
             stationLevel = b.stationLevel or 1, modules = b.modules or {},
             powered = CraftingPower.HasPower(b),
+            condition = b.condition, heat = b.heat,
         }
     end
     for id, b in pairs(placedBenches) do
@@ -45,6 +61,7 @@ function Benches.GetAllForClient()
             category = b.category, coords = b.coords, heading = b.heading,
             model = b.model, stationLevel = b.stationLevel or 1,
             modules = b.modules or {}, powered = CraftingPower.HasPower(b),
+            condition = b.condition, heat = b.heat, brokenParts = b.brokenParts,
         }
     end
     return list
@@ -101,6 +118,9 @@ local function rowToBench(row)
         model = joaat(row.model), modelName = row.model,
         stationLevel = tonumber(row.station_level) or 1,
         modules = decodeJson(row.modules, {}),
+        condition = tonumber(row.condition_pct) or 100,
+        heat = tonumber(row.heat) or 20,
+        brokenParts = decodeJson(row.broken_parts, {}),
     }
 end
 
@@ -133,6 +153,7 @@ function Benches.InsertPlaced(owner, category, modelHash, coords, heading, stati
         key = benchKey('placed', insertId), kind = 'placed', id = insertId,
         owner = owner, category = category, coords = coords, heading = heading,
         model = modelHash, modelName = modelName, stationLevel = level, modules = mods,
+        condition = 100, heat = 20, brokenParts = {},
     }
     placedBenches[insertId] = b
     return b
@@ -153,26 +174,32 @@ function Benches.Upgrade(src, key)
     end
     local bench = Benches.Resolve(key)
     if not bench or bench.kind ~= 'placed' then return false, 'craft_invalid' end
-    local max = Config.Stations.MaxLevel or 5
+    if not Validation.IsNearBench(src, bench.coords, Config.InteractDistance) then
+        return false, 'craft_too_far'
+    end
+    if CraftingPermissions and CraftingPermissions.CanUpgradeStation then
+        if not CraftingPermissions.CanUpgradeStation(src, bench) then
+            return false, 'craft_denied'
+        end
+    end
+    local max = Config.Stations.MaxLevel or 3
     if (bench.stationLevel or 1) >= max then return false, 'upgrade_max' end
 
     local nextLevel = (bench.stationLevel or 1) + 1
-    local upgrades = (Config.Stations.Upgrades or {})[bench.category]
+    local upgrades = (Config.Stations.Upgrades or {})[bench.category] or (Config.Stations.Upgrades or {})[bench.station]
     local req = upgrades and upgrades[nextLevel]
+    -- Skill check BEFORE consume (or refund)
+    if req and req.requireLevel then
+        local cat = req.skillCategory or (Config.Skills and Config.Skills.craftingCategory) or 'ingenieur'
+        local ok = CraftingSkills.HasRequiredLevel(cat, req.requireLevel, src)
+        if not ok then return false, 'craft_level_required', { req.requireLevel } end
+    end
     if req and req.costItems then
         if not Validation.HasIngredients(src, req.costItems) then
             return false, 'craft_no_ingredients'
         end
-        for i = 1, #req.costItems do
-            local c = req.costItems[i]
-            if not exports.ox_inventory:RemoveItem(src, c.item, c.count) then
-                return false, 'craft_no_ingredients'
-            end
-        end
-    end
-    if req and req.requireLevel then
-        local ok = CraftingSkills.HasRequiredLevel(Config.Skills.craftingCategory, req.requireLevel, src)
-        if not ok then return false, 'craft_level_required' end
+        local taken = CraftingMaterials.Take(src, req.costItems)
+        if not taken then return false, 'craft_no_ingredients' end
     end
 
     bench.stationLevel = nextLevel
@@ -182,22 +209,51 @@ function Benches.Upgrade(src, key)
     return true, nextLevel
 end
 
---- Attach module to station
+--- Attach module to station (consume item, allowlist, proximity, CanUpgradeStation)
 function Benches.AddModule(src, key, moduleId)
     if not Config.Stations or not Config.Stations.UpgradesEnabled then
         return false, 'upgrade_disabled'
     end
+    if type(moduleId) ~= 'string' or moduleId == '' then return false, 'craft_invalid' end
+    local defs = Config.Stations.ModuleDefs or {}
+    local allow = Config.Stations.Modules or {}
+    local def = defs[moduleId]
+    local allowed = def ~= nil
+    if not allowed then
+        for i = 1, #allow do if allow[i] == moduleId then allowed = true break end end
+    end
+    if not allowed then return false, 'module_denied' end
     local bench = Benches.Resolve(key)
-    if not bench or bench.kind ~= 'placed' then return false, 'craft_invalid' end
+    if not bench then return false, 'craft_invalid' end
+    if bench.kind == 'world' and Config.Stations.WorldSkipModules ~= false then
+        return false, 'module_world_skip'
+    end
+    if bench.kind ~= 'placed' then return false, 'craft_invalid' end
+    if not Validation.IsNearBench(src, bench.coords, Config.InteractDistance) then
+        return false, 'craft_too_far'
+    end
+    if CraftingPermissions and CraftingPermissions.CanUpgradeStation then
+        if not CraftingPermissions.CanUpgradeStation(src, bench) then
+            return false, 'craft_denied'
+        end
+    end
     bench.modules = bench.modules or {}
     for i = 1, #bench.modules do
         if bench.modules[i] == moduleId then return false, 'module_exists' end
     end
+    local itemName = (def and def.item) or moduleId
+    local cost = { { item = itemName, count = 1 } }
+    if not Validation.HasIngredients(src, cost) then
+        return false, 'craft_no_ingredients'
+    end
+    local taken = CraftingMaterials.Take(src, cost)
+    if not taken then return false, 'craft_no_ingredients' end
     bench.modules[#bench.modules + 1] = moduleId
     MySQL.update.await('UPDATE sanctuary_placed_benches SET modules = ? WHERE id = ?', {
         json.encode(bench.modules), bench.id
     })
     Benches.BroadcastSync()
+    CraftingCore.Emit('stationModuleAdded', src, bench, moduleId)
     return true
 end
 
@@ -238,6 +294,15 @@ CreateThread(function()
     end)
     pcall(function()
         MySQL.query.await('ALTER TABLE sanctuary_placed_benches ADD COLUMN modules LONGTEXT NULL')
+    end)
+    pcall(function()
+        MySQL.query.await('ALTER TABLE sanctuary_placed_benches ADD COLUMN condition_pct FLOAT NOT NULL DEFAULT 100')
+    end)
+    pcall(function()
+        MySQL.query.await('ALTER TABLE sanctuary_placed_benches ADD COLUMN heat FLOAT NOT NULL DEFAULT 20')
+    end)
+    pcall(function()
+        MySQL.query.await('ALTER TABLE sanctuary_placed_benches ADD COLUMN broken_parts LONGTEXT NULL')
     end)
     Benches.LoadPlaced()
     Wait(1000)
@@ -317,4 +382,20 @@ end)
 lib.callback.register('sanctuary_crafting:addStationModule', function(src, key, moduleId)
     local ok, err = Benches.AddModule(src, key, moduleId)
     return { ok = ok, reason = err }
+end)
+
+lib.callback.register('sanctuary_crafting:repairStation', function(src, key)
+    if not StationRuntime or not StationRuntime.MaintainOrRepair then
+        return { ok = false, reason = 'upgrade_disabled' }
+    end
+    local ok, result, args = StationRuntime.MaintainOrRepair(src, key, 'repair')
+    return { ok = ok, result = result, reason = (not ok) and result or nil, args = args }
+end)
+
+lib.callback.register('sanctuary_crafting:maintainStation', function(src, key)
+    if not StationRuntime or not StationRuntime.MaintainOrRepair then
+        return { ok = false, reason = 'upgrade_disabled' }
+    end
+    local ok, result, args = StationRuntime.MaintainOrRepair(src, key, 'maintain')
+    return { ok = ok, result = result, reason = (not ok) and result or nil, args = args }
 end)

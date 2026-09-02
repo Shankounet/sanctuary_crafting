@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.14.0
+# sanctuary_crafting v2.15.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,23 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.15.0 — Stations (réservation, modules, usure, chaleur, batch, signature)
+Vague **stations** : `Config.Crafting.ReserveOnQueue=false` + `ConsumeOnStart=true` (anti-dupe, défaut). Helper unique `CraftingMaterials` pipeline+file. Si `ReserveOnQueue`, escrow 1:1 (cancel avant `finishAt` rend tout, jamais après).
+
+Modules configurables (`config/stations.lua`) : reinforced_tools, power_cell, reinforced_bench, precision_kit, cooling, ventilation, filter, electric, storage_rack. Effets réels (précision/qualité, rack/file, cooling/ventilation/temp). `AddModule` consomme l'item, allowlist, proximité, `CanUpgradeStation`. Bancs monde skip modules (`WorldSkipModules`). NUI liste+installer compact sur la fiche.
+
+Niveaux I–III (`MaxLevel=3`) pour les **18** stations + legacy. `recipe.stationLevel` gate `validateStart` **et** file **et** `lockReason`. Check skill **avant** consume upgrade.
+
+Usure optionnelle (`Config.Stations.Condition`) + chaleur industrielle (`Heat`, particules **off**). MAINTENIR / RÉPARER. SQL `condition_pct` / `heat` / `broken_parts` auto-migrate.
+
+Outils : `Has` exige durabilité > 0 ; usure ox metadata au complete/collect. Barre NUI liée à `toolDurability`.
+
+Batch presets x1/x5/x10/MAX, même clamp serveur (file incluse), `maxQuantity` mappé, cap dur 50/100.
+
+Signature `none|batch|individual` (défaut batch). LOT partagé, plus de `craftUID` unique sur consommables stackables.
+
+File : `validateStart`, clamp, LoadOffline clear/dedup, pas de refund après `finishAt`, mutex collect/cancel, `bench.queueSize`, NUI Annuler.
 
 ### v2.14.0 — Vague gameplay (spec, enseignement, suivi, courses, favoris, récents, nouveaux)
 Identité de métier (`Config.Specializations`, SQL `sanctuary_player_spec`) : SQL > job ESX > survie. Stations exclusives (médical / ingénieur / mécano / armurier). Survie et stations non mappées = tout le monde. **BypassRequirements saute level/skill ml_skills, jamais spec / connaissance / enseignement.** File d'attente recopie les mêmes gates au start **et** au collect.
@@ -88,6 +105,7 @@ ensure sanctuary_crafting
 sanctuary_crafting/
 ├── config.lua                 # base + distances + anti-exploit + Skills pack
 ├── config/features.lua        # flags de tous les systèmes (implémentés)
+├── config/stations.lua        # modules / niveaux I–III / usure / chaleur
 ├── config/categories.lua      # Config.RecipeCategories (IDs propres FR)
 ├── config/recipes_import.lua  # pack recettes Alex (DevHub → sanctuary)
 ├── config/world_benches.lua   # bancs monde (Shared.Craftings)

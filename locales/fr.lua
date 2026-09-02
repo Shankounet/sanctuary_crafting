@@ -111,6 +111,17 @@ Locales['fr'] = {
     ['teach_success_student'] = 'Vous avez appris %s auprès de %s',
     ['teach_progress_teacher'] = 'Enseignement : %s',
     ['teach_progress_student'] = 'Apprentissage : %s',
+    ['craft_overheat'] = 'Station en surchauffe — attendez qu\'elle refroidisse',
+    ['craft_station_broken'] = 'Station hors service — réparez-la',
+    ['module_denied'] = 'Module non autorisé',
+    ['module_world_skip'] = 'Modules indisponibles sur ce banc monde',
+    ['station_world_skip'] = 'Entretien indisponible sur ce banc monde',
+    ['station_repaired'] = 'Station réparée',
+    ['station_maintained'] = 'Station entretenue',
+    ['station_upgraded'] = 'Station améliorée (niveau %s)',
+    ['module_installed'] = 'Module installé : %s',
+    ['queue_cancelled'] = 'Fabrication retirée de la file',
 }
+
 
 

@@ -1092,7 +1092,7 @@ button, input { font: inherit; color: inherit; }
   background: rgba(0,0,0,0.4); overflow: hidden;
 }
 #app .tool-wear .wear-bar i {
-  display: block; height: 100%; width: 72%;
+  display: block; height: 100%; width: 0%;
   background: linear-gradient(90deg, var(--color-warning), var(--color-success));
 }
 
@@ -4861,3 +4861,28 @@ button, input { font: inherit; color: inherit; }
   color: #9a8866;
 }
 .teach-actions { display: flex; justify-content: flex-end; }
+
+/* v2.15.0 stations — compact ops / batch presets / queue cancel (no layout rewrite) */
+#app .station-ops { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+#app .station-ops.hidden { display: none !important; }
+#app .station-ops-row { display: flex; flex-wrap: wrap; gap: 4px; }
+#app .station-mod-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+#app .station-mod-list li {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  font-size: 0.68rem; padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+#app .station-mod-list .mod-on { color: var(--color-success); }
+#app .station-mod-list .mod-off { color: var(--color-muted); }
+#app .batch-presets { display: inline-flex; gap: 3px; margin-left: 4px; }
+#app .batch-pre {
+  padding: 4px 6px !important; font-size: 0.62rem !important; letter-spacing: 0.04em;
+  min-width: 0;
+}
+#app .batch { flex-wrap: wrap; }
+#app .queue-card .qactions { display: flex; gap: 4px; margin-top: 5px; }
+#app .queue-card .qcancel {
+  font-size: 0.62rem; padding: 3px 6px;
+}
+#app .instr-temp.warn .t-l5, #app #stat-temp.warn { color: var(--color-warning); }
+#app .instr-temp.bad .t-l5, #app #stat-temp.bad { color: #c07060; }
