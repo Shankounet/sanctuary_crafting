@@ -30,7 +30,7 @@
     persistMode: true,
     persistPosition: true,
     allowDrag: true,
-    completedLingerMs: 4500,
+    completedLingerMs: 2000,
     autoRemoveCompleted: true,
     tickMs: 250,
     phases: {
@@ -223,16 +223,19 @@
   }
 
   function phaseLabel(entry, progress) {
-    if (entry.stepLabel && (entry.totalSteps > 1 || entry.status === 'queued' || entry.status === 'done' || entry.status === 'error')) {
+    const p = Math.max(0, Math.min(1, progress || 0));
+    const st = entry.status || 'active';
+    if (st === 'error') return 'Erreur';
+    if (st === 'done' || st === 'completed' || st === 'completing' || p >= 1) {
+      return 'FABRICATION TERMINÉE';
+    }
+    if (entry.stepLabel && (entry.totalSteps > 1 || st === 'queued')) {
       return entry.stepLabel;
     }
-    if (entry.status === 'done') return 'FABRICATION TERMINÉE';
-    if (entry.status === 'error') return 'Erreur';
-    if (entry.status === 'queued') return entry.stepLabel || 'En file';
+    if (st === 'queued') return entry.stepLabel || 'En file';
     const family = entry.phaseFamily || 'default';
     const phases = (config.phases && (config.phases[family] || config.phases.default)) || ['Préparation', 'Assemblage', 'Finition'];
-    const p = Math.max(0, Math.min(0.999, progress || 0));
-    const idx = Math.min(phases.length - 1, Math.floor(p * phases.length));
+    const idx = Math.min(phases.length - 1, Math.floor(Math.min(0.999, p) * phases.length));
     return phases[idx] || entry.stepLabel || 'Fabrication';
   }
 
@@ -321,7 +324,7 @@
 
   function scheduleAutoRemove(id) {
     if (config.autoRemoveCompleted === false) return;
-    const wait = config.completedLingerMs || 4500;
+    const wait = config.completedLingerMs || 2000;
     setTimeout(() => {
       const j = jobs.get(id);
       if (j && (j.status === 'done' || j.status === 'error' || j.status === 'cancelled')) {
@@ -374,11 +377,17 @@
     el.querySelector('.ct-batch').textContent = `×${entry.count || entry.batch || 1}`;
     el.querySelector('.ct-phase').textContent = phase;
     el.querySelector('.ct-fill').style.width = `${Math.round(pct * 100)}%`;
+    const visualDone = entry.status === 'done' || entry.status === 'completed' || entry.status === 'completing' || pct >= 1;
     el.querySelector('.ct-time').textContent =
-      entry.status === 'done' ? 'Terminé'
-        : entry.status === 'error' ? 'Échec'
+      entry.status === 'error' ? 'Échec'
+        : visualDone ? 'Terminé'
           : entry.status === 'queued' ? `File · ${formatRemain(remain)}`
             : formatRemain(remain);
+    const dismiss = el.querySelector('.ct-dismiss');
+    // Hide cancel/dismiss while completing at 100% — card auto-removes after linger
+    if (dismiss && visualDone && entry.status !== 'error') {
+      dismiss.classList.add('hidden');
+    }
     el.querySelector('.ct-pct').textContent = pctTxt;
     bindItemImg(el.querySelector('img'), entry.item || entry.recipeId, el.querySelector('.ct-thumb-fallback'));
 
@@ -428,54 +437,70 @@
         if (time) {
           time.textContent = entry.status === 'queued'
             ? `File · ${formatRemain(remain)}`
-            : formatRemain(remain);
+            : (remain <= 0 ? 'Terminé' : formatRemain(remain));
         }
         if (phase) phase.textContent = phaseLabel(entry, pct);
+        const dismiss = node.querySelector('.ct-dismiss');
+        if (dismiss && remain <= 0) dismiss.classList.add('hidden');
       }
       if (remain <= 0 && !completing.has(entry.craftId)) {
         completing.add(entry.craftId);
+        // Immediate visual TERMINÉ — never leave FINALISATION at 100%
+        entry.status = entry.status === 'queued' ? entry.status : 'done';
+        if (entry.status !== 'queued') {
+          entry.stepLabel = 'FABRICATION TERMINÉE';
+          jobs.set(entry.craftId, entry);
+          if (node) {
+            const ph = node.querySelector('.ct-phase');
+            const tm = node.querySelector('.ct-time');
+            if (ph) ph.textContent = 'FABRICATION TERMINÉE';
+            if (tm) tm.textContent = 'Terminé';
+          }
+          scheduleAutoRemove(entry.craftId);
+        }
+        const failSafe = setTimeout(() => {
+          const still = jobs.get(entry.craftId);
+          if (still && still.status === 'active') {
+            still.status = 'done';
+            still.stepLabel = 'FABRICATION TERMINÉE';
+            jobs.set(entry.craftId, still);
+            render();
+            scheduleAutoRemove(entry.craftId);
+          }
+          completing.delete(entry.craftId);
+        }, 1500);
         post('trackerComplete', { craftId: entry.craftId }).then((r) => {
-          // Client upserts done/advanced/error; if no follow-up, mark done locally
+          clearTimeout(failSafe);
           const cur = jobs.get(entry.craftId);
-          if (!cur) return;
-          if (r && r.ok && r.advanced) {
+          if (!cur) {
             completing.delete(entry.craftId);
             return;
           }
-          if (r && r.ok) {
-            // wait for client upsert; fallback:
-            setTimeout(() => {
-              const still = jobs.get(entry.craftId);
-              if (still && still.status === 'active') {
-                still.status = 'done';
-                still.stepLabel = 'FABRICATION TERMINÉE';
-                jobs.set(entry.craftId, still);
-                render();
-                scheduleAutoRemove(entry.craftId);
-              }
-              completing.delete(entry.craftId);
-            }, 400);
+          if (r && r.ok && r.advanced) {
+            completing.delete(entry.craftId);
             return;
           }
           if (r && r.reason === 'queue_not_ready') {
             completing.delete(entry.craftId);
             return;
           }
-          // soft already-done
-          if (r && r.already) {
+          // ok, already, craft_too_far, timeout, no reply → TERMINÉ (watchdog grants)
+          cur.status = 'done';
+          cur.stepLabel = 'FABRICATION TERMINÉE';
+          jobs.set(entry.craftId, cur);
+          render();
+          scheduleAutoRemove(entry.craftId);
+          completing.delete(entry.craftId);
+        }).catch(() => {
+          clearTimeout(failSafe);
+          const cur = jobs.get(entry.craftId);
+          if (cur && cur.status === 'active') {
             cur.status = 'done';
             cur.stepLabel = 'FABRICATION TERMINÉE';
             jobs.set(entry.craftId, cur);
             render();
             scheduleAutoRemove(entry.craftId);
-            completing.delete(entry.craftId);
-            return;
           }
-          cur.status = 'error';
-          cur.stepLabel = 'Erreur';
-          jobs.set(entry.craftId, cur);
-          render();
-          scheduleAutoRemove(entry.craftId);
           completing.delete(entry.craftId);
         });
       }
@@ -632,6 +657,38 @@
         msg.jobs.forEach((j) => upsertJob(j));
       }
       updateVisibility();
+      return;
+    }
+    if (action === 'craftFinished') {
+      if (!msg.craftId) return;
+      const prev = jobs.get(msg.craftId) || { craftId: msg.craftId };
+      upsertJob({
+        ...prev,
+        craftId: msg.craftId,
+        status: 'done',
+        stepLabel: 'FABRICATION TERMINÉE',
+        label: msg.label || prev.label,
+        item: (msg.result && msg.result.item) || prev.item,
+        count: (msg.result && msg.result.count) || prev.count,
+        batch: msg.batch || prev.batch,
+        benchKey: msg.benchKey || prev.benchKey,
+      });
+      return;
+    }
+    if (action === 'craftAdvanced') {
+      if (!msg.craftId) return;
+      const prev = jobs.get(msg.craftId) || { craftId: msg.craftId };
+      upsertJob({
+        ...prev,
+        craftId: msg.craftId,
+        status: 'active',
+        duration: msg.duration,
+        stepIndex: msg.stepIndex,
+        totalSteps: msg.totalSteps,
+        stepLabel: msg.stepLabel || msg.label,
+        label: msg.label || prev.label,
+      });
+      completing.delete(msg.craftId);
       return;
     }
   });

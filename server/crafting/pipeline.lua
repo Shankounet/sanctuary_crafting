@@ -1,11 +1,15 @@
 --[[
     crafting/pipeline.lua — craftId UUID, anti-dupe, inventaire sécurisé
-    Flow: start → (remove ingredients) → craftId → complete(craftId) one-shot | cancel refund
+    Flow: start → running → FinalizeCraft (client | watchdog | session) → completed
+    FINALISATION is a visual NUI phase only. When remainingMs<=0 the craft MUST complete.
+    Timing: craft.startedAt / craft.duration are GetGameTimer() MILLISECONDS.
+            craft.startedUnix / completedAt / log finishesAt are Unix SECONDS.
 ]]
 
 CraftingPipeline = CraftingPipeline or {}
 
---- active[craftId] = { src, recipeId, benchKey, startedAt, duration, ingredients, batch, completed, craftUID }
+--- active[craftId] = { src, recipeId, benchKey, startedAt (ms), duration (ms), state, ingredients, batch, completed, craftUID }
+--- state: queued | running | completing | completed | cancelled | failed
 local activeById = {}
 local activeBySrc = {} -- [src] = { [craftId]=true }
 
@@ -102,9 +106,55 @@ local function clearActive(craftId, refund)
     return craft
 end
 
+--- remainingMs: duration(ms) - elapsed(ms). Never mix with os.time() seconds.
+local function remainingMsOf(craft)
+    if not craft then return 0 end
+    local nowMs = GetGameTimer() -- ms
+    local startedAtMs = tonumber(craft.startedAt) or nowMs -- GetGameTimer ms
+    local durationMs = tonumber(craft.duration) or 0 -- ms
+    return math.max(0, durationMs - (nowMs - startedAtMs))
+end
+
+local function elapsedMsOf(craft)
+    if not craft then return 0 end
+    local nowMs = GetGameTimer() -- ms
+    local startedAtMs = tonumber(craft.startedAt) or nowMs
+    return nowMs - startedAtMs
+end
+
+local function finishesAtUnixOf(craft)
+    local startedUnix = craft and craft.startedUnix
+    if type(startedUnix) ~= 'number' then
+        startedUnix = os.time()
+    end
+    return startedUnix + math.ceil(remainingMsOf(craft) / 1000)
+end
+
+local function finalizeLogsOn()
+    return not Config.Crafting or Config.Crafting.FinalizeLogs ~= false
+end
+
+local function craftLog(msg)
+    if finalizeLogsOn() then
+        print(msg)
+    end
+end
+
 function CraftingPipeline.Cancel(src, craftId, reason)
     local craft = activeById[craftId]
     if not craft or craft.src ~= src then return false, 'craft_invalid' end
+    if craft.state == 'completed' or (craft.completed and craft.state ~= 'running') then
+        return true
+    end
+    if craft.state == 'completing' then
+        return false, 'craft_busy'
+    end
+    -- At 100% / remainingMs<=0: complete instead of refund (player may have closed UI)
+    if remainingMsOf(craft) <= 0 and (not craft.state or craft.state == 'running') then
+        local r = CraftingPipeline.FinalizeCraft(src, craftId, { reason = 'watchdog', requireNear = false })
+        return r and r.ok or false, r and r.reason
+    end
+    craft.state = 'cancelled'
     local doRefund = Config.Crafting and Config.Crafting.RefundOnCancel
     if doRefund and craft.removed and Config.Crafting.PartialRefund then
         local elapsed = GetGameTimer() - (craft.startedAt or 0)
@@ -133,7 +183,13 @@ function CraftingPipeline.CancelAll(src, refund)
     local ids = {}
     for id in pairs(set) do ids[#ids + 1] = id end
     for i = 1, #ids do
-        clearActive(ids[i], refund)
+        local craft = activeById[ids[i]]
+        if craft and (craft.state == 'completed' or craft.state == 'completing' or craft.completed) then
+            clearActive(ids[i], false)
+        else
+            if craft then craft.state = 'cancelled' end
+            clearActive(ids[i], refund)
+        end
     end
 end
 
@@ -366,6 +422,7 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
         duration = duration, batch = ctx.batch,
         ingredients = ctx.ingredients, removed = removed,
         completed = false,
+        state = 'running',
         stepIndex = stepIndex, totalSteps = totalSteps,
         removedHistory = removed and { ctx.ingredients } or {},
     }
@@ -373,6 +430,13 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
     emitNoise(src, recipe, bench)
     CraftingCore.Emit('craftStarted', src, craft)
 
+    do
+        local startedUnix = craft.startedUnix -- unix s
+        local finishesAtUnix = startedUnix + math.ceil(duration / 1000) -- duration is ms
+        craftLog(('[CRAFT] start id=%s startedAt=%s finishesAt=%s durationMs=%s'):format(
+            craftId, tostring(startedUnix), tostring(finishesAtUnix), tostring(duration)
+        ))
+    end
     DebugPrint('startCraft', src, craftId, recipe.id, duration, 'step', stepIndex, '/', totalSteps)
     local resultItem = recipe.result and recipe.result.item or nil
     local resultCount = recipe.result and ((recipe.result.count or 1) * ctx.batch) or ctx.batch
@@ -395,20 +459,46 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
     }
 end)
 
-lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
-    if type(craftId) ~= 'string' then return { ok = false, reason = 'craft_invalid' } end
+function CraftingPipeline.FinalizeCraft(src, craftId, opts)
+    opts = opts or {}
+    local reason = opts.reason or 'client'
+    craftLog(('[CRAFT] finalizeCraft called id=%s src=%s reason=%s'):format(tostring(craftId), tostring(src), tostring(reason)))
+
+    if type(craftId) ~= 'string' then
+        return { ok = false, reason = 'craft_invalid' }
+    end
     local craft = activeById[craftId]
-    if not craft or craft.src ~= src or craft.completed then
+    if not craft then
+        return { ok = false, reason = 'craft_invalid' }
+    end
+    if craft.src ~= src then
         return { ok = false, reason = 'craft_invalid' }
     end
 
-    -- one-shot lock
-    craft.completed = true
+    -- Idempotent / double-grant protection
+    if craft.state == 'completed' or craft.completed == true then
+        return { ok = true, already = true, craftId = craftId }
+    end
+    if craft.state == 'completing' then
+        return { ok = true, already = true, pending = true, craftId = craftId }
+    end
+    if craft.state and craft.state ~= 'running' then
+        return { ok = false, reason = 'craft_invalid' }
+    end
 
-    local elapsed = GetGameTimer() - (craft.startedAt or 0)
+    -- Timing: startedAt = GetGameTimer() ms; duration = ms
+    local elapsedMs = elapsedMsOf(craft)
+    local remainingMs = remainingMsOf(craft)
+    local durationMs = tonumber(craft.duration) or 0
     local factor = (Config.Crafting and Config.Crafting.MinDurationFactor) or 0.85
-    local minTime = math.floor((craft.duration or 0) * factor)
-    if elapsed < minTime then
+    local minTime = math.floor(durationMs * factor)
+    -- Anti-cheat: elapsed < duration * MinDurationFactor → reject early complete.
+    -- Watchdog / session only call when remainingMs<=0 (elapsed >= duration >= minTime).
+    if elapsedMs < minTime then
+        if reason == 'watchdog' or reason == 'session' then
+            return { ok = false, reason = 'craft_not_ready' }
+        end
+        craft.state = 'failed'
         clearActive(craftId, craft.removed and Config.Crafting.RefundOnCancel)
         return { ok = false, reason = 'craft_failed' }
     end
@@ -416,30 +506,49 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
     local recipe = Config.RecipeById[craft.recipeId]
     local bench = Benches and Benches.Resolve and Benches.Resolve(craft.benchKey)
     if not recipe or not bench then
+        craft.state = 'failed'
         clearActive(craftId, craft.removed)
         return { ok = false, reason = 'craft_invalid' }
     end
 
-    if not Validation.IsNearBench(src, bench.coords, Config.CraftCancelDistance or 3.0) then
-        clearActive(craftId, craft.removed and Config.Crafting.RefundOnCancel)
-        return { ok = false, reason = 'craft_too_far' }
+    -- Distance: remainingMs<=0 OR watchdog/session → never craft_too_far, never refund.
+    -- Client early complete (remainingMs > 0) keeps the near-bench check.
+    local requireNear = opts.requireNear
+    if remainingMs <= 0 or reason == 'watchdog' or reason == 'session' then
+        requireNear = false
+    elseif requireNear == nil then
+        requireNear = remainingMs > 0
+    end
+    if requireNear then
+        if not Validation.IsNearBench(src, bench.coords, Config.CraftCancelDistance or 3.0) then
+            craft.state = 'failed'
+            clearActive(craftId, craft.removed and Config.Crafting.RefundOnCancel)
+            return { ok = false, reason = 'craft_too_far' }
+        end
     end
 
     local okSkill = CraftingSkills and CraftingSkills.CheckRecipeGates and CraftingSkills.CheckRecipeGates(src, recipe)
     if not okSkill then
+        craft.state = 'failed'
         clearActive(craftId, craft.removed)
         return { ok = false, reason = 'craft_failed' }
     end
 
+    -- Lock BEFORE rewards so a second call cannot grant twice
+    craft.state = 'completing'
+    craft.completed = true
+
     -- Remove on complete if not removed at start (single-step or current step)
     if not craft.removed then
         if not Validation.HasIngredients(src, craft.ingredients) then
+            craft.state = 'failed'
             clearActive(craftId, false)
             return { ok = false, reason = 'craft_no_ingredients' }
         end
         for i = 1, #craft.ingredients do
             local ing = craft.ingredients[i]
             if not exports.ox_inventory:RemoveItem(src, ing.item, ing.count) then
+                craft.state = 'failed'
                 clearActive(craftId, false)
                 return { ok = false, reason = 'craft_no_ingredients' }
             end
@@ -456,9 +565,8 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
         local nextIndex = stepIndex + 1
         local nextIngs = stepIngredients(recipe, nextIndex, craft.batch or 1)
         if not Validation.HasIngredients(src, nextIngs) then
-            -- ne consomme pas ; reste sur l'étape courante terminée → annule avec refund historique
+            craft.state = 'failed'
             clearActive(craftId, false)
-            -- refund all previously removed step ingredients
             for _, hist in ipairs(craft.removedHistory or {}) do
                 for i = 1, #hist do
                     exports.ox_inventory:AddItem(src, hist[i].item, hist[i].count)
@@ -472,6 +580,7 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
                 for j = 1, i - 1 do
                     exports.ox_inventory:AddItem(src, nextIngs[j].item, nextIngs[j].count)
                 end
+                craft.state = 'failed'
                 clearActive(craftId, false)
                 for _, hist in ipairs(craft.removedHistory or {}) do
                     for hi = 1, #hist do
@@ -486,32 +595,35 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
         craft.ingredients = nextIngs
         craft.removed = true
         craft.stepIndex = nextIndex
-        craft.completed = false -- réouvre one-shot pour l'étape suivante
+        craft.completed = false
+        craft.state = 'running'
         local nextStep = recipe.steps[nextIndex]
         local rawDur = stepDuration(recipe, nextIndex)
         local duration = CraftingSkills.ApplyCraftTimeBonus(rawDur, src)
         if (craft.batch or 1) > 1 then
             duration = math.floor(duration * craft.batch * 0.85)
         end
-        craft.duration = duration
-        craft.startedAt = GetGameTimer()
-        craft.startedUnix = os.time()
+        craft.duration = duration -- ms
+        craft.startedAt = GetGameTimer() -- ms
+        craft.startedUnix = os.time() -- unix s
         local stepLabel = (nextStep and nextStep.label) or recipe.label
         CraftingCore.Emit('craftStepAdvanced', src, craft, nextIndex, totalSteps)
         DebugPrint('advanceStep', src, craftId, nextIndex, '/', totalSteps)
-        return {
+        local payload = {
             ok = true, advanced = true, craftId = craftId, craftUID = craft.craftUID,
             stepIndex = nextIndex, totalSteps = totalSteps,
             duration = duration, label = stepLabel, stepLabel = stepLabel,
             batch = craft.batch,
+            benchKey = craft.benchKey,
         }
+        TriggerClientEvent('sanctuary_crafting:client:craftAdvanced', src, payload)
+        return payload
     end
 
     local batch = craft.batch or 1
     local resultItem = recipe.result.item
     local resultCount = (recipe.result.count or 1) * batch
 
-    -- Dismantle yields
     local given = {}
     if recipe.dismantle and Config.Dismantling and Config.Dismantling.Enabled and recipe.dismantleYields then
         local bonus = 0
@@ -534,11 +646,11 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
         if quality then meta.quality = quality end
 
         if not Validation.CanCarry(src, resultItem, resultCount) then
-            -- refund
             for i = 1, #craft.ingredients do
                 local ing = craft.ingredients[i]
                 exports.ox_inventory:AddItem(src, ing.item, ing.count)
             end
+            craft.state = 'failed'
             clearActive(craftId, false)
             return { ok = false, reason = 'craft_inventory_full' }
         end
@@ -549,6 +661,7 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
                 local ing = craft.ingredients[i]
                 exports.ox_inventory:AddItem(src, ing.item, ing.count)
             end
+            craft.state = 'failed'
             clearActive(craftId, false)
             return { ok = false, reason = 'craft_inventory_full' }
         end
@@ -556,7 +669,10 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
         giveByproducts(src, recipe)
     end
 
-    -- XP ml_skills only
+    craftLog(('[CRAFT] reward granted id=%s item=%s count=%s'):format(
+        craftId, tostring(given[1] and given[1].item or resultItem), tostring(given[1] and given[1].count or resultCount)
+    ))
+
     if recipe.xp and recipe.xp.category and recipe.xp.amount then
         CraftingSkills.AddXP(recipe.xp.category, recipe.xp.amount * batch, src)
     end
@@ -565,25 +681,78 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
         Mastery.Add(src, recipe.id, (Config.Mastery.XpPerCraft or 1) * batch)
     end
 
+    craft.state = 'completed'
+    craft.completedAt = os.time() -- unix s
+    craftLog(('[CRAFT] state completed id=%s completedAt=%s'):format(craftId, tostring(craft.completedAt)))
+
     clearActive(craftId, false)
     CraftingCore.Emit('craftCompleted', src, craft, given)
     DebugPrint('completeCraft ok', src, craftId)
 
-    -- chain: id(s) suivants sous même craftUID (client / project peut enchaîner)
     local chainNext = nil
     if type(recipe.chain) == 'table' and #recipe.chain > 0 then
         chainNext = recipe.chain[1]
     end
 
-    return {
+    local resultPayload = {
         ok = true, craftId = craftId, craftUID = craft.craftUID,
         result = given[1] or recipe.result, results = given,
         label = recipe.label, quality = given[1] and given[1].quality,
         stepIndex = craft.stepIndex or totalSteps, totalSteps = totalSteps,
         chainNext = chainNext, chain = recipe.chain,
         advanced = false,
+        batch = batch,
+        benchKey = craft.benchKey,
     }
+    TriggerClientEvent('sanctuary_crafting:client:craftFinished', src, {
+        craftId = craftId,
+        label = recipe.label,
+        result = resultPayload.result,
+        batch = batch,
+        benchKey = craft.benchKey,
+    })
+
+    -- Queue-next: CraftQueue entries already have their own finishAt + collect path.
+    -- Do not force-start a queued job as an interactive craft. Auto-promote of the
+    -- next interactive job is deferred (no existing Enqueue→startCraft hook).
+
+    return resultPayload
+end
+
+lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
+    if type(craftId) ~= 'string' then return { ok = false, reason = 'craft_invalid' } end
+    local craft = activeById[craftId]
+    local remainingMs = craft and remainingMsOf(craft) or 0
+    -- Client at 100% (remainingMs<=0) skips the near-bench gate — player may have closed UI.
+    return CraftingPipeline.FinalizeCraft(src, craftId, {
+        reason = 'client',
+        requireNear = remainingMs > 0,
+    })
 end)
+
+--- Watchdog: never leave a craft running at remainingMs<=0 (100% / 0s / FINALISATION).
+CreateThread(function()
+    while true do
+        Wait(2000)
+        local ids = {}
+        for craftId in pairs(activeById) do
+            ids[#ids + 1] = craftId
+        end
+        for i = 1, #ids do
+            local craft = activeById[ids[i]]
+            if craft and craft.state == 'running' and remainingMsOf(craft) <= 0 then
+                craftLog(('[CRAFT] finished timestamp reached id=%s finishesAt=%s'):format(
+                    craft.craftId, tostring(finishesAtUnixOf(craft))
+                ))
+                CraftingPipeline.FinalizeCraft(craft.src, craft.craftId, {
+                    reason = 'watchdog',
+                    requireNear = false,
+                })
+            end
+        end
+    end
+end)
+
 
 RegisterNetEvent('sanctuary_crafting:server:cancelCraft', function(craftId)
     local src = source
@@ -598,6 +767,17 @@ end)
 
 AddEventHandler('playerDropped', function()
     local src = source
+    local set = activeBySrc[src]
+    if set then
+        local ids = {}
+        for id in pairs(set) do ids[#ids + 1] = id end
+        for i = 1, #ids do
+            local craft = activeById[ids[i]]
+            if craft and remainingMsOf(craft) <= 0 and (craft.state == 'running' or not craft.state) then
+                CraftingPipeline.FinalizeCraft(src, craft.craftId, { reason = 'session', requireNear = false })
+            end
+        end
+    end
     local refund = Config.Crafting and Config.Crafting.RefundOnDisconnect
     CraftingPipeline.CancelAll(src, refund)
     Validation.ClearPlayer(src)
@@ -614,16 +794,16 @@ local function craftSessionDebug()
 end
 
 local function serializeActiveCraft(craft)
-    local nowMs = GetGameTimer()
-    local startedAtMs = craft.startedAt or nowMs
-    local durationMs = tonumber(craft.duration) or 0
-    local remainingMs = math.max(0, durationMs - (nowMs - startedAtMs))
-    local nowUnix = os.time()
+    local nowMs = GetGameTimer() -- ms
+    local startedAtMs = craft.startedAt or nowMs -- GetGameTimer ms
+    local durationMs = tonumber(craft.duration) or 0 -- ms
+    local remainingMs = remainingMsOf(craft) -- ms
+    local nowUnix = os.time() -- unix s
     local startedUnix = craft.startedUnix
     if type(startedUnix) ~= 'number' then
         startedUnix = nowUnix - math.floor(math.max(0, nowMs - startedAtMs) / 1000)
     end
-    -- finishesAt from remaining (GetGameTimer) so reopen shows advanced progress
+    -- finishesAt unix seconds from remaining (GetGameTimer ms)
     local finishesAt = startedUnix + math.ceil(remainingMs / 1000)
 
     local recipe = Config.RecipeById and Config.RecipeById[craft.recipeId]
@@ -647,7 +827,7 @@ local function serializeActiveCraft(craft)
         resultCount = resultCount,
         batch = batch,
         quantity = batch,
-        state = 'active',
+        state = craft.state or 'running',
         startedAt = startedUnix,
         finishesAt = finishesAt,
         duration = remainingMs,
@@ -671,7 +851,7 @@ function CraftingPipeline.SerializeActive(src, benchKey)
     if not set then return matching, other end
     for craftId in pairs(set) do
         local craft = activeById[craftId]
-        if craft and craft.src == src and not craft.completed then
+        if craft and craft.src == src and (craft.state == 'running' or not craft.state) and not craft.completed then
             local row = serializeActiveCraft(craft)
             if benchKey and craft.benchKey ~= benchKey then
                 other[#other + 1] = row
@@ -686,6 +866,24 @@ end
 --- Station-scoped session (source of truth for NUI rehydrate).
 --- Interactive = RAM pipeline; queued = CraftQueue (SQL-backed offline).
 function CraftingPipeline.GetSession(src, benchKey)
+    -- Finalize expired running crafts BEFORE serialize so the client never
+    -- rehydrates a 100%/0s/FINALISATION interactive job.
+    local set = activeBySrc[src]
+    if set then
+        local ids = {}
+        for craftId in pairs(set) do ids[#ids + 1] = craftId end
+        for i = 1, #ids do
+            local craft = activeById[ids[i]]
+            if craft and craft.src == src and (craft.state == 'running' or not craft.state) then
+                if remainingMsOf(craft) <= 0 then
+                    CraftingPipeline.FinalizeCraft(src, craft.craftId, {
+                        reason = 'session',
+                        requireNear = false,
+                    })
+                end
+            end
+        end
+    end
     local active, other = CraftingPipeline.SerializeActive(src, benchKey)
     local queued = {}
     if CraftQueue and CraftQueue.List then

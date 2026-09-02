@@ -1221,8 +1221,16 @@
     if (mod) mod.setAttribute('data-fab-state', next);
   }
 
+  function setFabCancelVisible(show) {
+    const btn = $('#btn-cancel');
+    if (!btn) return;
+    btn.classList.toggle('hidden', !show);
+    btn.disabled = !show;
+  }
+
   function craftPhaseFor(recipe, progress) {
     const p = Math.max(0, Math.min(1, progress || 0));
+    if (p >= 1) return 'TERMINÉ';
     const cat = String((recipe && recipe.category) || '').toLowerCase();
     let mid = 'Assemblage';
     if (/medical|medecin|soin|pharma/.test(cat)) mid = 'Stérilisation';
@@ -1248,6 +1256,7 @@
     const p = orig > 0 ? Math.min(1, Math.max(0, 1 - rem / orig)) : 0;
     const phaseEl = $('#fab-active-phase');
     if (phaseEl) phaseEl.textContent = craftPhaseFor(recipe, p);
+    setFabCancelVisible(p < 1);
     const timeEl = $('#fab-active-time');
     if (timeEl) timeEl.textContent = durationLabel(rem);
     const pctEl = $('#fab-active-pct');
@@ -1410,6 +1419,7 @@
       if (timeEl) timeEl.textContent = durationLabel(leftMs);
       const phaseEl = $('#fab-active-phase');
       if (phaseEl) phaseEl.textContent = craftPhaseFor(recipe, p);
+      setFabCancelVisible(p < 1);
       return p;
     };
     paint(performance.now());
@@ -1468,6 +1478,9 @@
       const craftBtn = $('#btn-craft');
       if (craftBtn) craftBtn.disabled = true;
       if (remaining <= 0) {
+        const phaseEl = $('#fab-active-phase');
+        if (phaseEl) phaseEl.textContent = 'TERMINÉ';
+        setFabCancelVisible(false);
         finishCraft();
       } else {
         runProgress(remaining, finishCraft);
@@ -1504,16 +1517,70 @@
     state.craftDurationMs = data.duration;
     state.progressRecipe = state.selected;
     fillFabActive(state.selected, batch, data.duration, data.duration);
+    setFabCancelVisible(true);
     setFabState('active');
     const whyEl = $('#craft-why');
     if (whyEl) whyEl.classList.add('hidden');
     runProgress(data.duration, finishCraft);
   }
 
+  function showFabTerminated(label) {
+    const phaseEl = $('#fab-active-phase');
+    if (phaseEl) phaseEl.textContent = 'TERMINÉ';
+    const pctEl = $('#fab-active-pct');
+    if (pctEl) pctEl.textContent = '100%';
+    const timeEl = $('#fab-active-time');
+    if (timeEl) timeEl.textContent = '0s';
+    const fill = $('#progress-fill');
+    if (fill) fill.style.width = '100%';
+    setFabCancelVisible(false);
+    const doneLabel = $('#fab-done-label');
+    const craftName = label
+        || (state.progressRecipe && state.progressRecipe.label)
+        || (state.selected && state.selected.label)
+        || 'Objet fabriqué';
+    if (doneLabel) doneLabel.textContent = craftName;
+    state.lastCraft = craftName;
+    try { localStorage.setItem(LAST_CRAFT_KEY, craftName); } catch (_) { /* ignore */ }
+    updateFabIdleConsole();
+    setFabState('done');
+    if (fabDoneTimer) clearTimeout(fabDoneTimer);
+    fabDoneTimer = setTimeout(() => {
+      fabDoneTimer = null;
+      setFabState('ready');
+      if (state.selected) updateActionBar(state.selected);
+    }, 1600);
+    return craftName;
+  }
+
   async function finishCraft() {
     if (state.finishLock) return;
     state.finishLock = true;
-    const data = await post('complete', { craftId: state.craftId });
+    const craftId = state.craftId;
+    // Visual TERMINÉ immediately — never sit on FINALISATION at 100%
+    showFabTerminated();
+    let settled = false;
+    const watchdogUi = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      // No reply in ~1.5s: keep TERMINÉ; server watchdog grants
+      state.progressGen = (state.progressGen || 0) + 1;
+      state.crafting = false;
+      state.craftId = null;
+      state.craftDurationMs = null;
+      state.finishLock = false;
+    }, 1500);
+
+    let data;
+    try {
+      data = await post('complete', { craftId });
+    } catch (_) {
+      data = { ok: true, already: true, timeout: true };
+    }
+    if (settled && !(data && data.ok && data.advanced)) return;
+    settled = true;
+    clearTimeout(watchdogUi);
+
     if (data && data.ok && data.advanced) {
       beep('click');
       await post('notify', {
@@ -1522,47 +1589,36 @@
         label: data.stepLabel || data.label,
         args: [data.stepIndex, data.totalSteps, data.stepLabel || data.label],
       });
+      if (fabDoneTimer) {
+        clearTimeout(fabDoneTimer);
+        fabDoneTimer = null;
+      }
       const phaseEl = $('#fab-active-phase');
       if (phaseEl && data.stepLabel) phaseEl.textContent = data.stepLabel;
       state.craftDurationMs = data.duration;
+      state.crafting = true;
+      setFabCancelVisible(true);
+      setFabState('active');
       state.finishLock = false;
       runProgress(data.duration, finishCraft);
       return;
     }
+
     state.progressGen = (state.progressGen || 0) + 1;
     state.crafting = false;
     state.craftId = null;
     state.craftDurationMs = null;
-    const fill = $('#progress-fill');
-    if (fill) fill.style.width = '0%';
-    const alreadyDone = !!(data && !data.ok && data.reason === 'craft_invalid');
-    const success = !!(data && data.ok) || alreadyDone;
+    const alreadyDone = !!(data && (data.already || data.reason === 'craft_invalid' || data.reason === 'craft_too_far'));
+    const success = !!(data && data.ok) || alreadyDone || !data;
     if (success) {
       beep('success');
       if (data && data.chainNext) beep('blueprint');
-      const doneLabel = $('#fab-done-label');
-      const craftName = (data && data.label)
-          || (state.selected && state.selected.label)
-          || 'Objet fabriqué';
-      if (doneLabel) {
-        doneLabel.textContent = craftName;
-      }
-      state.lastCraft = craftName;
-      try { localStorage.setItem(LAST_CRAFT_KEY, craftName); } catch (_) { /* ignore */ }
-      updateFabIdleConsole();
-      setFabState('done');
-      // Arm linger BEFORE refresh so hydrateSession (session wins / no active) keeps 'done'
-      if (fabDoneTimer) clearTimeout(fabDoneTimer);
-      fabDoneTimer = setTimeout(() => {
-        fabDoneTimer = null;
-        setFabState('ready');
-        if (state.selected) updateActionBar(state.selected);
-      }, 1600);
+      showFabTerminated(data && data.label);
     } else {
       beep('error');
       setFabState('ready');
     }
-    if (!alreadyDone) {
+    if (!alreadyDone && data && !data.timeout) {
       await post('notify', {
         type: success ? 'success' : 'error',
         reason: success ? 'craft_success' : ((data && data.reason) || 'craft_failed'),
@@ -1577,7 +1633,7 @@
   }
 
   async function cancelCraft() {
-    if (!state.craftId) return;
+    if (!state.craftId || state.finishLock) return;
     await post('cancel', { craftId: state.craftId });
     state.progressGen = (state.progressGen || 0) + 1;
     state.crafting = false;
@@ -2086,6 +2142,29 @@
     } else if (msg.action === 'queue') {
       state.queue = msg.queue || [];
       renderQueue();
+    } else if (msg.action === 'craftFinished') {
+      const same = !msg.craftId || !state.craftId || msg.craftId === state.craftId;
+      state.progressGen = (state.progressGen || 0) + 1;
+      state.crafting = false;
+      if (same) {
+        state.craftId = null;
+        state.craftDurationMs = null;
+      }
+      showFabTerminated(msg.label);
+    } else if (msg.action === 'craftAdvanced') {
+      if (msg.craftId && state.craftId && msg.craftId !== state.craftId) return;
+      state.crafting = true;
+      state.craftId = msg.craftId || state.craftId;
+      state.craftDurationMs = msg.duration;
+      if (fabDoneTimer) {
+        clearTimeout(fabDoneTimer);
+        fabDoneTimer = null;
+      }
+      setFabCancelVisible(true);
+      setFabState('active');
+      const phaseEl = $('#fab-active-phase');
+      if (phaseEl && msg.stepLabel) phaseEl.textContent = msg.stepLabel;
+      runProgress(msg.duration, finishCraft);
     }
   });
 

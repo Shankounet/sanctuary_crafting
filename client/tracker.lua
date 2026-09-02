@@ -159,7 +159,21 @@ function CraftTracker.ApplySession(benchKey, session)
         for id, job in pairs(jobs) do
             if job.benchKey == key and not keep[id] then
                 local st = job.status
-                if st == 'active' or st == 'queued' or st == 'paused' then
+                if st == 'done' or st == 'completing' or st == 'completed' then
+                    -- keep linger card
+                elseif st == 'active' then
+                    local remaining = (job.endsAt or 0) - nowMs()
+                    if remaining <= 0 then
+                        -- Session no longer has this job: server just finalized. Show TERMINÉ, don't yank.
+                        CraftTracker.Upsert({
+                            craftId = id,
+                            status = 'done',
+                            stepLabel = 'FABRICATION TERMINÉE',
+                        })
+                    else
+                        drop[#drop + 1] = id
+                    end
+                elseif st == 'queued' or st == 'paused' then
                     drop[#drop + 1] = id
                 end
             end
@@ -454,7 +468,7 @@ RegisterNUICallback('trackerComplete', function(data, cb)
         return
     end
 
-    if result and result.ok then
+    if result and (result.ok or result.already) then
         CraftTracker.Upsert({
             craftId = id,
             status = 'done',
@@ -464,27 +478,28 @@ RegisterNUICallback('trackerComplete', function(data, cb)
             count = (result.result and result.result.count) or (entry and entry.count),
         })
         playTrackerSound('complete')
-    else
-        local reason = result and result.reason or 'craft_failed'
-        -- soft-ignore already completed (race with menu finishCraft)
-        if reason == 'craft_invalid' then
-            if entry and (entry.status == 'done' or entry.status == 'active') then
-                CraftTracker.Upsert({
-                    craftId = id,
-                    status = 'done',
-                    stepLabel = 'FABRICATION TERMINÉE',
-                })
-                cb({ ok = true, already = true })
-                return
-            end
-        end
+        cb(result)
+        return
+    end
+
+    local reason = result and result.reason or 'craft_failed'
+    -- craft_too_far must not happen at 100%; treat as done (watchdog grants)
+    if reason == 'craft_invalid' or reason == 'craft_too_far' or (result and result.already) then
         CraftTracker.Upsert({
             craftId = id,
-            status = 'error',
-            stepLabel = 'Erreur',
+            status = 'done',
+            stepLabel = 'FABRICATION TERMINÉE',
+            label = entry and entry.label,
         })
-        playTrackerSound('error')
+        cb({ ok = true, already = true })
+        return
     end
+    CraftTracker.Upsert({
+        craftId = id,
+        status = 'error',
+        stepLabel = 'Erreur',
+    })
+    playTrackerSound('error')
     cb(result or { ok = false })
 end)
 
@@ -514,6 +529,46 @@ RegisterNetEvent('esx:playerLoaded', function()
         CraftTracker.Sync()
         refreshQueueIntoTracker()
     end)
+end)
+
+RegisterNetEvent('sanctuary_crafting:client:craftFinished', function(payload)
+    if not enabled() then return end
+    payload = type(payload) == 'table' and payload or {}
+    local craftId = payload.craftId
+    if not craftId then return end
+    CraftTracker.Upsert({
+        craftId = craftId,
+        status = 'done',
+        stepLabel = 'FABRICATION TERMINÉE',
+        label = payload.label,
+        item = payload.result and payload.result.item,
+        count = payload.result and payload.result.count,
+        batch = payload.batch,
+        benchKey = payload.benchKey,
+    })
+end)
+
+RegisterNetEvent('sanctuary_crafting:client:craftAdvanced', function(payload)
+    if not enabled() then return end
+    payload = type(payload) == 'table' and payload or {}
+    local craftId = payload.craftId
+    if not craftId then return end
+    local duration = tonumber(payload.duration) or 0
+    local started = nowMs()
+    CraftTracker.Upsert({
+        craftId = craftId,
+        status = 'active',
+        startedAt = started,
+        endsAt = started + duration,
+        duration = duration,
+        stepIndex = payload.stepIndex,
+        totalSteps = payload.totalSteps,
+        stepLabel = payload.stepLabel or payload.label,
+        label = payload.label,
+        clientTimer = started,
+        wallNow = wallMs(),
+        useWallClock = false,
+    })
 end)
 
 -- Expose for nui.lua

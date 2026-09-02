@@ -307,3 +307,9 @@
   text-align: center;
   font-size: 11px;
 }
+
+#craft-tracker .hidden,
+#craft-tracker .ct-dismiss.hidden {
+  display: none !important;
+}
+

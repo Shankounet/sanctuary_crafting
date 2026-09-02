@@ -87,6 +87,9 @@ Config.Crafting = {
     --- Remboursement partiel si annulation après X% (0 = full refund rules only)
     PartialRefund = true,
     PartialRefundAfter = 0.5, -- après 50% de progression : 50% des stacks arrondis
+    --- [CRAFT] finalize watchdog prints (start / finished timestamp / reward / state)
+    --- startedAt/finishesAt in logs are Unix seconds; startedAt/duration internally are ms
+    FinalizeLogs = true,
 }
 
 --------------------------------------------------------------------------------

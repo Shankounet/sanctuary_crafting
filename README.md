@@ -11,6 +11,14 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 ## Notes de version
 
+### v2.8.0 — Craft finalize watchdog
+Interactive crafts no longer sit at 100% / 0s / FINALISATION waiting for the client.
+
+- Server `FinalizeCraft` is idempotent (completing lock + `already=true`); watchdog every 2s completes `running` crafts with `remainingMs<=0`
+- Distance gate skipped at 100% / watchdog / session (no `craft_too_far` refund after time elapsed)
+- NUI/tracker show TERMINÉ immediately at remain 0; cancel hidden; linger ~2s
+- Queue-next interactive auto-start is deferred (CraftQueue keeps its own `finishAt` + collect)
+
 ### v2.3.0 — Craft intelligence (mastery / knowledge / search / path / artisans)
 Enrichissement **additif** du catalogue craft (serveur autoritaire) :
 
