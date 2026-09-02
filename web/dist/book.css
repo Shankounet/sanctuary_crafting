@@ -2554,178 +2554,139 @@
 
 
 /* ============================================================
-   v2.9.1 — leather = cover/binding only; inserts = light paper-soft
-   CEF-safe: no mix-blend, no feTurbulence, no Google Fonts.
-   Paths relative to web/dist/book.css → tex/*.png
+   v2.11.0 — assets as the only materials
+   CSS = layout / shadow / rotation. No fake leather, no fake paper.
+   Replace a file in web/dist/tex/ → the Carnet follows.
+
+   MAPPING
+     --bookCoverTexture      tex/leather.png          couverture / dos / reliure
+     --mainPageTexture       tex/paper-soft.png       pages G/D
+     --alternatePageTexture  tex/paper-worn.png       fiches / notes (sans overlay)
+     post-its                (aucun asset fourni — ne pas inventer)
    ============================================================ */
 #book-app {
-  --tex-leather: url("tex/leather.png");
-  --tex-paper: url("tex/paper-soft.png");
-  --tex-worn: url("tex/paper-worn.png");
+  --bookCoverTexture: url("tex/leather.png");
+  --mainPageTexture: url("tex/paper-soft.png");
+  --alternatePageTexture: url("tex/paper-worn.png");
+  --tex-leather: var(--bookCoverTexture);
+  --tex-paper: var(--mainPageTexture);
+  --tex-worn: var(--alternatePageTexture);
 }
 
-/* —— Covers: real leather, worn hide —— */
+/* Couverture = le PNG cuir, cover, rien par-dessus */
 #book-app .book-cover {
-  background-image:
-    linear-gradient(180deg, rgba(255,220,180,0.07) 0%, transparent 18%, transparent 72%, rgba(0,0,0,0.38) 100%),
-    linear-gradient(90deg, rgba(0,0,0,0.28), transparent 22%, transparent 78%, rgba(0,0,0,0.22)),
-    var(--tex-leather) !important;
-  background-size: auto, auto, 280px 280px !important;
-  background-position: center, center, 0 0 !important;
-  background-repeat: no-repeat, no-repeat, repeat !important;
+  background-color: transparent !important;
+  background-image: var(--bookCoverTexture) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 220, 170, 0.1),
-    inset 0 -10px 22px rgba(0, 0, 0, 0.42),
-    0 10px 28px rgba(0, 0, 0, 0.45) !important;
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 220, 170, 0.08) !important;
 }
 #book-app .book-cover-left {
-  background-position: center, center, 12% 8% !important;
+  background-position: 18% 40% !important;
 }
 #book-app .book-cover-right {
-  background-position: center, center, 62% 18% !important;
+  background-position: 82% 40% !important;
 }
 
-/* —— Binding: leather in the gutter —— */
+/* Reliure = même cuir + ombre / couture existantes (éléments HTML) */
 #book-app .book-binding {
-  background-image:
-    linear-gradient(90deg,
-      rgba(8,4,2,0.82) 0%,
-      rgba(20,10,6,0.55) 18%,
-      rgba(40,24,14,0.28) 46%,
-      rgba(20,10,6,0.55) 82%,
-      rgba(8,4,2,0.82) 100%),
-    var(--tex-leather) !important;
-  background-size: auto, 90px 220px !important;
-  background-position: center, 40% 0 !important;
+  background-color: transparent !important;
+  background-image: var(--bookCoverTexture) !important;
+  background-size: cover !important;
+  background-position: 45% 50% !important;
+  background-repeat: no-repeat !important;
   box-shadow:
-    inset 0 0 14px rgba(0, 0, 0, 0.75),
-    -12px 0 24px rgba(0, 0, 0, 0.38),
-    12px 0 24px rgba(0, 0, 0, 0.38) !important;
+    inset 0 0 10px rgba(0, 0, 0, 0.45),
+    -8px 0 18px rgba(0, 0, 0, 0.28),
+    8px 0 18px rgba(0, 0, 0, 0.28) !important;
 }
 
-/* —— Main pages: soft beige paper + aging overlays —— */
-#book-app .book-page {
-  background-color: #efe4cc !important;
-  background-image:
-    linear-gradient(180deg, rgba(255,250,236,0.28) 0%, transparent 16%, transparent 78%, rgba(90,60,30,0.1) 100%),
-    var(--tex-paper) !important;
-  background-size: auto, 520px 520px !important;
-  background-repeat: no-repeat, repeat !important;
+/* Pages = papier vieilli, visible, pas de voile beige */
+#book-app .book-page,
+#book-app .book-page-left,
+#book-app .book-page-right {
+  background-color: transparent !important;
+  background-image: var(--mainPageTexture) !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
 }
 #book-app .book-page-left {
-  background-image:
-    linear-gradient(90deg, transparent 0%, transparent 78%, rgba(50,30,12,0.16) 100%),
-    linear-gradient(180deg, rgba(255,250,236,0.22) 0%, transparent 18%),
-    var(--tex-paper) !important;
-  background-size: auto, auto, 540px 540px !important;
-  background-position: 0 0, 0 0, 8% 6% !important;
+  background-position: 12% 50% !important;
   box-shadow:
-    inset -22px 0 32px rgba(40, 22, 8, 0.16),
-    inset 0 0 0 1px rgba(90, 70, 40, 0.12) !important;
+    inset -18px 0 28px rgba(40, 22, 8, 0.14),
+    inset 0 0 0 1px rgba(90, 70, 40, 0.1) !important;
 }
 #book-app .book-page-right {
-  background-image:
-    linear-gradient(270deg, transparent 0%, transparent 78%, rgba(50,30,12,0.16) 100%),
-    linear-gradient(180deg, rgba(255,250,236,0.18) 0%, transparent 20%),
-    var(--tex-paper) !important;
-  background-size: auto, auto, 540px 540px !important;
-  background-position: 0 0, 0 0, 72% 14% !important;
+  background-position: 88% 50% !important;
   box-shadow:
-    inset 22px 0 32px rgba(40, 22, 8, 0.16),
-    inset 0 0 0 1px rgba(90, 70, 40, 0.12) !important;
+    inset 18px 0 28px rgba(40, 22, 8, 0.14),
+    inset 0 0 0 1px rgba(90, 70, 40, 0.1) !important;
 }
 
-/* extra edge wear on pages (keep existing ::after folds) */
-#book-app .book-page-edge {
-  background-image:
-    linear-gradient(180deg, rgba(70,45,20,0.06), transparent 12%, transparent 88%, rgba(70,45,20,0.08)),
-    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(90,70,40,0.018) 2px, rgba(90,70,40,0.018) 3px) !important;
-  opacity: 0.7 !important;
+/* Neutraliser les faux grains / taches / plis CSS qui recouvrent l'asset */
+#book-app .book-page-edge,
+#book-app .book-page-edge::before,
+#book-app .book-page-edge::after,
+#book-app .book-page-left .book-page-edge::before,
+#book-app .book-page-left .book-page-edge::after,
+#book-app .book-page-right .book-page-edge::before,
+#book-app .book-page-right .book-page-edge::after,
+#book-app .book-page-left::after,
+#book-app .book-page-right::after,
+#book-app .book-page-right .book-page-inner::before {
+  background: none !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+  content: none !important;
+  border-width: 0 !important;
 }
 
-/* —— Inserts: LIGHT paper only. Leather NEVER behind text. ——
-   Projet / découverte / déblocage = papier beige clair (paper-soft).
-   paper-worn reserved for rare aged fragments, never as a dark fill. */
+/* Notes / fiches = papier, asset visible, ombre + rotation seulement */
 #book-app .scrap-note,
 #book-app .dossier-sheet,
 #book-app .vc-card,
 #book-app .sticky-note,
 #book-app .visit-card,
-#book-app .disc-card {
-  background-color: #f6efd8 !important;
-  background-image:
-    linear-gradient(175deg, rgba(255,252,240,0.72) 0%, rgba(246,236,210,0.42) 100%),
-    var(--tex-paper) !important;
-  background-size: auto, 320px 320px !important;
-  background-repeat: no-repeat, repeat !important;
-  background-position: 0 0, 18% 12% !important;
-  box-shadow:
-    2px 3px 6px rgba(50, 35, 15, 0.16),
-    inset 0 1px 0 rgba(255, 255, 245, 0.45) !important;
-  border: 1px solid rgba(110, 90, 55, 0.28) !important;
+#book-app .disc-card,
+#book-app .id-polaroid {
+  background-color: transparent !important;
+  background-image: var(--mainPageTexture) !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
 }
-/* Projet principal — pale yellow scrap */
-#book-app .scrap-note.tint-warm {
-  background-color: #f4e6bc !important;
-  background-image:
-    linear-gradient(175deg, rgba(255,246,214,0.78) 0%, rgba(240,220,164,0.48) 100%),
-    var(--tex-paper) !important;
-  background-position: 0 0, 12% 22% !important;
+#book-app .scrap-note.tint-warm { background-position: 20% 30% !important; }
+#book-app .scrap-note.tint-cool { background-position: 70% 40% !important; }
+#book-app .scrap-note.tint-rose { background-position: 40% 80% !important; }
+#book-app .dossier-sheet { background-position: 55% 60% !important; }
+#book-app .scrap-note,
+#book-app .dossier-sheet,
+#book-app .id-polaroid {
+  box-shadow: 2px 4px 8px rgba(40, 24, 10, 0.2) !important;
 }
-/* Dernière découverte — pale green/beige */
-#book-app .scrap-note.tint-cool {
-  background-color: #eef0de !important;
-  background-image:
-    linear-gradient(175deg, rgba(240,246,220,0.8) 0%, rgba(214,222,186,0.5) 100%),
-    var(--tex-paper) !important;
-  background-position: 0 0, 68% 28% !important;
-}
-#book-app .scrap-note.tint-rose {
-  background-color: #f4e6d8 !important;
-  background-image:
-    linear-gradient(175deg, rgba(252,238,226,0.78) 0%, rgba(236,214,196,0.48) 100%),
-    var(--tex-paper) !important;
-}
-/* Prochain déblocage — light dossier, not worn, not leather */
-#book-app .dossier-sheet {
-  background-color: #f3ead4 !important;
-  background-image:
-    linear-gradient(180deg, rgba(255,250,236,0.75) 0%, rgba(242,230,204,0.5) 100%),
-    var(--tex-paper) !important;
-  background-position: 0 0, 42% 58% !important;
-}
-/* Blueprints keep their own technical paper — do not paint leather/worn */
+
+/* Blueprints: grille technique légère par-dessus le papier (pas un faux fond) */
 #book-app .blueprint-sheet,
 #book-app .bp-sheet {
+  background-color: transparent !important;
   background-image:
-    repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(60, 95, 125, 0.1) 18px, rgba(60, 95, 125, 0.1) 19px),
-    repeating-linear-gradient(90deg, transparent, transparent 18px, rgba(60, 95, 125, 0.07) 18px, rgba(60, 95, 125, 0.07) 19px),
-    linear-gradient(160deg, rgba(228,236,242,0.72) 0%, rgba(213,226,234,0.55) 100%),
-    var(--tex-paper) !important;
-  background-size: auto, auto, auto, 280px 280px !important;
+    repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(60, 95, 125, 0.08) 18px, rgba(60, 95, 125, 0.08) 19px),
+    repeating-linear-gradient(90deg, transparent, transparent 18px, rgba(60, 95, 125, 0.06) 18px, rgba(60, 95, 125, 0.06) 19px),
+    var(--mainPageTexture) !important;
+  background-size: auto, auto, cover !important;
+  background-position: 0 0, 0 0, center !important;
+  background-repeat: repeat, repeat, no-repeat !important;
 }
 
-/* polaroid: blank photo paper, taped */
-#book-app .id-polaroid {
-  background-color: #f3ead6 !important;
-  background-image:
-    linear-gradient(180deg, rgba(255,255,255,0.35) 0%, transparent 40%),
-    var(--tex-paper) !important;
-  background-size: auto, 180px 180px !important;
-  box-shadow:
-    3px 5px 12px rgba(30, 18, 8, 0.22),
-    inset 0 1px 0 rgba(255,255,255,0.4) !important;
-}
-
-/* stamps stay ink, slight paper chip */
 #book-app .book-stamp,
 #book-app .stamp {
   background-image: none;
 }
 
-/* tabs: no leather — labels must sit on cardboard, not hide */
-
-/* micro page-turn (CEF-safe, no opacity stuck at 0) */
 #book-app .book-page-inner.page-turn {
   animation: book-page-settle 160ms ease !important;
   opacity: 1 !important;
@@ -2736,16 +2697,6 @@
   to { transform: none; }
 }
 
-#book-app .scrap-note {
-  animation: book-scrap-lay 180ms ease;
-}
-@keyframes book-scrap-lay {
-  from { transform: rotate(-1.2deg) translateY(3px); }
-  to { }
-}
-
-/* keep handwriting readable on textured paper */
 #book-app .book-page-inner {
   color: #2a2218;
-  text-shadow: 0 0 0 transparent;
 }
