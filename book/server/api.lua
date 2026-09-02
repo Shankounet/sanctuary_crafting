@@ -32,6 +32,11 @@ lib.callback.register('sanctuary_crafting:book:module', function(src, moduleName
     elseif m == 'pins' then
         return { ok = true, data = SurvivalBook.ListPins(src) }
     elseif m == 'shopping' then
+        if (not payload.recipeId or payload.recipeId == '') and ShoppingList and ShoppingList.BuildFromPins then
+            local list, err = ShoppingList.BuildFromPins(src)
+            if not list then return { ok = false, reason = err } end
+            return { ok = true, data = list, fromPins = true }
+        end
         local list, err = SurvivalBook.SmartShopping(src, payload.recipeId, payload.batch, payload.depth)
         if not list then return { ok = false, reason = err } end
         return { ok = true, data = list }

@@ -175,7 +175,16 @@ function SurvivalBook.AddObjectiveFromRecipe(src, recipeId, opts)
     local recipe = Config.RecipeById and Config.RecipeById[recipeId]
     if not recipe then return nil, 'craft_invalid' end
     opts = type(opts) == 'table' and opts or {}
-    local obj, err = SurvivalBook.AddObjective(src, (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(recipe)) or recipe.label or recipeId, 'recipe', { recipeId = recipeId })
+    -- idempotent: reuse open recipe objective
+    local existing = SurvivalBook.ListObjectives(src, { skipLive = true }) or {}
+    for _, o in ipairs(existing) do
+        if not o.done and o.kind == 'recipe' and o.payload and o.payload.recipeId == recipeId then
+            o.already = true
+            return o
+        end
+    end
+    local facing = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(recipe)) or recipe.label or recipeId
+    local obj, err = SurvivalBook.AddObjective(src, facing, 'recipe', { recipeId = recipeId })
     if not obj then return nil, err end
 
     -- Optional sub-objectives for missing materials (server-owned counts only)
@@ -190,31 +199,53 @@ function SurvivalBook.AddObjectiveFromRecipe(src, recipeId, opts)
                 if GetResourceState('ox_inventory') == 'started' then
                     owned = exports.ox_inventory:GetItemCount(src, ing.item) or 0
                 end
-                if owned < need then
-                    local deficit = need - owned
-                    local title = string.format('Récupérer %s ×%d', ing.item, deficit)
-                    local sub, serr = SurvivalBook.AddObjective(src, title, 'gather', {
-                        recipeId = recipeId,
-                        item = ing.item,
-                        count = deficit,
-                        parentObjectiveId = obj.id,
-                    })
-                    if sub then
-                        subs[#subs + 1] = sub
-                    elseif serr == 'book_objectives_full' then
-                        break
-                    end
+                local lab = (OxItemCatalog and OxItemCatalog.Label and OxItemCatalog.Label(ing.item)) or ing.item
+                local title = string.format('Récupérer %s', lab)
+                local sub, serr = SurvivalBook.AddObjective(src, title, 'gather', {
+                    recipeId = recipeId,
+                    item = ing.item,
+                    need = need,
+                    count = need,
+                    parentObjectiveId = obj.id,
+                })
+                if sub then
+                    subs[#subs + 1] = sub
+                elseif serr == 'book_objectives_full' then
+                    break
                 end
             end
         end
     end
+    -- skill sub
+    if recipe.requireLevel and CraftingSkills then
+        local cat = CraftingSkills.LevelCategoryForRecipe and CraftingSkills.LevelCategoryForRecipe(recipe)
+        local title = string.format('Atteindre le niveau %s', tostring(recipe.requireLevel))
+        local sub = SurvivalBook.AddObjective(src, title, 'skill', {
+            recipeId = recipeId,
+            category = cat,
+            requireLevel = recipe.requireLevel,
+            parentObjectiveId = obj.id,
+        })
+        if sub then subs[#subs + 1] = sub end
+    end
+    local bpId = recipe.requireBlueprint or recipe.blueprintId
+    if bpId then
+        local sub = SurvivalBook.AddObjective(src, 'Obtenir le plan technique', 'blueprint', {
+            recipeId = recipeId,
+            blueprintId = bpId,
+            parentObjectiveId = obj.id,
+        })
+        if sub then subs[#subs + 1] = sub end
+    end
+
     obj.subObjectives = subs
     return obj
 end
 
-function SurvivalBook.ListObjectives(src)
+function SurvivalBook.ListObjectives(src, opts)
     local id = BookDB.Ident(src)
     if not id then return {} end
+    opts = type(opts) == 'table' and opts or {}
     local rows = MySQL.query.await(
         'SELECT id, kind, title, payload, done, UNIX_TIMESTAMP(created_at) AS ts FROM sanctuary_book_objectives WHERE identifier = ? ORDER BY done ASC, id DESC',
         { id }
@@ -226,6 +257,69 @@ function SurvivalBook.ListObjectives(src)
             payload = jdec(rows[i].payload, {}), done = rows[i].done == 1,
             createdAt = rows[i].ts,
         }
+    end
+    if opts.skipLive then return out end
+
+    local function invCount(item)
+        if GetResourceState('ox_inventory') ~= 'started' then return 0 end
+        return exports.ox_inventory:GetItemCount(src, item) or 0
+    end
+
+    for i = 1, #out do
+        local o = out[i]
+        local pl = o.payload or {}
+        if o.kind == 'gather' and pl.item then
+            local need = tonumber(pl.need or pl.count) or 1
+            local owned = invCount(pl.item)
+            o.need = need
+            o.owned = owned
+            o.remaining = math.max(0, need - owned)
+            o.liveDone = owned >= need
+            local lab = (OxItemCatalog and OxItemCatalog.Label and OxItemCatalog.Label(pl.item)) or pl.item
+            o.title = string.format('Récupérer %s', lab)
+            if o.liveDone and not o.done then
+                SurvivalBook.CompleteObjective(src, o.id)
+                o.done = true
+            end
+        elseif o.kind == 'skill' then
+            local cat = pl.category
+            local need = tonumber(pl.requireLevel) or 0
+            local cur = 0
+            if CraftingSkills and CraftingSkills.GetLevel then
+                cur = CraftingSkills.GetLevel(cat, src) or 0
+            end
+            o.need = need
+            o.owned = cur
+            o.playerSkillLevel = cur
+            o.liveDone = cur >= need
+            if o.liveDone and not o.done then
+                SurvivalBook.CompleteObjective(src, o.id)
+                o.done = true
+            end
+        elseif o.kind == 'blueprint' then
+            local bpId = pl.blueprintId
+            local has = true
+            if bpId and Blueprints and Blueprints.Has then
+                has = Blueprints.Has(src, bpId) == true
+            end
+            o.liveDone = has
+            o.owned = has and 1 or 0
+            o.need = 1
+            if o.liveDone and not o.done then
+                SurvivalBook.CompleteObjective(src, o.id)
+                o.done = true
+            end
+        end
+    end
+    local byId = {}
+    for i = 1, #out do byId[out[i].id] = out[i] end
+    for i = 1, #out do
+        local o = out[i]
+        local pid = o.payload and o.payload.parentObjectiveId
+        if pid and byId[pid] then
+            byId[pid].children = byId[pid].children or {}
+            byId[pid].children[#byId[pid].children + 1] = o
+        end
     end
     return out
 end
@@ -303,6 +397,9 @@ function SurvivalBook.PinRecipe(src, recipeId)
         { id, recipeId, #pinCache[id] + 1 }
     )
     pinCache[id][#pinCache[id] + 1] = recipeId
+    if Config.Follow and Config.Follow.AutoObjectives ~= false then
+        SurvivalBook.AddObjectiveFromRecipe(src, recipeId, { withMissing = true })
+    end
     TriggerClientEvent('sanctuary_crafting:book:pinsUpdated', src, SurvivalBook.ListPins(src))
     return true
 end

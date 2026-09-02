@@ -151,3 +151,35 @@ CREATE TABLE IF NOT EXISTS `sanctuary_book_orders` (
     UNIQUE KEY `uniq_uid` (`order_uid`),
     KEY `idx_owner` (`owner`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE IF NOT EXISTS `sanctuary_player_spec` (
+    `identifier` VARCHAR(60) NOT NULL,
+    `spec_id` VARCHAR(32) NOT NULL,
+    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`identifier`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `sanctuary_player_recent` (
+    `identifier` VARCHAR(60) NOT NULL,
+    `recipe_id` VARCHAR(64) NOT NULL,
+    `crafted_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`identifier`, `recipe_id`),
+    KEY `idx_ident_time` (`identifier`, `crafted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `sanctuary_player_recipe_unread` (
+    `identifier` VARCHAR(60) NOT NULL,
+    `recipe_id` VARCHAR(64) NOT NULL,
+    `source` VARCHAR(24) NOT NULL DEFAULT 'discovery',
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`identifier`, `recipe_id`),
+    KEY `idx_ident` (`identifier`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `sanctuary_player_skill_watch` (
+    `identifier` VARCHAR(60) NOT NULL,
+    `category` VARCHAR(32) NOT NULL,
+    `level` INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (`identifier`, `category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

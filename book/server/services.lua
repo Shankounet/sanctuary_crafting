@@ -144,10 +144,20 @@ end
 --- Progression READ-ONLY from CraftingSkills (ml_skills)
 function SurvivalBook.GetProgression(src)
     if not BookDB.Mod('Progression') then return { available = false } end
-    local cats = {
-        (Config.Skills and Config.Skills.craftingCategory) or 'crafting',
-        (Config.Skills and Config.Skills.survivalCategory) or 'survival',
-    }
+    local cats = {}
+    local seen = {}
+    local function addCat(c)
+        if c and not seen[c] then seen[c] = true; cats[#cats + 1] = c end
+    end
+    if Config.Skills and Config.Skills.categories then
+        for _, c in ipairs(Config.Skills.categories) do addCat(c) end
+    end
+    addCat(Config.Skills and Config.Skills.craftingCategory)
+    addCat(Config.Skills and Config.Skills.survivalCategory)
+    if Specializations and Specializations.Resolve then
+        local spec = Specializations.Resolve(src)
+        for _, s in ipairs((spec and spec.skills) or {}) do addCat(s.id) end
+    end
     local levels = {}
     local available = CraftingSkills and CraftingSkills.IsAvailable and CraftingSkills.IsAvailable()
     for i = 1, #cats do
@@ -231,18 +241,27 @@ local function recipeCraftability(src, recipe)
 
     local bpOk = true
     local bpId = recipe.requireBlueprint or recipe.blueprintId
-    if bpId and Blueprints and Blueprints.Has then
+    if Blueprints and Blueprints.KnowsRecipe then
+        bpOk = Blueprints.KnowsRecipe(src, recipe) == true
+    elseif bpId and Blueprints and Blueprints.Has then
         bpOk = Blueprints.Has(src, bpId)
     end
 
-    local can = okIngredients and gatesOk and bpOk
+    local specOk, specReason = true, nil
+    if Specializations and Specializations.CanCraftRecipe then
+        specOk, specReason = Specializations.CanCraftRecipe(src, recipe)
+    end
+
+    local can = okIngredients and gatesOk and bpOk and specOk
     return can, {
         ingredients = okIngredients,
         gates = gatesOk,
-        gateReason = gateReason,
+        gateReason = gateReason or specReason,
         blueprint = bpOk,
+        spec = specOk,
+        specReason = specReason,
         missing = missing,
-        almost = (not okIngredients) and #missing <= 2 and gatesOk and bpOk,
+        almost = (not okIngredients) and #missing <= 2 and gatesOk and bpOk and specOk,
         oneLevelAway = (not gatesOk) and gateReason == 'craft_level_required',
     }
 end
@@ -491,6 +510,7 @@ function SurvivalBook.EnabledModules()
 end
 
 function SurvivalBook.ShellMeta(src)
+    local spec = (Specializations and Specializations.Resolve and Specializations.Resolve(src)) or nil
     return {
         accent = (Config.Book and Config.Book.Accent) or '#9a8866',
         theme = (Config.Book and Config.Book.Theme) or 'field_manual',
@@ -499,6 +519,8 @@ function SurvivalBook.ShellMeta(src)
         title = _('book_title'),
         subtitle = _('book_subtitle'),
         itemLabels = (OxItemCatalog and OxItemCatalog.UsedLabels and OxItemCatalog.UsedLabels()) or {},
+        playerSpec = spec,
+        specialization = spec and spec.label or nil,
     }
 end
 

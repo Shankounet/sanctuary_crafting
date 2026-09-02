@@ -75,6 +75,25 @@ function CraftQueue._startQueued(src, recipeId, benchKey, batch)
     if CraftingSkills.NotifyBypassIfNeeded then
         CraftingSkills.NotifyBypassIfNeeded(src)
     end
+    if Specializations and Specializations.CanUseStation then
+        local okSt, stReason, stArgs = Specializations.CanUseStation(src, bench.category)
+        if not okSt then return nil, stReason, stArgs end
+    end
+    if Specializations and Specializations.CanCraftRecipe then
+        local okSp, spReason, spArgs = Specializations.CanCraftRecipe(src, recipe)
+        if not okSp then return nil, spReason, spArgs end
+    end
+    if Blueprints and Blueprints.KnowsRecipe and not Blueprints.KnowsRecipe(src, recipe) then
+        local bpId = recipe.requireBlueprint or recipe.blueprintId
+        if bpId then return nil, 'craft_blueprint_required', { bpId } end
+        return nil, 'craft_knowledge_required', { recipe.id }
+    end
+    if recipe.requireBlueprint or recipe.blueprintId then
+        local bpId = recipe.requireBlueprint or recipe.blueprintId
+        if Config.Blueprints and Config.Blueprints.Enabled and Blueprints and not Blueprints.Has(src, bpId) then
+            return nil, 'craft_blueprint_required', { bpId }
+        end
+    end
     if not Validation.IsNearBench(src, bench.coords, Config.InteractDistance) then
         return nil, 'craft_too_far'
     end
@@ -140,6 +159,9 @@ function CraftQueue.TryCollect(src, craftId)
             exports.ox_inventory:AddItem(src, recipe.result.item, count, meta)
             if recipe.xp and recipe.xp.category then
                 CraftingSkills.AddXP(recipe.xp.category, (recipe.xp.amount or 0) * (e.batch or 1), src)
+                if NewlyLearned and NewlyLearned.ScanLevelUnlocks then
+                    NewlyLearned.ScanLevelUnlocks(src)
+                end
             end
             table.remove(list, i)
             local id = ident(src)

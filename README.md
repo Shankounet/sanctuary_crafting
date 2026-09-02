@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.3.0
+# sanctuary_crafting v2.14.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,13 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.14.0 — Vague gameplay (spec, enseignement, suivi, courses, favoris, récents, nouveaux)
+Identité de métier (`Config.Specializations`, SQL `sanctuary_player_spec`) : SQL > job ESX > survie. Stations exclusives (médical / ingénieur / mécano / armurier). Survie et stations non mappées = tout le monde. **BypassRequirements saute level/skill ml_skills, jamais spec / connaissance / enseignement.** File d'attente recopie les mêmes gates au start **et** au collect.
+
+Enseignement (`Config.Teaching`, `server/systems/teaching.lua`) : ENSEIGNER sur la fiche, overlay compact, ox_lib progress, succès serveur uniquement.
+
+Suivi Carnet : pin = follow → objectifs live (ingrédients ox_inventory, skill ml_skills, plan). Courses fusionnées depuis les pins (5+8+2=15, owned soustrait une fois). Catalogue : sections FAVORIS / RÉCEMMENT FABRIQUÉS / NOUVEAUX (serveur). `ml_skills` reste la seule source XP/niveaux.
 
 ### v2.13.0 — Carnet mapping textures strict
 Couverture / cadre / reliure = `tex/leather_cover.png`. Pages gauche et droite = `tex/paper_aged_new.png` (fond PNG direct, pas de voile beige). Fiches collées (projet / découverte / documents) = `tex/paper_dark.png`. Un texture par élément ; CSS = position, ombre, tilt.

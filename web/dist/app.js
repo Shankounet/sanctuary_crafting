@@ -35,6 +35,11 @@
     searchIndex: {},
     sort: 'name',
     rarityFilter: 'all',
+    playerSpec: null,
+    recentlyCrafted: [],
+    newlyLearned: [],
+    teaching: {},
+    teachTarget: null,
   };
 
   const SEEN_KEY = 'sanctuary_crafting:seenRecipes';
@@ -368,7 +373,9 @@
   }
 
   function isNewRecipe(r) {
-    /* Do not mark all mastery-0 recipes as new on first visit */
+    if (!r) return false;
+    if (r.unread) return true;
+    if ((state.newlyLearned || []).includes(r.id)) return true;
     return recipeMarkedNew(r) && !seenRecipes.has(r.id);
   }
 
@@ -453,6 +460,11 @@
     },
     craft_no_power: () => 'Atelier hors tension',
     craft_tool_required: () => 'Outil requis manquant ou usé',
+    craft_spec_required: (r) => {
+      const sp = (r.lockArgs && r.lockArgs[0]) || r.requireSpec;
+      return sp ? `Spécialisation requise : ${humanize(sp)}` : 'Spécialisation requise';
+    },
+    craft_knowledge_required: () => 'Recette non connue',
   };
 
   function lockText(r) {
@@ -650,7 +662,7 @@
     if (countEl) countEl.textContent = `${list.length} / ${state.recipes.length}`;
     setEmpty(empty, list.length === 0);
 
-    list.forEach((r) => {
+    const makeCard = (r) => {
       const card = document.createElement('article');
       card.className = 'recipe-card';
       if (r.locked) card.classList.add('locked');
@@ -676,7 +688,7 @@
       }
       const resultItem = (r.result && r.result.item) || r.id;
       const code = recipeCode(r);
-      const showNouveau = uxOn('nouveauIndicator', true) && recipeMarkedNew(r) && !seenRecipes.has(r.id);
+      const showNouveau = uxOn('nouveauIndicator', true) && isNewRecipe(r);
       const tip = uxOn('badgeTooltips', true) ? (status.tip || status.text) : status.text;
       const nouveauHtml = showNouveau
         ? '<span class="card-nouveau">NOUVEAU</span>'
@@ -686,8 +698,6 @@
         card.classList.add(`knowledge-${kn}`);
         card.dataset.knowledge = kn;
       }
-      // Une seule marque importante en coin (pas de micro-icônes bas / rareté / stack)
-      // Priorité : Maîtrisé > Blueprint > Suivi Carnet. Favori reste le bouton étoile.
       let cornerHtml = '';
       const masteredOn = uxOn('masteredBadge', true) && (r.mastered === true || kn === 'mastered');
       if (masteredOn) {
@@ -745,8 +755,41 @@
           await refresh();
         });
       }
-      grid.appendChild(card);
-    });
+      return card;
+    };
+
+    const appendGroup = (title, recipes) => {
+      if (!recipes.length) return;
+      const h = document.createElement('h3');
+      h.className = 'catalog-group-title';
+      h.textContent = title;
+      grid.appendChild(h);
+      recipes.forEach((r) => grid.appendChild(makeCard(r)));
+    };
+
+    const byId = {};
+    list.forEach((r) => { byId[r.id] = r; });
+    const showGroups = state.filter === 'all' && !state.search;
+    const used = new Set();
+    if (showGroups) {
+      const favs = list.filter((r) => isFavorite(r.id));
+      appendGroup('FAVORIS', favs);
+      favs.forEach((r) => used.add(r.id));
+      const recents = [];
+      (state.recentlyCrafted || []).forEach((id) => {
+        if (byId[id] && !used.has(id)) recents.push(byId[id]);
+      });
+      appendGroup('RÉCEMMENT FABRIQUÉS', recents);
+      recents.forEach((r) => used.add(r.id));
+      const news = list.filter((r) => isNewRecipe(r) && !used.has(r.id));
+      appendGroup('NOUVEAUX', news);
+      news.forEach((r) => used.add(r.id));
+      const rest = list.filter((r) => !used.has(r.id));
+      if (used.size && rest.length) appendGroup('CATALOGUE', rest);
+      else rest.forEach((r) => grid.appendChild(makeCard(r)));
+    } else {
+      list.forEach((r) => grid.appendChild(makeCard(r)));
+    }
   }
 
   function toolList(r) {
@@ -772,7 +815,13 @@
   function selectRecipe(r) {
     state.selected = r;
     playTick();
-    if (uxOn('nouveauIndicator', true) && recipeMarkedNew(r)) {
+    if (r.unread || isNewRecipe(r)) {
+      post('newlyConsult', { recipeId: r.id }).then(() => {
+        r.unread = false;
+        state.newlyLearned = (state.newlyLearned || []).filter((id) => id !== r.id);
+      });
+      markRecipeSeen(r.id);
+    } else if (uxOn('nouveauIndicator', true) && recipeMarkedNew(r)) {
       const first = !seenRecipes.has(r.id);
       markRecipeSeen(r.id);
       if (first && (r.newlyUnlocked || r.isNew)) showToast('Nouveau plan déverrouillé', 'warn');
@@ -885,9 +934,10 @@
 
     // —— Specialization ——
     const specBlock = $('#block-spec');
-    if (r.requireSkill) {
+    const specNeed = r.requireSpec || r.requireSkill;
+    if (specNeed) {
       specBlock.classList.remove('hidden');
-      $('#d-spec-need').textContent = humanize(r.requireSkill);
+      $('#d-spec-need').textContent = humanize(specNeed);
       const yours = $('#d-spec-yours');
       const has = r.hasSpecialization;
       if (has === true) {
@@ -1047,8 +1097,16 @@
 
     syncPinButton(r);
     syncCompareButton(r);
+    syncTeachButton(r);
 
     renderList();
+  }
+
+  function syncTeachButton(r) {
+    const btn = $('#btn-teach');
+    if (!btn) return;
+    const show = !!(r && r.teachable && r.known !== false && r.teacherKnows !== false);
+    btn.classList.toggle('hidden', !show);
   }
 
   function blueprintTierLabel(meta) {
@@ -1798,6 +1856,14 @@
     if (data.itemLabels) state.itemLabels = data.itemLabels;
     state.favorites = data.favorites || [];
     state.pinned = data.pinned || [];
+    state.playerSpec = data.playerSpec || null;
+    state.recentlyCrafted = data.recentlyCrafted || [];
+    state.newlyLearned = data.newlyLearned || [];
+    state.teaching = data.teaching || {};
+    if (data.shoppingPins) {
+      state.shop = data.shoppingPins;
+      renderShop();
+    }
     const rarityNav = $('#rarity-filters');
     if (rarityNav) rarityNav.hidden = !uxOn('rarityFilters', true);
     state.flags = data.flags || {};
@@ -1877,44 +1943,48 @@
     renderQueue();
   }
 
+  function shopRows() {
+    const raw = state.shop;
+    if (Array.isArray(raw)) return raw;
+    if (!raw || typeof raw !== 'object') return [];
+    return Object.entries(raw).map(([item, count]) => {
+      if (typeof count === 'object' && count) {
+        return {
+          item,
+          label: count.label,
+          need: count.need || count.count || 1,
+          owned: count.owned,
+          remaining: count.remaining != null ? count.remaining : count.count,
+          sources: count.sources || [],
+        };
+      }
+      return { item, need: count, remaining: count, sources: [] };
+    });
+  }
+
   function renderShop() {
     const ul = $('#shop-list');
     const empty = $('#shop-empty');
     if (!ul) return;
     ul.innerHTML = '';
-    const entries = Object.entries(state.shop || {});
-    setEmpty(empty, entries.length === 0);
-    entries.forEach(([item, count]) => {
+    const rows = shopRows();
+    setEmpty(empty, rows.length === 0);
+    rows.forEach((row) => {
       const li = document.createElement('li');
-      const need = typeof count === 'object' && count != null
-        ? (count.need || count.count || count.required || 1)
-        : count;
-      const owned = typeof count === 'object' && count != null && typeof count.owned === 'number'
-        ? count.owned
-        : null;
+      const need = row.need || row.count || 1;
+      const owned = typeof row.owned === 'number' ? row.owned : null;
+      const remaining = row.remaining != null ? row.remaining : (owned != null ? Math.max(0, need - owned) : need);
       const ownedTxt = owned != null ? `${owned}/${need}` : `×${need}`;
-      const miss = owned != null ? owned < need : true;
+      const miss = remaining > 0;
+      const srcs = (row.sources || []).map((s) => `${s.label || s.recipeId} ×${s.count}`).join(' · ');
       li.innerHTML = `
         <span class="check-mark" aria-hidden="true"><i class="fa-${miss ? 'regular fa-square' : 'solid fa-square-check'}"></i></span>
         <img class="ing-thumb" alt="" />
-        <span class="iname">${escapeHtml((typeof count === 'object' && count && count.label) || itemDisplayName(item))}</span>
+        <span class="iname">${escapeHtml(row.label || itemDisplayName(row.item))}</span>
         <span class="shop-need${miss ? '' : ' ok'}">${escapeHtml(ownedTxt)}</span>
-        <button type="button" class="pin" title="Épingler au carnet" data-pin-item="${escapeHtml(item)}">
-          <i class="fa-solid fa-thumbtack"></i>
-        </button>
+        ${srcs ? `<span class="shop-src t-l6">${escapeHtml(srcs)}</span>` : ''}
       `;
-      bindItemImg(li.querySelector('img'), item, null);
-      const pin = li.querySelector('[data-pin-item]');
-      if (pin) {
-        pin.addEventListener('click', () => {
-          if (state.selected) {
-            post('bookPinRecipe', { recipeId: state.selected.id }).then((r) => {
-              post('notify', { type: r && r.ok ? 'success' : 'error', reason: r && r.ok ? 'book_pinned' : (r && r.reason) || 'craft_failed' });
-              beep(r && r.ok ? 'click' : 'error');
-            });
-          }
-        });
-      }
+      bindItemImg(li.querySelector('img'), row.item, null);
       ul.appendChild(li);
     });
   }
@@ -2051,16 +2121,23 @@
   });
   bindUi('#btn-shop', 'click', async () => {
     if (!state.selected) return;
-    const batchEl = $('#batch');
-    const batch = parseInt(batchEl && batchEl.value, 10) || 1;
-    const data = await post('shopping', { recipeId: state.selected.id, batch });
-    state.shop = (data && data.list) || {};
+    if (!isPinned(state.selected.id)) {
+      const pin = await post('bookPinRecipe', { recipeId: state.selected.id });
+      if (pin && pin.pins) {
+        state.pinned = (pin.pins || []).map((x) => x.recipeId || x).filter(Boolean);
+        syncPinButton(state.selected);
+      }
+    }
+    const data = await post('shoppingFromPins', {});
+    state.shop = (data && data.list) || [];
     renderShop();
     openTab('shop');
+    showToast('Courses reconstruites depuis les suivis', 'ok');
   });
   bindUi('#btn-shop-clear', 'click', async () => {
     await post('shoppingClear', {});
-    state.shop = {};
+    const data = await post('shoppingFromPins', {});
+    state.shop = (data && data.list) || [];
     renderShop();
   });
   bindUi('#btn-tree', 'click', async () => {
@@ -2141,6 +2218,77 @@
   });
   bindUi('#btn-artisans-book', 'click', () => {
     post('bookOpenFromCraft', { page: 'artisans' });
+  });
+
+  function markCond(ok, label) {
+    const mark = ok ? '✓' : '✕';
+    const cls = ok ? 'ok' : 'bad';
+    return `<li class="${cls}"><span class="mark">${mark}</span> ${escapeHtml(label)}</li>`;
+  }
+
+  async function openTeachOverlay() {
+    const overlay = $('#teach-overlay');
+    if (!overlay || !state.selected) return;
+    overlay.classList.remove('hidden');
+    const title = $('#teach-title');
+    if (title) title.textContent = `Enseigner · ${state.selected.label}`;
+    const nearby = await post('teachNearby', {});
+    const players = (nearby && nearby.players) || [];
+    const list = $('#teach-players');
+    const empty = $('#teach-empty');
+    const startBtn = $('#teach-start');
+    state.teachTarget = null;
+    if (startBtn) startBtn.disabled = true;
+    if (list) {
+      list.innerHTML = '';
+      players.forEach((pl) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<button type="button" class="ghost small teach-pick" data-id="${pl.id}">${escapeHtml(pl.name)} <span class="t-l6">${pl.distance} m</span></button>`;
+        list.appendChild(li);
+      });
+      list.querySelectorAll('.teach-pick').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          list.querySelectorAll('.teach-pick').forEach((b) => b.classList.remove('on'));
+          btn.classList.add('on');
+          state.teachTarget = Number(btn.dataset.id);
+          const prev = await post('teachPreview', { recipeId: state.selected.id, target: state.teachTarget });
+          paintTeachConds(prev);
+          if (startBtn) startBtn.disabled = !(prev && prev.canStart);
+        });
+      });
+    }
+    if (empty) empty.classList.toggle('hidden', players.length > 0);
+    const prev = await post('teachPreview', { recipeId: state.selected.id });
+    paintTeachConds(prev);
+  }
+
+  function paintTeachConds(prev) {
+    const ul = $('#teach-conds');
+    if (!ul) return;
+    const c = (prev && prev.conditions) || {};
+    ul.innerHTML = [
+      markCond(c.teachable !== false, 'Transmissible'),
+      markCond(c.teacherKnown !== false, 'Connaissance'),
+      markCond(c.teacherSpec !== false, 'Spécialisation'),
+      markCond(c.teacherLevel !== false, 'Niveau'),
+      c.proximity == null ? markCond(false, 'Proximité') : markCond(!!c.proximity, 'Proximité'),
+      c.studentAlreadyKnown ? markCond(false, 'Élève : déjà connue') : markCond(c.studentKnown !== true, 'Élève : à enseigner'),
+      c.studentSpec == null ? '' : markCond(!!c.studentSpec, 'Élève : spécialisation'),
+    ].filter(Boolean).join('');
+  }
+
+  bindUi('#btn-teach', 'click', () => openTeachOverlay());
+  bindUi('#teach-close', 'click', () => {
+    const overlay = $('#teach-overlay');
+    if (overlay) overlay.classList.add('hidden');
+  });
+  bindUi('#teach-start', 'click', async () => {
+    if (!state.selected || !state.teachTarget) return;
+    const r = await post('teachStart', { recipeId: state.selected.id, target: state.teachTarget });
+    const overlay = $('#teach-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    if (!(r && r.ok)) showToast('Enseignement refusé', 'err');
+    else showToast('Enseignement lancé', 'ok');
   });
 
   window.addEventListener('message', (event) => {
