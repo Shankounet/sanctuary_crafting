@@ -31,6 +31,26 @@ local function scaleIngredients(ingredients, batch)
     return list
 end
 
+local function itemLabelOf(item, override, fallback)
+    if OxItemCatalog and OxItemCatalog.Label then
+        return OxItemCatalog.Label(item, override, fallback)
+    end
+    return fallback or item
+end
+
+local function recipeFacingLabel(recipe)
+    if OxItemCatalog and OxItemCatalog.RecipeLabel then
+        return OxItemCatalog.RecipeLabel(recipe)
+    end
+    return recipe and recipe.label
+end
+
+local function recipeFacingDesc(recipe)
+    if OxItemCatalog and OxItemCatalog.RecipeDescription then
+        return OxItemCatalog.RecipeDescription(recipe)
+    end
+    return (recipe and recipe.description) or 'Aucune description disponible.'
+end
 
 local function recipeHasSteps(recipe)
     return recipe and type(recipe.steps) == 'table' and #recipe.steps > 0
@@ -411,7 +431,8 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
     end
 
     local step = select(1, currentStepInfo(recipe, stepIndex))
-    local stepLabel = (step and step.label) or recipe.label
+    local facing = recipeFacingLabel(recipe)
+    local stepLabel = (step and step.label) or facing
 
     local craftId = GenerateCraftId()
     local craftUID = ('%s:%s:%d'):format(recipe.id, craftId:sub(1, 8), os.time())
@@ -443,7 +464,7 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
     local phaseFamily = recipe.category or bench.category
     return {
         ok = true, craftId = craftId, craftUID = craftUID,
-        duration = duration, label = stepLabel, batch = ctx.batch,
+        duration = duration, label = facing, batch = ctx.batch,
         stepIndex = stepIndex, totalSteps = totalSteps,
         stepLabel = stepLabel,
         recipeId = recipe.id,
@@ -697,7 +718,7 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
     local resultPayload = {
         ok = true, craftId = craftId, craftUID = craft.craftUID,
         result = given[1] or recipe.result, results = given,
-        label = recipe.label, quality = given[1] and given[1].quality,
+        label = recipeFacingLabel(recipe), quality = given[1] and given[1].quality,
         stepIndex = craft.stepIndex or totalSteps, totalSteps = totalSteps,
         chainNext = chainNext, chain = recipe.chain,
         advanced = false,
@@ -706,7 +727,7 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
     }
     TriggerClientEvent('sanctuary_crafting:client:craftFinished', src, {
         craftId = craftId,
-        label = recipe.label,
+        label = recipeFacingLabel(recipe),
         result = resultPayload.result,
         batch = batch,
         benchKey = craft.benchKey,
@@ -811,7 +832,7 @@ local function serializeActiveCraft(craft)
     local batch = craft.batch or 1
     local resultItem = recipe and recipe.result and recipe.result.item or nil
     local resultCount = recipe and recipe.result and ((recipe.result.count or 1) * batch) or batch
-    local label = (recipe and recipe.label) or craft.recipeId
+    local label = (recipe and recipeFacingLabel(recipe)) or craft.recipeId
     local step = recipe and select(1, currentStepInfo(recipe, craft.stepIndex or 1)) or nil
     local stepLabel = (step and step.label) or label
     local category = (recipe and recipe.category) or (bench and bench.category)
@@ -944,16 +965,6 @@ lib.callback.register('sanctuary_crafting:getCraftSession', function(src, benchK
 end)
 
 -- Menu / NUI data
-local function itemLabelOf(item)
-    if not item then return nil end
-    local ok, data = pcall(function()
-        return exports.ox_inventory:Items(item)
-    end)
-    if ok and type(data) == 'table' and data.label then
-        return data.label
-    end
-    return item
-end
 
 local BP_TIER_LABEL = {
     military = 'PLAN MILITAIRE',
@@ -1088,7 +1099,7 @@ local function findDismantleSources(src, item)
                 if bookOn then
                     if SurvivalBook.HasDiscoveredResource(src, sourceItem)
                         or SurvivalBook.HasDiscoveredResource(src, item) then
-                        out[#out + 1] = { recipeId = rr.id, label = rr.label, item = sourceItem }
+                        out[#out + 1] = { recipeId = rr.id, label = recipeFacingLabel(rr), item = sourceItem }
                     end
                 end
             end
@@ -1102,7 +1113,7 @@ local function findDismantleSources(src, item)
                 if dy[i] and dy[i].item == item then
                     local srcItem = rr.result and rr.result.item
                     if srcItem and bookOn and SurvivalBook.HasDiscoveredResource(src, srcItem) then
-                        out[#out + 1] = { recipeId = rr.id, label = rr.label, item = srcItem }
+                        out[#out + 1] = { recipeId = rr.id, label = recipeFacingLabel(rr), item = srcItem }
                     end
                 end
             end
@@ -1153,7 +1164,7 @@ local function buildPathHints(src, r, entry, artisans)
                     if not push({
                         kind = 'craft',
                         title = 'FABRIQUER LE COMPOSANT',
-                        detail = prod.label or prod.id,
+                        detail = recipeFacingLabel(prod) or prod.id,
                         recipeId = prod.id,
                         priority = 20,
                     }) then break end
@@ -1327,7 +1338,7 @@ local function buildRecipeEntry(src, r, ctx)
         if GetResourceState('ox_inventory') == 'started' then
             owned = exports.ox_inventory:GetItemCount(src, ing.item) or 0
         end
-        local lab = ing.label or itemLabelOf(ing.item)
+        local lab = itemLabelOf(ing.item, ing.labelOverride, ing.label)
         ingsOut[i] = { item = ing.item, count = ing.count or 1, owned = owned, label = lab }
     end
 
@@ -1360,7 +1371,7 @@ local function buildRecipeEntry(src, r, ctx)
         if owned < need then
             missingCount = missingCount + 1
             if not primaryMissing then
-                primaryMissing = { item = ing.item, owned = owned, count = need }
+                primaryMissing = { item = ing.item, owned = owned, count = need, label = ing.label or itemLabelOf(ing.item) }
             end
         end
     end
@@ -1435,22 +1446,44 @@ local function buildRecipeEntry(src, r, ctx)
     local bpMeta = blueprintMetaOf(r)
 
     local resultOut = r.result
-    if type(resultOut) == 'table' and resultOut.item and not resultOut.label then
+    if type(resultOut) == 'table' and resultOut.item then
         resultOut = {
             item = resultOut.item,
             count = resultOut.count or 1,
-            label = itemLabelOf(resultOut.item),
+            label = itemLabelOf(resultOut.item, r.labelOverride or resultOut.labelOverride, resultOut.label),
+            description = recipeFacingDesc(r),
         }
     end
 
     local entry = {
-        id = r.id, label = r.label, category = r.category, tags = tags,
-        description = r.description,
+        id = r.id, label = recipeFacingLabel(r), category = r.category, tags = tags,
+        description = recipeFacingDesc(r),
         ingredients = ingsOut,
         result = resultOut, duration = r.duration,
         xp = r.xp, requireLevel = r.requireLevel, requireSkill = r.requireSkill,
         requireBlueprint = bpId,
-        requireTool = r.requireTool, tools = r.tools, station = r.station, rarity = r.rarity,
+        requireTool = r.requireTool, tools = (function()
+            local srcTools = r.tools
+            if type(srcTools) ~= 'table' then
+                if type(r.requireTool) == 'string' then
+                    return { { item = r.requireTool, count = 1, label = itemLabelOf(r.requireTool) } }
+                end
+                return srcTools
+            end
+            local outT = {}
+            for i = 1, #srcTools do
+                local t = srcTools[i]
+                if type(t) == 'string' then
+                    outT[i] = { item = t, count = 1, label = itemLabelOf(t) }
+                elseif type(t) == 'table' then
+                    outT[i] = {
+                        item = t.item, count = t.count or 1,
+                        label = itemLabelOf(t.item, t.labelOverride, t.label),
+                    }
+                end
+            end
+            return outT
+        end)(), station = r.station, rarity = r.rarity,
         hideIfSkillLocked = r.hideIfSkillLocked, quality = r.quality, byproducts = r.byproducts,
         queueable = r.queueable, batchMax = r.batchMax, dismantle = r.dismantle,
         stationLevel = r.stationLevel, powerCost = r.powerCost, noiseLevel = r.noiseLevel,
@@ -1576,6 +1609,7 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
         stationLevel = benchLevel, modules = bench.modules or {},
         powered = (CraftingPower and CraftingPower.HasPower and CraftingPower.HasPower(bench)) or false,
         recipes = out, favorites = favorites, pinned = pinned,
+        itemLabels = (OxItemCatalog and OxItemCatalog.UsedLabels and OxItemCatalog.UsedLabels()) or {},
         session = session,
         ui = Config.UI, ux = ux,
         compare = {

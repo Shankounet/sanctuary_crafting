@@ -134,7 +134,7 @@ function SurvivalBook.CraftTreeMasked(src, recipeId, depth)
             end
         end
         return {
-            type = 'recipe', id = r.id, label = r.label,
+            type = 'recipe', id = r.id, label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or r.label,
             result = r.result, children = children,
         }
     end
@@ -177,7 +177,7 @@ function SurvivalBook.NextUnlocks(src, limit)
             local lvl = progression.levels[cat] and progression.levels[cat].level or 0
             if lvl < req and (req - lvl) <= 3 then
                 out[#out + 1] = {
-                    recipeId = id, label = r.label, requireLevel = req,
+                    recipeId = id, label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or r.label, requireLevel = req,
                     currentLevel = lvl, category = r.category,
                     delta = req - lvl,
                 }
@@ -188,7 +188,7 @@ function SurvivalBook.NextUnlocks(src, limit)
             if not CraftingSkills.HasSkill(cat, r.requireSkill, src) then
                 -- show as locked skill (no other players)
                 out[#out + 1] = {
-                    recipeId = id, label = r.label, requireSkill = r.requireSkill,
+                    recipeId = id, label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or r.label, requireSkill = r.requireSkill,
                     category = r.category, kind = 'skill',
                 }
             end
@@ -254,7 +254,7 @@ function SurvivalBook.CanCraftNow(src, limit)
     for id, r in pairs(Config.RecipeById or {}) do
         local can, info = recipeCraftability(src, r)
         if can then
-            out[#out + 1] = { recipeId = id, label = r.label, category = r.category }
+            out[#out + 1] = { recipeId = id, label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or r.label, category = r.category }
         end
         if #out >= limit then break end
     end
@@ -270,11 +270,11 @@ function SurvivalBook.Suggestions(src)
         if not can then
             if info.almost then
                 almost[#almost + 1] = {
-                    recipeId = id, label = r.label, missing = info.missing, category = r.category,
+                    recipeId = id, label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or r.label, missing = info.missing, category = r.category,
                 }
             elseif info.oneLevelAway then
                 oneLevel[#oneLevel + 1] = {
-                    recipeId = id, label = r.label, category = r.category,
+                    recipeId = id, label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or r.label, category = r.category,
                 }
             end
         end
@@ -364,7 +364,7 @@ function SurvivalBook.Productions(src)
             queue[#queue + 1] = {
                 craftId = e.craftId,
                 recipeId = e.recipeId,
-                label = r and r.label or e.recipeId,
+                label = (r and OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or (r and r.label) or e.recipeId,
                 finishAt = e.finishAt,
                 batch = e.batch,
             }
@@ -383,7 +383,7 @@ function SurvivalBook.Productions(src)
             projects[#projects + 1] = {
                 projectUid = rows[i].project_uid,
                 recipeId = rows[i].recipe_id,
-                label = r and r.label or rows[i].recipe_id,
+                label = (r and OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or (r and r.label) or rows[i].recipe_id,
                 status = rows[i].status,
                 isOwner = rows[i].owner == id,
             }
@@ -498,5 +498,6 @@ function SurvivalBook.ShellMeta(src)
         locale = Config.Locale or 'fr',
         title = _('book_title'),
         subtitle = _('book_subtitle'),
+        itemLabels = (OxItemCatalog and OxItemCatalog.UsedLabels and OxItemCatalog.UsedLabels()) or {},
     }
 end

@@ -45,14 +45,26 @@ AddEventHandler('playerDropped', function()
     lists[source] = nil
 end)
 
+local function enrichShopMap(map)
+    local out = {}
+    for item, count in pairs(map or {}) do
+        out[item] = {
+            count = count,
+            need = count,
+            label = (OxItemCatalog and OxItemCatalog.Label and OxItemCatalog.Label(item)) or item,
+        }
+    end
+    return out
+end
+
 lib.callback.register('sanctuary_crafting:shoppingBuild', function(src, recipeId, batch)
     local list, err = ShoppingList.BuildFromRecipe(src, recipeId, batch)
     if not list then return { ok = false, reason = err } end
-    return { ok = true, list = list }
+    return { ok = true, list = enrichShopMap(list) }
 end)
 
 lib.callback.register('sanctuary_crafting:shoppingGet', function(src)
-    return { ok = true, list = ShoppingList.Get(src) }
+    return { ok = true, list = enrichShopMap(ShoppingList.Get(src)) }
 end)
 
 lib.callback.register('sanctuary_crafting:shoppingClear', function(src)

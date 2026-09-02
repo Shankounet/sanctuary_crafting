@@ -28,6 +28,7 @@
     queueMax: 5,
     lastCraft: null,
     menuMeta: {},
+    itemLabels: {},
     sounds: { Enabled: true, Volume: 0.35, Files: {} },
     audioCtx: null,
     sideTab: 'queue',
@@ -313,6 +314,33 @@
   function humanize(id) {
     if (!id) return '—';
     return String(id).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+
+  function looksLikeItemId(s) {
+    return typeof s === 'string' && /^[a-z0-9_]+$/.test(s) && !/\s/.test(s);
+  }
+
+  function itemDisplayName(id, fallback) {
+    if (fallback && !looksLikeItemId(fallback)) return fallback;
+    if (id && state.itemLabels && state.itemLabels[id]) return state.itemLabels[id];
+    if (fallback) return fallback;
+    if (id && state.itemLabels && state.itemLabels[id]) return state.itemLabels[id];
+    return humanize(id);
+  }
+
+  function recipeDescription(r) {
+    if (!r) return 'Aucune description disponible.';
+    const raw = r.descriptionOverride
+      || r.description
+      || r.desc
+      || r.itemDescription
+      || (r.result && (r.result.description || r.result.desc));
+    if (raw == null) return 'Aucune description disponible.';
+    const s = String(raw).trim();
+    if (!s || s === 'null' || s === 'undefined' || s === 'nil') return 'Aucune description disponible.';
+    if (/^Composant documenté/.test(s)) return 'Aucune description disponible.';
+    return s;
   }
 
   function categoryLabel(cat) {
@@ -791,12 +819,7 @@
       rarityEl.textContent = '';
     }
 
-    const desc = r.description
-      || r.desc
-      || r.itemDescription
-      || (r.result && (r.result.description || r.result.desc))
-      || (r.tags && r.tags.length ? r.tags.map(humanize).join(' · ') : '')
-      || `Composant documenté pour atelier. Assemblage « ${r.label} » — procédure reconstruite et maintenue.`;
+    const desc = recipeDescription(r);
     const descEl = $('#d-desc');
     if (descEl) {
       descEl.textContent = desc;
@@ -813,7 +836,8 @@
     $('#d-quality').textContent = qh || '—';
     const resCount = (r.result && r.result.count) || 1;
     const resItem = (r.result && r.result.item) || '—';
-    $('#d-result').textContent = `${resCount}× ${resItem}`;
+    const resLabel = (r.result && r.result.label) || r.label || itemDisplayName(resItem);
+    $('#d-result').textContent = `${resCount}× ${resLabel}`;
     $('#d-duration').textContent = durationLabel(r.duration);
     $('#d-qty').textContent = `×${resCount}`;
 
@@ -918,7 +942,7 @@
       li.innerHTML = `
         <img class="ing-thumb" alt="" />
         <span class="mark ${info.cls}">${info.mark}</span>
-        <span class="iname">${escapeHtml(ing.label || humanize(ing.item))}</span>
+        <span class="iname">${escapeHtml(ing.label || itemDisplayName(ing.item))}</span>
         <span class="icount ${info.cls}">${escapeHtml(info.text)}</span>
       `;
       bindItemImg(li.querySelector('img'), ing.item, null);
@@ -942,7 +966,7 @@
         li.innerHTML = `
           <img class="ing-thumb" alt="" />
           <span class="mark">·</span>
-          <span class="iname">${escapeHtml(humanize(t.item))}</span>
+          <span class="iname">${escapeHtml(t.label || itemDisplayName(t.item))}</span>
           <span class="icount">×${escapeHtml(t.count || 1)}</span>
           <span class="wear-bar" aria-hidden="true"><i></i></span>
         `;
@@ -1771,6 +1795,7 @@
   function applyMenu(data) {
     state.benchKey = data.benchKey;
     state.recipes = data.recipes || [];
+    if (data.itemLabels) state.itemLabels = data.itemLabels;
     state.favorites = data.favorites || [];
     state.pinned = data.pinned || [];
     const rarityNav = $('#rarity-filters');
@@ -1872,7 +1897,7 @@
       li.innerHTML = `
         <span class="check-mark" aria-hidden="true"><i class="fa-${miss ? 'regular fa-square' : 'solid fa-square-check'}"></i></span>
         <img class="ing-thumb" alt="" />
-        <span class="iname">${escapeHtml(humanize(item))}</span>
+        <span class="iname">${escapeHtml((typeof count === 'object' && count && count.label) || itemDisplayName(item))}</span>
         <span class="shop-need${miss ? '' : ' ok'}">${escapeHtml(ownedTxt)}</span>
         <button type="button" class="pin" title="Épingler au carnet" data-pin-item="${escapeHtml(item)}">
           <i class="fa-solid fa-thumbtack"></i>
@@ -1898,7 +1923,7 @@
     if (!node) return '';
     if (node.type === 'raw') {
       return `<div class="tree-node raw">
-        <div class="t-label">${escapeHtml(humanize(node.item))} ×${escapeHtml(node.count)}</div>
+        <div class="t-label">${escapeHtml(node.label || itemDisplayName(node.item))} ×${escapeHtml(node.count)}</div>
         <div class="t-sub">Ressource · brute</div>
       </div>`;
     }
@@ -1907,7 +1932,7 @@
     const result = node.result && node.result.item ? `${node.result.item}` : '';
     let html = `<div class="tree-node" data-tree-id="${escapeHtml(rid)}">
       <div class="t-label">${escapeHtml(label)}</div>
-      <div class="t-sub">${result ? 'Nœud · ' + escapeHtml(humanize(result)) : 'Nœud de fabrication'}</div>
+      <div class="t-sub">${result ? 'Nœud · ' + escapeHtml((node.result && node.result.label) || itemDisplayName(result)) : 'Nœud de fabrication'}</div>
     </div>`;
     const kids = node.children || [];
     if (kids.length) {
