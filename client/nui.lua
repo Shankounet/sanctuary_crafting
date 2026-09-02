@@ -133,7 +133,7 @@ RegisterNUICallback('complete', function(data, cb)
                 clientTimer = started,
                 wallNow = (os.time and os.time() or 0) * 1000,
             })
-        elseif result and result.ok then
+        elseif result and (result.ok or result.already) then
             CraftTracker.Upsert({
                 craftId = data.craftId,
                 status = 'done',
@@ -142,7 +142,15 @@ RegisterNUICallback('complete', function(data, cb)
                 item = result.result and result.result.item,
                 count = result.result and result.result.count,
             })
-        elseif result and result.reason ~= 'craft_invalid' then
+        elseif result and (result.reason == 'craft_invalid' or result.reason == 'craft_too_far') then
+            -- 100% complete is idempotent; craft_too_far must not stick the UI after time elapsed
+            CraftTracker.Upsert({
+                craftId = data.craftId,
+                status = 'done',
+                stepLabel = 'FABRICATION TERMINÉE',
+                label = result.label,
+            })
+        elseif result and result.reason then
             CraftTracker.Upsert({
                 craftId = data.craftId,
                 status = 'error',
@@ -238,6 +246,65 @@ end)
 RegisterNetEvent('sanctuary_crafting:client:craftCancelled', function(craftId)
     if trackerEnabled() and craftId then
         CraftTracker.Remove(craftId)
+    end
+end)
+
+RegisterNetEvent('sanctuary_crafting:client:craftFinished', function(payload)
+    payload = type(payload) == 'table' and payload or {}
+    local craftId = payload.craftId
+    SendNUIMessage({
+        action = 'craftFinished',
+        craftId = craftId,
+        label = payload.label,
+        result = payload.result,
+        batch = payload.batch,
+        benchKey = payload.benchKey,
+    })
+    if trackerEnabled() and craftId then
+        CraftTracker.Upsert({
+            craftId = craftId,
+            status = 'done',
+            stepLabel = 'FABRICATION TERMINÉE',
+            label = payload.label,
+            item = payload.result and payload.result.item,
+            count = payload.result and payload.result.count,
+            batch = payload.batch,
+            benchKey = payload.benchKey,
+        })
+    end
+end)
+
+RegisterNetEvent('sanctuary_crafting:client:craftAdvanced', function(payload)
+    payload = type(payload) == 'table' and payload or {}
+    local craftId = payload.craftId
+    SendNUIMessage({
+        action = 'craftAdvanced',
+        craftId = craftId,
+        duration = payload.duration,
+        stepIndex = payload.stepIndex,
+        totalSteps = payload.totalSteps,
+        stepLabel = payload.stepLabel,
+        label = payload.label,
+        batch = payload.batch,
+        benchKey = payload.benchKey,
+    })
+    if trackerEnabled() and craftId then
+        local duration = tonumber(payload.duration) or 0
+        local started = GetGameTimer()
+        CraftTracker.Upsert({
+            craftId = craftId,
+            status = 'active',
+            startedAt = started,
+            endsAt = started + duration,
+            duration = duration,
+            stepIndex = payload.stepIndex,
+            totalSteps = payload.totalSteps,
+            stepLabel = payload.stepLabel or payload.label,
+            label = payload.label,
+            clientTimer = started,
+            wallNow = (os.time and os.time() or 0) * 1000,
+            useWallClock = false,
+        })
     end
 end)
 
