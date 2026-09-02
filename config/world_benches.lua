@@ -48,8 +48,7 @@ Config.WorldBenches = {
         category = 'survie', -- craftsId / station
         coords = vec3(-1149.496948, 4944.349609, 222.219696),
         heading = 74.37775421142578,
-        model = 'diamond_tiertwo', -- prop name (joaat côté client si besoin)
-        prop = 'diamond_tiertwo',
+        type = 'coords', -- table MLO/monde déjà là: point d'interaction seul, pas de spawn prop
         queueSize = 6,
         blip = { name = 'Table de Survie', sprite = 566, size = 0.8, color = 5 },
         -- camera skipped: camera = {              x = -453.82940673828,              y = 1143.0400390625,              z = 326.64797973632,       
