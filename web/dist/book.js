@@ -1130,7 +1130,7 @@
       };
     });
     const ht = $('#hud-toggle');
-    if (ht) ht.onclick = () => post('bookToggleHud', { enabled: true });
+    if (ht) ht.onclick = () => post('bookToggleHud', { toggle: true });
   }
 
   async function renderCanCraft() {
@@ -1428,7 +1428,7 @@
       book.style.opacity = '';
     }
     if (data.action === 'bookPins') {
-      // HUD handled in Lua
+      /* HUD is #book-pins-hud via pinsHud */
     }
     if (data.action === 'bookEvent' && state.open) {
       if (state.page === 'dashboard' || state.page === 'history' || state.page === 'artisans' || state.page === 'resources') {

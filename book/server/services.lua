@@ -501,3 +501,39 @@ function SurvivalBook.ShellMeta(src)
         itemLabels = (OxItemCatalog and OxItemCatalog.UsedLabels and OxItemCatalog.UsedLabels()) or {},
     }
 end
+
+local function enrichPinsHud(src, list)
+    for i = 1, #(list or {}) do
+        local p = list[i]
+        local r = Config.RecipeById and Config.RecipeById[p.recipeId]
+        if r then
+            p.label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or p.label
+            p.item = r.result and r.result.item
+            local can, info = recipeCraftability(src, r)
+            local missN = (info and info.missing and #info.missing) or 0
+            p.missingCount = missN
+            if can then
+                p.tone = 'ok'
+                p.status = 'Faisable'
+            elseif info and info.almost then
+                p.tone = 'almost'
+                p.status = missN > 0 and ('Manque ' .. missN) or 'Presque'
+            else
+                p.tone = 'blocked'
+                p.status = 'Non faisable'
+            end
+        else
+            p.tone = 'blocked'
+            p.status = 'Inconnu'
+        end
+    end
+    return list
+end
+
+do
+    local origListPins = SurvivalBook.ListPins
+    function SurvivalBook.ListPins(src)
+        return enrichPinsHud(src, origListPins(src) or {})
+    end
+end
+

@@ -26,7 +26,7 @@ Config.Book = {
     Progression   = { Enabled = true }, -- READ-ONLY ml_skills
     NextUnlocks   = { Enabled = true },
     Objectives    = { Enabled = true },
-    Pins          = { Enabled = true, MiniHud = true },
+    Pins          = { Enabled = true, MiniHud = true, HudMax = 4 },
     Shopping      = { Enabled = true, MaxDepth = 5 }, -- smart recursive, no double-count
     CraftTree     = { Enabled = true },
     Resources     = { Enabled = true, UnknownLabel = '???' },
