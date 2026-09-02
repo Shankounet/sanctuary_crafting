@@ -146,14 +146,45 @@ RegisterNUICallback('bookClose', function(_, cb)
     cb({ ok = true })
 end)
 
+-- Never hold the NUI callback on a heavy lib.callback.await: in CEF a pending
+-- NUI cb often stalls JS timers, so postWithTimeout never fires.
 RegisterNUICallback('bookDashboard', function(_, cb)
-    local r = lib.callback.await('sanctuary_crafting:book:dashboard', false)
-    cb(r or { ok = false })
+    cb({ ok = true, pending = true })
+    CreateThread(function()
+        local ok, r = pcall(function()
+            return lib.callback.await('sanctuary_crafting:book:dashboard', false)
+        end)
+        SendNUIMessage({
+            action = 'bookDashboardResult',
+            payload = (ok and type(r) == 'table' and r) or { ok = false },
+        })
+        Wait(0)
+        local okE, extra = pcall(function()
+            return lib.callback.await('sanctuary_crafting:book:module', false, 'dashboardExtra', {})
+        end)
+        if okE and type(extra) == 'table' then
+            SendNUIMessage({
+                action = 'bookDashboardExtra',
+                payload = extra,
+            })
+        end
+    end)
 end)
 
 RegisterNUICallback('bookModule', function(data, cb)
-    local r = lib.callback.await('sanctuary_crafting:book:module', false, data.module, data.payload or {})
-    cb(r or { ok = false })
+    local reqId = data and data.reqId
+    cb({ ok = true, pending = true, reqId = reqId })
+    CreateThread(function()
+        local ok, r = pcall(function()
+            return lib.callback.await('sanctuary_crafting:book:module', false, data.module, data.payload or {})
+        end)
+        SendNUIMessage({
+            action = 'bookModuleResult',
+            module = data and data.module,
+            reqId = reqId,
+            payload = (ok and type(r) == 'table' and r) or { ok = false },
+        })
+    end)
 end)
 
 RegisterNUICallback('bookAction', function(data, cb)

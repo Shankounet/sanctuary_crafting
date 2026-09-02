@@ -11,6 +11,9 @@
     collapse: document.getElementById('ph-collapse'),
     pin: document.getElementById('ph-pin'),
     hide: document.getElementById('ph-hide'),
+    summary: document.getElementById('ph-summary'),
+    title: root.querySelector('.ph-title'),
+    shell: root.querySelector('.ph-shell'),
   };
 
   function post(name, data) {
@@ -43,16 +46,56 @@
   let lastMax = 4;
   let lastFeature = true;
 
+  function pinToneCounts(pins) {
+    let ok = 0, almost = 0, blocked = 0;
+    (pins || []).forEach((pin) => {
+      if (pin.tone === 'ok') ok += 1;
+      else if (pin.tone === 'almost') almost += 1;
+      else blocked += 1;
+    });
+    return { ok, almost, blocked };
+  }
+
+  function paintSummary() {
+    if (!els.summary) return;
+    const t = pinToneCounts(lastPins);
+    const missing = t.almost + t.blocked;
+    const bits = [];
+    if (missing) bits.push(missing + (missing > 1 ? ' manquantes' : ' manquante'));
+    if (t.ok) bits.push(t.ok + (t.ok > 1 ? ' faisables' : ' faisable'));
+    els.summary.textContent = bits.join(' · ');
+    els.summary.hidden = !collapsed;
+  }
+
   function applyChrome() {
     root.classList.toggle('is-collapsed', collapsed);
+    if (els.title) {
+      els.title.textContent = collapsed
+        ? ('Épingles ' + lastPins.length)
+        : 'Carnet — Épingles';
+    }
     if (els.collapse) {
       els.collapse.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
-      els.collapse.title = collapsed ? 'Déplier' : 'Réduire';
+      els.collapse.title = collapsed ? 'Agrandir' : 'Réduire';
+      els.collapse.setAttribute('aria-label', collapsed ? 'Agrandir' : 'Réduire');
+      const ico = els.collapse.querySelector('i');
+      if (ico) {
+        ico.className = collapsed
+          ? 'fa-solid fa-expand'
+          : 'fa-solid fa-minus';
+      }
     }
     if (els.pin) {
       els.pin.classList.toggle('is-on', pinned);
       els.pin.setAttribute('aria-pressed', pinned ? 'true' : 'false');
+      els.pin.title = pinned ? 'Widget épinglé' : 'Non épinglé';
+      els.pin.setAttribute('aria-label', 'Épingler le widget');
     }
+    if (els.hide) {
+      els.hide.title = 'Masquer';
+      els.hide.setAttribute('aria-label', 'Masquer');
+    }
+    paintSummary();
   }
 
   function shouldShow() {
@@ -132,6 +175,8 @@
     const crafts = lastCrafts;
     const max = lastMax;
     if (els.count) els.count.textContent = String(pins.length);
+    paintSummary();
+    if (collapsed && els.title) els.title.textContent = 'Épingles ' + pins.length;
     if (!els.list) return;
     els.list.innerHTML = '';
     if (!pins.length) return;
@@ -165,8 +210,12 @@
     if (hiddenN > 0) {
       const more = document.createElement('div');
       more.className = 'ph-more';
-      more.textContent = `+${hiddenN}`;
+      more.textContent = hiddenN === 1 ? '+1 autre' : ('+' + hiddenN + ' autres');
       els.list.appendChild(more);
+    }
+    paintSummary();
+    if (collapsed && els.title) {
+      els.title.textContent = 'Épingles ' + pins.length;
     }
   }
 
@@ -205,6 +254,15 @@
       ev.stopPropagation();
       /* D: hide → pinsVisible=false ONLY. Never unpin, never empty SQL, never miniHud=false-only. */
       setPinsVisible(false);
+    });
+  }
+  if (els.shell) {
+    els.shell.addEventListener('click', (ev) => {
+      if (!collapsed) return;
+      if (ev.target.closest('#ph-pin, #ph-hide, #ph-collapse')) return;
+      collapsed = false;
+      saveFlag(COLLAPSE_KEY, false);
+      applyChrome();
     });
   }
 

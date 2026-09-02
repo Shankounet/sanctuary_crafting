@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.16.1
+# sanctuary_crafting v2.16.2
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,11 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.16.2 — Carnet Accueil non bloquant + finition HUD épingles
+Accueil: `navigate` ne vide plus les pages sur « Chargement… ». `bookDashboard` (et `bookModule`) répondent tout de suite `pending` puis `SendNUIMessage` — plus de NUI cb bloquant (CEF stallait les timers). `SurvivalBook.Dashboard` = paint léger (progression, pins, objectifs ≤5, stats, productions, chaque section en pcall). CanCraftNow / Suggestions / NextUnlocks / MaintenanceHints partent en `bookDashboardExtra`. JS peint Accueil depuis ShellMeta à 2s si rien. Pas de `loadModule('artisans')` sur l'accueil.
+
+HUD épingles: wrapper transparent fit-content (plus de rectangle noir CEF). Compact: résumé tons + clic pour agrandir. Overflow `+N autre(s)`. Pin PINNÉ / NON PINNÉ. X = `setPinsVisible(false)` seulement.
 
 ### v2.16.1 — HUD widgets: états restaurables
 Pins + tracker: plus de cul-de-sac (minimal sans expand, hide qui cuit `miniHud=false`, carré noir CEF). États `expanded|compact|minimal|hidden` / `pinsVisible`. Clic compact/minimal → expand, chevron ↗, hide = `display:none`. Restore via Paramètres HUD (Craft + Carnet). LS `sanctuary_hud.*`. SQL pins intactes. Callbacks NUI joueur inchangés (`hudSettings*` / `hudReset` ajoutés).

@@ -400,18 +400,52 @@
     if (ov) ov.classList.add('hidden');
   }
 
+  let nuiReq = 0;
+  const moduleWaiters = new Map();
+  const moduleBuf = new Map();
+  let dashGen = 0;
+  let lastDash = {};
+
+  function takeModuleResult(reqId, ms) {
+    if (moduleBuf.has(reqId)) {
+      const payload = moduleBuf.get(reqId);
+      moduleBuf.delete(reqId);
+      return Promise.resolve(payload);
+    }
+    return new Promise((resolve) => {
+      const t = setTimeout(() => {
+        moduleWaiters.delete(reqId);
+        resolve({ ok: false, timeout: true });
+      }, ms);
+      moduleWaiters.set(reqId, (payload) => {
+        clearTimeout(t);
+        resolve(payload || { ok: false });
+      });
+    });
+  }
+
   async function loadModule(name, payload) {
     const key = name + JSON.stringify(payload || {});
-    const r = await postWithTimeout('bookModule', { module: name, payload: payload || {} }, 2500);
-    if (r && r.ok) state.cache[key] = r.data;
-    return r;
+    const reqId = ++nuiReq;
+    const r = await post('bookModule', { module: name, payload: payload || {}, reqId });
+    let out = r;
+    if (r && r.pending) out = await takeModuleResult(reqId, 2500);
+    if (out && out.ok) state.cache[key] = out.data;
+    return out;
   }
 
   async function navigate(page) {
     state.page = page;
     renderTabs();
     setContext();
-    setPages('<p class="empty">Chargement…</p>', '<p class="empty">…</p>');
+    /* Keep boot skeleton / last content. Never wipe to a blank Chargement spread. */
+    const L0 = leftEl();
+    if (L0 && !String(L0.innerHTML || '').trim()) {
+      paintBootPages(
+        (state.meta && state.meta.title) || 'Carnet de survie',
+        (state.meta && state.meta.subtitle) || 'Journal de terrain'
+      );
+    }
     try {
       if (page === 'dashboard') await renderDashboard();
       else if (page === 'progression') await renderProgression();
@@ -442,17 +476,15 @@
   }
 
   /* ========== ACCUEIL (diegetic spread) ========== */
-  async function renderDashboard() {
-    const r = await postWithTimeout('bookDashboard', {}, 2500);
-    if (!r || !r.ok) {
-      setPages(
-        pageHead('Accueil', 'Feuillet du jour indisponible') +
-          `<p class="hand-note">Le carnet n'a pas pu ouvrir la synthèse. Réessayer plus tard.</p>`,
-        folio('ii')
-      );
-      return;
-    }
-    const d = r.data || {};
+  function mergeDash(extra) {
+    lastDash = Object.assign({}, lastDash, extra || {});
+    lastDash._ready = true;
+    return lastDash;
+  }
+
+  function paintDashboard(d, opts) {
+    d = d || {};
+    opts = opts || {};
     const st = d.stats || {};
     const prog = d.progression || {};
     const levels = prog.levels || {};
@@ -467,15 +499,6 @@
     const charName = characterName();
     const spec = pickSpecialization(levels);
     const discovery = almost[0] || canCraft[0] || null;
-
-    let artisansList = Array.isArray(d.artisans) ? d.artisans : [];
-    if (!artisansList.length && modEnabled('Artisans')) {
-      try {
-        const artsR = await loadModule('artisans');
-        artisansList = (artsR && artsR.data) || [];
-        d.artisans = artisansList;
-      } catch (_) { /* ignore */ }
-    }
 
     const place = (state.meta && (state.meta.place || state.meta.location)) || null;
     const dateStr = (state.meta && (state.meta.date || state.meta.openedAt || state.meta.day)) || null;
@@ -533,6 +556,10 @@
       </div>`;
     }
 
+    const faint = opts.faint
+      ? `<p class="hand-note" style="opacity:.55">Feuillet en cours de copie…</p>`
+      : '';
+
     const left = `
       <div class="accueil-hero">
         <p class="book-stamp">Carnet de terrain</p>
@@ -556,6 +583,7 @@
       <h3 class="section-title">Compétences</h3>
       ${msSkillLines(levels)}
       <div class="day-note">${esc(daily)}</div>
+      ${faint}
       ${folio('i')}`;
 
     const right = `
@@ -609,6 +637,39 @@
         navigate('projects');
       });
     });
+  }
+
+  function applyDashboardPayload(payload, token) {
+    if (token != null && token !== dashGen) return;
+    if (state.page !== 'dashboard') return;
+    const r = payload || {};
+    if (r.ok && r.data && !r.pending) {
+      paintDashboard(mergeDash(r.data));
+      return;
+    }
+    if (r.data && !r.pending) {
+      paintDashboard(mergeDash(r.data));
+      return;
+    }
+    /* pending / fail / timeout: Accueil from meta + emptyPhrase scraps */
+    paintDashboard(lastDash, { fromMeta: true, faint: !!r.pending });
+  }
+
+  async function renderDashboard() {
+    const token = ++dashGen;
+    lastDash = {};
+    /* Immediate Accueil from ShellMeta — pages never stay empty / Chargement. */
+    paintDashboard({}, { fromMeta: true, faint: true });
+    post('bookDashboard', {}).then((r) => {
+      if (token !== dashGen) return;
+      if (r && r.ok && r.data && !r.pending) applyDashboardPayload(r, token);
+    }).catch(() => {});
+    window.setTimeout(() => {
+      if (token !== dashGen || state.page !== 'dashboard') return;
+      if (!lastDash._ready) {
+        paintDashboard(lastDash, { fromMeta: true, faint: false });
+      }
+    }, 2000);
   }
 
 
@@ -1476,6 +1537,26 @@
     }
     if (data.action === 'bookPins') {
       /* HUD is #book-pins-hud via pinsHud */
+    }
+    if (data.action === 'bookDashboardResult') {
+      applyDashboardPayload(data.payload || {}, dashGen);
+    }
+    if (data.action === 'bookDashboardExtra') {
+      if (state.page === 'dashboard' && state.open) {
+        const extra = (data.payload && (data.payload.data || data.payload)) || {};
+        paintDashboard(mergeDash(extra));
+      }
+    }
+    if (data.action === 'bookModuleResult') {
+      const id = data.reqId;
+      const payload = data.payload || { ok: false };
+      const fn = moduleWaiters.get(id);
+      if (fn) {
+        moduleWaiters.delete(id);
+        fn(payload);
+      } else if (id != null) {
+        moduleBuf.set(id, payload);
+      }
     }
     if (data.action === 'bookEvent' && state.open) {
       if (state.page === 'dashboard' || state.page === 'history' || state.page === 'artisans' || state.page === 'resources') {
