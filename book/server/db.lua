@@ -25,11 +25,14 @@ function BookDB.Ensure()
 
     MySQL.query.await([[CREATE TABLE IF NOT EXISTS `sanctuary_book_pins` (
         `identifier` VARCHAR(60) NOT NULL,
-        `recipe_id` VARCHAR(64) NOT NULL,
+        `recipe_id` VARCHAR(80) NOT NULL,
         `sort_order` INT NOT NULL DEFAULT 0,
         `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (`identifier`, `recipe_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci]])
+    pcall(function()
+        MySQL.query.await('ALTER TABLE sanctuary_book_pins MODIFY recipe_id VARCHAR(80) NOT NULL')
+    end)
 
     MySQL.query.await([[CREATE TABLE IF NOT EXISTS `sanctuary_book_notes` (
         `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -45,8 +48,12 @@ function BookDB.Ensure()
         `identifier` VARCHAR(60) NOT NULL,
         `item` VARCHAR(64) NOT NULL,
         `discovered_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `note` TEXT NULL,
         PRIMARY KEY (`identifier`, `item`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci]])
+    pcall(function()
+        MySQL.query.await('ALTER TABLE sanctuary_book_discovered_resources ADD COLUMN note TEXT NULL')
+    end)
 
     MySQL.query.await([[CREATE TABLE IF NOT EXISTS `sanctuary_book_artisans` (
         `identifier` VARCHAR(60) NOT NULL,

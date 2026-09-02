@@ -101,11 +101,22 @@ lib.callback.register('sanctuary_crafting:book:action', function(src, action, pa
     elseif action == 'removeObjective' then
         return { ok = SurvivalBook.RemoveObjective(src, payload.id) }
     elseif action == 'pin' then
+        if payload.kind == 'resource' or (payload.item and not payload.recipeId) then
+            local ok, err = SurvivalBook.PinResource(src, payload.item)
+            return { ok = ok and true or false, reason = err, pins = SurvivalBook.ListPins(src) }
+        end
         local ok, err = SurvivalBook.PinRecipe(src, payload.recipeId)
         return { ok = ok and true or false, reason = err, pins = SurvivalBook.ListPins(src) }
     elseif action == 'unpin' then
+        if payload.kind == 'resource' or (payload.item and not payload.recipeId) then
+            SurvivalBook.UnpinResource(src, payload.item)
+            return { ok = true, pins = SurvivalBook.ListPins(src) }
+        end
         SurvivalBook.UnpinRecipe(src, payload.recipeId)
         return { ok = true, pins = SurvivalBook.ListPins(src) }
+    elseif action == 'saveResourceNote' then
+        local ok, err = SurvivalBook.SaveResourceNote(src, payload.item, payload.note)
+        return { ok = ok and true or false, reason = err }
     elseif action == 'saveNote' then
         local note, err = SurvivalBook.SaveNote(src, payload)
         if not note then return { ok = false, reason = err } end

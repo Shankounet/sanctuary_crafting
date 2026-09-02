@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.17.3
+# sanctuary_crafting v2.18.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,9 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.18.0 — Carnet Ressources: encyclopédie de terrain
+Page Ressources: fiche gauche + index organique (slips papier, pas une grille de 6 cartes). États INCONNU (pas listé) / REPÉRÉ (silhouette, pas de label ox) / IDENTIFIÉ (nom + image ox) / DOCUMENTÉ (desc ox + usages connus + note). Images via `nui://ox_inventory/web/images/` (même résolution que le craft). Pins ressource `res:<item>` dans la table pins existante. Note perso optionnelle (colonne `note` NULL). Schema **218**. Callbacks NUI verrouillés inchangés; actions `saveResourceNote` + `pin`/`unpin` kind=resource.
 
 ### v2.17.3 -- Table de Survie: point d'interaction seul (pas de prop spawn)
 Banc monde `survie_crafting`: `type = 'coords'` (plus de `model`/`prop`). Coords inchangées vec3(-1149.496948, 4944.349609, 222.219696). ox_target zone sur la table MLO existante. Autres stations inchangées.

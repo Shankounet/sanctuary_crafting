@@ -40,6 +40,90 @@ local function itemLabel(item)
     return item
 end
 
+local RES_PIN_PREFIX = 'res:'
+local MAX_SPOTTED = 8
+local EMPTY_OX_DESC = 'Aucune description disponible.'
+
+local ANNOT_BY_CAT = {
+    bandages = 'assez solide une fois plié',
+    med_kits = 'à garder au sec',
+    painkillers = 'flacon à bien refermer',
+    remedies = 'ne pas laisser au soleil',
+    ammo = 'lourde pour la taille',
+    weapons = 'graisser avant de ranger',
+    powders = 'craint l’humidité',
+    repair_kits = 'vérifier les embouts',
+    weapon_repair = 'un peu graisseux au toucher',
+    weapon_body = 'pièce brute, encore à ajuster',
+    weapon_barrel = 'surveiller le canon avant assemblage',
+}
+
+local function discRec(v)
+    if type(v) == 'table' then return v end
+    return { ts = tonumber(v) or 0, note = nil }
+end
+
+local function usefulDesc(s)
+    if type(s) ~= 'string' then return nil end
+    local t = s:match('^%s*(.-)%s*$')
+    if not t or t == '' or t == EMPTY_OX_DESC then return nil end
+    return t
+end
+
+local function opaqueSpotId(item)
+    local h = 0
+    for i = 1, #item do
+        h = (h * 33 + string.byte(item, i)) % 2147483647
+    end
+    return ('s%08x'):format(h)
+end
+
+local function isResPinKey(rid)
+    return type(rid) == 'string' and rid:sub(1, #RES_PIN_PREFIX) == RES_PIN_PREFIX
+end
+
+local function resPinKey(item)
+    return RES_PIN_PREFIX .. tostring(item)
+end
+
+local function resPinItem(rid)
+    if not isResPinKey(rid) then return nil end
+    return rid:sub(#RES_PIN_PREFIX + 1)
+end
+
+local function recipeIngs(recipe)
+    if not recipe then return {} end
+    if type(recipe.steps) == 'table' and #recipe.steps > 0 then
+        local ings = {}
+        for _, step in ipairs(recipe.steps) do
+            for _, ing in ipairs(step.ingredients or {}) do
+                ings[#ings + 1] = ing
+            end
+        end
+        return ings
+    end
+    return recipe.ingredients or {}
+end
+
+local function playerKnowsRecipe(src, recipe)
+    if not recipe then return false end
+    if Blueprints and Blueprints.KnowsRecipe then
+        return Blueprints.KnowsRecipe(src, recipe) == true
+    end
+    return true
+end
+
+local function oxImageName(item)
+    local data = OxItemCatalog and OxItemCatalog.Get and OxItemCatalog.Get(item)
+    if data and type(data.image) == 'string' and data.image ~= '' then
+        return data.image
+    end
+    if type(item) == 'string' and item ~= '' then
+        return item .. '.png'
+    end
+    return nil
+end
+
 function SurvivalBook.Notify(src, key, nType, args)
     if not BookDB.Mod('Notifications') then return end
     local cd = (Config.Book.Notifications and Config.Book.Notifications.CooldownMs) or 8000
@@ -103,11 +187,28 @@ function SurvivalBook.LoadDiscoveries(src)
     local id = BookDB.Ident(src)
     if not id then return end
     discoveredCache[id] = {}
-    local rows = MySQL.query.await(
-        'SELECT item, UNIX_TIMESTAMP(discovered_at) AS ts FROM sanctuary_book_discovered_resources WHERE identifier = ?', { id }
-    ) or {}
+    local okQ, rows = pcall(function()
+        return MySQL.query.await(
+            'SELECT item, UNIX_TIMESTAMP(discovered_at) AS ts, note FROM sanctuary_book_discovered_resources WHERE identifier = ?',
+            { id }
+        )
+    end)
+    if not okQ then
+        rows = MySQL.query.await(
+            'SELECT item, UNIX_TIMESTAMP(discovered_at) AS ts FROM sanctuary_book_discovered_resources WHERE identifier = ?',
+            { id }
+        )
+    end
+    rows = rows or {}
     for i = 1, #rows do
-        discoveredCache[id][rows[i].item] = tonumber(rows[i].ts) or 0
+        local note = rows[i].note
+        if type(note) == 'string' then
+            note = note:match('^%s*(.-)%s*$')
+            if note == '' then note = nil end
+        else
+            note = nil
+        end
+        discoveredCache[id][rows[i].item] = { ts = tonumber(rows[i].ts) or 0, note = note }
     end
 end
 
@@ -134,7 +235,7 @@ function SurvivalBook.DiscoverResource(src, item, label, reason)
         'INSERT IGNORE INTO sanctuary_book_discovered_resources (identifier, item) VALUES (?,?)',
         { id, item }
     )
-    discoveredCache[id][item] = os.time()
+    discoveredCache[id][item] = { ts = os.time(), note = nil }
     SurvivalBook.PushHistory(id, 'resource_discovered', { item = item, label = lab, reason = reason })
     TriggerClientEvent('sanctuary_crafting:book:resourceDiscovered', src, item, lab)
     TriggerEvent('sanctuary_crafting:book:resourceDiscovered', src, item, lab)
@@ -142,15 +243,149 @@ function SurvivalBook.DiscoverResource(src, item, label, reason)
     return true
 end
 
+function SurvivalBook.SaveResourceNote(src, item, note)
+    if type(item) ~= 'string' or item == '' then return false, 'craft_invalid' end
+    local id = BookDB.Ident(src)
+    if not id then return false, 'craft_invalid' end
+    if not discoveredCache[id] then SurvivalBook.LoadDiscoveries(src) end
+    if not discoveredCache[id][item] then return false, 'craft_invalid' end
+    local text = type(note) == 'string' and note:match('^%s*(.-)%s*$') or ''
+    if #text > 600 then text = text:sub(1, 600) end
+    local rec = discRec(discoveredCache[id][item])
+    if text == '' then
+        MySQL.update.await(
+            'UPDATE sanctuary_book_discovered_resources SET note = NULL WHERE identifier = ? AND item = ?',
+            { id, item }
+        )
+        rec.note = nil
+    else
+        MySQL.update.await(
+            'UPDATE sanctuary_book_discovered_resources SET note = ? WHERE identifier = ? AND item = ?',
+            { text, id, item }
+        )
+        rec.note = text
+    end
+    discoveredCache[id][item] = rec
+    return true
+end
+
+--- Encyclopédie: identified SQL rows + optional spotted (RAM, known recipes only).
+--- Never sends ox label/description/image for spotted entries.
 function SurvivalBook.ListResources(src)
     local id = BookDB.Ident(src)
     if not id then return {} end
     if not discoveredCache[id] then SurvivalBook.LoadDiscoveries(src) end
-    local out = {}
-    for item, ts in pairs(discoveredCache[id] or {}) do
-        out[#out + 1] = { item = item, label = itemLabel(item), discoveredAt = ts }
+    if not pinCache[id] then SurvivalBook.LoadPins(src) end
+
+    local discovered = discoveredCache[id] or {}
+    local pinnedSet = {}
+    for _, rid in ipairs(pinCache[id] or {}) do
+        if type(rid) == 'string' then
+            pinnedSet[rid] = true
+        end
     end
-    table.sort(out, function(a, b) return (a.discoveredAt or 0) > (b.discoveredAt or 0) end)
+
+    local usesByItem = {}
+    local spottedFromKnown = {}
+    local spottedFromPinned = {}
+
+    local function addUse(item, recipe, recipeId, role)
+        if type(item) ~= 'string' or item == '' or not recipe or type(recipeId) ~= 'string' then return end
+        local lab = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(recipe))
+            or recipe.label
+            or recipeId
+        usesByItem[item] = usesByItem[item] or {}
+        local list = usesByItem[item]
+        for i = 1, #list do
+            if list[i].recipeId == recipeId then return end
+        end
+        list[#list + 1] = { recipeId = recipeId, label = lab, role = role }
+    end
+
+    for rid, recipe in pairs(Config.RecipeById or {}) do
+        if recipe and playerKnowsRecipe(src, recipe) then
+            local recipeId = recipe.id or rid
+            local ings = recipeIngs(recipe)
+            local pinKnown = type(recipeId) == 'string' and pinnedSet[recipeId] == true
+            local learned = recipe.requiresLearn == true or recipe.requireBlueprint or recipe.blueprintId
+            for i = 1, #ings do
+                local it = ings[i] and ings[i].item
+                if type(it) == 'string' and it ~= '' then
+                    addUse(it, recipe, recipeId, 'ingredient')
+                    if pinKnown or learned then
+                        spottedFromKnown[it] = true
+                    end
+                    if pinKnown then spottedFromPinned[it] = true end
+                end
+            end
+            local resultItem = recipe.result and recipe.result.item
+            if type(resultItem) == 'string' and resultItem ~= '' then
+                addUse(resultItem, recipe, recipeId, 'result')
+            end
+        end
+    end
+
+    local out = {}
+    for item, raw in pairs(discovered) do
+        local rec = discRec(raw)
+        local uses = usesByItem[item]
+        local desc = OxItemCatalog and OxItemCatalog.Description and OxItemCatalog.Description(item) or nil
+        local ud = usefulDesc(desc)
+        local documented = (rec.note and rec.note ~= '') or ud ~= nil or (uses and #uses > 0)
+        local row = {
+            id = item,
+            item = item,
+            state = documented and 'documented' or 'identified',
+            label = itemLabel(item),
+            image = oxImageName(item),
+            discoveredAt = rec.ts or 0,
+            pinned = pinnedSet[resPinKey(item)] == true,
+        }
+        if documented then
+            if ud then row.description = ud end
+            if uses and #uses > 0 then
+                local slim = {}
+                for i = 1, #uses do
+                    slim[i] = { label = uses[i].label, role = uses[i].role }
+                end
+                row.knownUses = slim
+            end
+            if rec.note and rec.note ~= '' then row.note = rec.note end
+            local first = uses and uses[1]
+            local rr = first and Config.RecipeById and Config.RecipeById[first.recipeId]
+            local cat = rr and rr.category
+            if type(cat) == 'string' and ANNOT_BY_CAT[cat] then
+                row.annot = ANNOT_BY_CAT[cat]
+            end
+        end
+        out[#out + 1] = row
+    end
+
+    local spottedN = 0
+    local spottedSeen = {}
+    local function addSpotted(item)
+        if spottedN >= MAX_SPOTTED then return end
+        if type(item) ~= 'string' or item == '' then return end
+        if discovered[item] or spottedSeen[item] then return end
+        spottedSeen[item] = true
+        spottedN = spottedN + 1
+        out[#out + 1] = {
+            id = opaqueSpotId(item),
+            state = 'spotted',
+        }
+    end
+    for item in pairs(spottedFromPinned) do addSpotted(item) end
+    for item in pairs(spottedFromKnown) do addSpotted(item) end
+
+    table.sort(out, function(a, b)
+        local sa = a.state == 'spotted' and 1 or 0
+        local sb = b.state == 'spotted' and 1 or 0
+        if sa ~= sb then return sa < sb end
+        if (a.discoveredAt or 0) ~= (b.discoveredAt or 0) then
+            return (a.discoveredAt or 0) > (b.discoveredAt or 0)
+        end
+        return tostring(a.label or a.id or '') < tostring(b.label or b.id or '')
+    end)
     return out
 end
 
@@ -387,12 +622,25 @@ function SurvivalBook.ListPins(src)
     if not pinCache[id] then SurvivalBook.LoadPins(src) end
     local out = {}
     for i, rid in ipairs(pinCache[id] or {}) do
-        local r = Config.RecipeById and Config.RecipeById[rid]
-        out[i] = {
-            recipeId = rid,
-            label = r and r.label or rid,
-            category = r and r.category or nil,
-        }
+        if isResPinKey(rid) then
+            local item = resPinItem(rid)
+            out[i] = {
+                recipeId = rid,
+                kind = 'resource',
+                label = itemLabel(item) or 'Ressource',
+                status = 'Suivi',
+                tone = 'almost',
+            }
+        else
+            local r = Config.RecipeById and Config.RecipeById[rid]
+            local lab = r and OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)
+            out[i] = {
+                recipeId = rid,
+                kind = 'recipe',
+                label = lab or (r and r.label) or rid,
+                category = r and r.category or nil,
+            }
+        end
     end
     return out
 end
@@ -421,13 +669,47 @@ function SurvivalBook.PinRecipe(src, recipeId)
     return true
 end
 
+function SurvivalBook.PinResource(src, item)
+    if not BookDB.Mod('Pins') then return false, 'book_pins_disabled' end
+    if type(item) ~= 'string' or item == '' then return false, 'craft_invalid' end
+    if not SurvivalBook.HasDiscoveredResource(src, item) then
+        return false, 'craft_invalid'
+    end
+    local id = BookDB.Ident(src)
+    if not id then return false, 'craft_invalid' end
+    if not pinCache[id] then SurvivalBook.LoadPins(src) end
+    local key = resPinKey(item)
+    for _, rid in ipairs(pinCache[id]) do
+        if rid == key then return true, 'already' end
+    end
+    local maxP = (Config.Book and Config.Book.MaxPins) or 8
+    if #pinCache[id] >= maxP then return false, 'book_pins_full' end
+    MySQL.insert.await(
+        'INSERT IGNORE INTO sanctuary_book_pins (identifier, recipe_id, sort_order) VALUES (?,?,?)',
+        { id, key, #pinCache[id] + 1 }
+    )
+    pinCache[id][#pinCache[id] + 1] = key
+    if Config.Follow and Config.Follow.AutoObjectives ~= false then
+        local lab = itemLabel(item) or 'ressource'
+        SurvivalBook.AddObjective(src, ('Suivre : %s'):format(lab), 'manual', { item = item, resource = true })
+    end
+    TriggerClientEvent('sanctuary_crafting:book:pinsUpdated', src, SurvivalBook.ListPins(src))
+    return true
+end
+
 function SurvivalBook.UnpinRecipe(src, recipeId)
     local id = BookDB.Ident(src)
     if not id then return false end
+    if type(recipeId) ~= 'string' or recipeId == '' then return false end
     MySQL.query.await('DELETE FROM sanctuary_book_pins WHERE identifier = ? AND recipe_id = ?', { id, recipeId })
     SurvivalBook.LoadPins(src)
     TriggerClientEvent('sanctuary_crafting:book:pinsUpdated', src, SurvivalBook.ListPins(src))
     return true
+end
+
+function SurvivalBook.UnpinResource(src, item)
+    if type(item) ~= 'string' or item == '' then return false end
+    return SurvivalBook.UnpinRecipe(src, resPinKey(item))
 end
 
 --------------------------------------------------------------------------------

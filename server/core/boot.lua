@@ -109,7 +109,7 @@ local function autoMigrate()
     if AdminLogs and AdminLogs.EnsureTable then AdminLogs.EnsureTable() end
     pcall(function() MySQL.query.await('ALTER TABLE sanctuary_craft_queue ADD COLUMN recipe_snapshot LONGTEXT NULL') end)
     pcall(function() MySQL.query.await('ALTER TABLE sanctuary_craft_queue ADD COLUMN recipe_version INT NULL') end)
-    local target = (Config.SchemaVersion or 217)
+    local target = (Config.SchemaVersion or 218)
     local cur = 0
     local row = MySQL.query.await('SELECT version FROM sanctuary_schema_version WHERE id = 1')
     if row and row[1] then cur = tonumber(row[1].version) or 0 end
@@ -139,6 +139,16 @@ local function autoMigrate()
             MySQL.query.await(
                 ('DELETE FROM sanctuary_admin_logs WHERE created_at < (NOW() - INTERVAL %d DAY)'):format(days)
             )
+        end)
+    end
+
+    -- v2.18 optional personal note on identified resources (no labels/images)
+    if cur < 218 then
+        pcall(function()
+            MySQL.query.await('ALTER TABLE sanctuary_book_discovered_resources ADD COLUMN note TEXT NULL')
+        end)
+        pcall(function()
+            MySQL.query.await('ALTER TABLE sanctuary_book_pins MODIFY recipe_id VARCHAR(80) NOT NULL')
         end)
     end
 

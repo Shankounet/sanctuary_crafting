@@ -910,50 +910,201 @@
   background: rgba(154, 136, 102, 0.7);
 }
 
-/* Encyclopedia / codex resources */
-#book-app .ency-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+/* Encyclopedia / field slips — not a uniform card grid */
+#book-app .ency-empty {
+  padding: 8px 4px 12px;
 }
-#book-app .ency-entry {
+#book-app .ency-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 10px;
+  align-items: flex-start;
+  padding: 4px 0 8px;
+}
+#book-app .ency-slip {
   position: relative;
-  padding: 10px 10px 10px;
-  border: 1px solid rgba(120, 100, 70, 0.25);
-  background: rgba(255, 252, 244, 0.35);
-  text-align: center;
+  width: 42%;
+  padding: 8px 9px 10px;
+  cursor: pointer;
+  color: #2a2218;
+  box-shadow: 2px 3px 5px rgba(40, 24, 10, 0.16);
 }
-#book-app .ency-entry .sil {
-  width: 44px; height: 44px;
+#book-app .ency-slip:nth-child(3n+1) {
+  transform: rotate(-1.2deg);
+  width: 44%;
+}
+#book-app .ency-slip:nth-child(3n+2) {
+  transform: rotate(0.9deg);
+  width: 38%;
+  margin-top: 6px;
+}
+#book-app .ency-slip:nth-child(3n) {
+  transform: rotate(1.4deg);
+  width: 46%;
+}
+#book-app .ency-slip.is-on {
+  transform: rotate(-0.3deg) translateY(1px);
+  box-shadow: 1px 1px 2px rgba(40, 24, 10, 0.18);
+}
+#book-app .ency-slip.is-on .ency-name {
+  text-decoration: underline;
+  text-decoration-color: rgba(42, 34, 24, 0.7);
+  text-underline-offset: 3px;
+}
+#book-app .ency-slip.spotted {
+  width: 34%;
+}
+#book-app .ency-thumb {
+  width: 52px;
+  height: 52px;
   margin: 0 auto 6px;
-  border: 1.5px dashed rgba(90, 70, 40, 0.35);
-  border-radius: 50%;
   display: grid;
   place-items: center;
-  font-family: var(--book-display);
-  font-size: 18px;
-  color: var(--book-muted);
-  background: rgba(90, 70, 40, 0.04);
 }
-#book-app .ency-entry.known .sil {
-  border-style: solid;
-  color: var(--book-accent);
-  background: rgba(154, 136, 102, 0.12);
+#book-app .ency-thumb img,
+#book-app .ency-polaroid img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
-#book-app .ency-entry .ency-label {
-  font-size: 12px;
-  font-weight: 600;
+#book-app .ency-thumb img {
+  width: 52px;
+  height: 52px;
+}
+#book-app .ency-name {
+  font-family: var(--book-hand);
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: center;
+  color: #2a2218;
+}
+#book-app .ency-st {
+  font-family: var(--book-hand);
+  font-size: 11px;
+  color: #5a4630;
+  text-align: center;
+  margin-top: 2px;
+  font-style: italic;
+}
+#book-app .ency-sil {
+  width: 44px;
+  height: 52px;
+  margin: 4px auto;
+  border: 1.5px dashed rgba(42, 34, 24, 0.4);
+  border-radius: 40% 42% 38% 44%;
+  display: grid;
+  place-items: center;
+  color: #2a2218;
+  font-family: var(--book-hand);
+  font-size: 16px;
+}
+#book-app .ency-index-field {
+  display: block;
+  margin: 4px 0 10px;
+  font-family: var(--book-hand);
+  color: #2a2218;
+}
+#book-app .ency-index-field span {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+#book-app .ency-ink-field {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(42, 34, 24, 0.45);
+  font-family: var(--book-hand);
+  font-size: 16px;
+  color: #2a2218;
+  outline: none;
+  padding: 2px 0 4px;
+}
+#book-app .ency-fiche {
+  position: relative;
+  padding: 12px 14px 16px;
+  color: #2a2218;
+  box-shadow: 2px 4px 10px rgba(40, 24, 10, 0.2);
+  transform: rotate(-0.7deg);
+}
+#book-app .ency-polaroid {
+  position: relative;
+  display: inline-block;
+  margin: 8px 10px 14px 6px;
+  padding: 8px 8px 18px;
+  box-shadow: 2px 3px 6px rgba(40, 24, 10, 0.18);
+  transform: rotate(-2.1deg);
+}
+#book-app .ency-polaroid.rot-sp { transform: rotate(1.6deg); }
+#book-app .ency-polaroid img {
+  width: 148px;
+  height: 148px;
+  background: rgba(42, 34, 24, 0.04);
+}
+#book-app .ency-annot {
+  position: absolute;
+  right: -18px;
+  bottom: 10px;
+  max-width: 92px;
+  font-family: var(--book-hand);
+  font-size: 11px;
   line-height: 1.25;
+  color: #2a2218;
+  transform: rotate(8deg);
 }
-#book-app .ency-entry .ency-id {
+#book-app .ency-annot::before {
+  content: "↗";
+  display: block;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+#book-app .ency-block { margin: 8px 0 10px; }
+#book-app .ency-sec {
+  margin: 0 0 4px;
   font-family: var(--book-ui);
   font-size: 10px;
-  color: var(--book-muted);
-  margin-top: 2px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #2a2218;
 }
-#book-app .ency-entry.unknown .ency-label {
-  font-style: italic;
-  color: var(--book-muted);
+#book-app .ency-uses {
+  margin: 0;
+  padding: 0 0 0 2px;
+  list-style: none;
+}
+#book-app .ency-uses li { margin: 3px 0; }
+#book-app .ency-note { margin-top: 10px; }
+#book-app .ency-note-ink {
+  display: block;
+  width: 100%;
+  min-height: 72px;
+  background: transparent;
+  border: 0;
+  outline: none;
+  resize: none;
+  font-family: var(--book-hand);
+  font-size: 15px;
+  line-height: 24px;
+  color: #2a2218;
+  padding: 0 4px;
+}
+#book-app .ency-ink-act {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--book-hand);
+  font-size: 14px;
+  color: #2a2218;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+#book-app .ency-follow {
+  margin-top: 12px;
 }
 
 /* Network ink sketch */
@@ -1522,7 +1673,6 @@
   }
   #book-app .book-edge-tabs { right: -28px; width: 28px; }
   #book-app .book-edge-tabs button { font-size: 9px; padding: 8px 3px; }
-  #book-app .ency-grid { grid-template-columns: 1fr; }
   #book-app .book-index-grid { grid-template-columns: 1fr; }
   #book-app .visit-card { padding-left: 14px; }
   #book-app .visit-card .photo-clip { display: none; }
@@ -2485,6 +2635,7 @@
      cover / outer / binding     tex/leather_cover.png
      left + right pages          tex/paper_aged_new.png
      Accueil glued fiches        tex/paper_aged_new.png (LIGHT crop, not paper_dark)
+     Resource fiche + index slips tex/paper_aged_new.png (LIGHT crop, not paper_dark)
      Notes clips / other docs    tex/paper_dark.png
      new note leaf               tex/paper_aged_new.png (different crop)
      post-its                    tex/postit_{yellow,blue,green,pink}.png
@@ -3061,4 +3212,46 @@
 }
 #book-app .situation-page .sit-k {
   color: #5a4630;
+}
+
+/* ============================================================
+   v2.18.0 — Resources encyclopedia: LIGHT paper crop on fiches
+   leather remains cover/binding only. paper_dark is not writing surface.
+   ============================================================ */
+#book-app .ency-fiche,
+#book-app .ency-slip,
+#book-app .ency-polaroid {
+  background-color: #e8dcc4 !important;
+  background-image: var(--lightSheetTexture) !important;
+  background-repeat: no-repeat !important;
+  color: #2a2218 !important;
+}
+#book-app .ency-fiche {
+  background-size: 165% 165% !important;
+  background-position: 78% 22% !important;
+}
+#book-app .ency-slip {
+  background-size: 190% 190% !important;
+}
+#book-app .ency-slip:nth-child(3n+1) { background-position: 22% 30% !important; }
+#book-app .ency-slip:nth-child(3n+2) { background-position: 70% 18% !important; }
+#book-app .ency-slip:nth-child(3n) { background-position: 40% 72% !important; }
+#book-app .ency-polaroid {
+  background-size: 210% 210% !important;
+  background-position: 36% 64% !important;
+}
+#book-app .ency-note-ink {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 23px,
+    rgba(42, 34, 24, 0.18) 23px,
+    rgba(42, 34, 24, 0.18) 24px
+  );
+}
+#book-app .ency-fiche .hand-note,
+#book-app .ency-fiche .book-page-title,
+#book-app .ency-fiche .book-stamp,
+#book-app .ency-empty .hand-note {
+  color: #2a2218;
 }

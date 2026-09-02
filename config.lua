@@ -108,7 +108,7 @@ Config.Admin = {
     CustomCallback = nil, -- optional function(src) -> boolean (OR with ACE / ESX group)
 }
 
-Config.SchemaVersion = 217
+Config.SchemaVersion = 218
 
 Config.EnableWorldBenchCommand = true
 Config.WorldBenchCommand = 'placeworldbench'
