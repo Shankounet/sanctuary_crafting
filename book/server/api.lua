@@ -23,7 +23,9 @@ lib.callback.register('sanctuary_crafting:book:module', function(src, moduleName
     payload = type(payload) == 'table' and payload or {}
     local m = tostring(moduleName or '')
 
-    if m == 'progression' then
+    if m == 'dashboardExtra' then
+        return { ok = true, data = SurvivalBook.DashboardExtra(src) }
+    elseif m == 'progression' then
         return { ok = true, data = SurvivalBook.GetProgression(src) }
     elseif m == 'nextUnlocks' then
         return { ok = true, data = SurvivalBook.NextUnlocks(src, payload.limit or 12) }

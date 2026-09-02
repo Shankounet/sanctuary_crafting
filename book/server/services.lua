@@ -471,27 +471,58 @@ function SurvivalBook.Search(src, query)
     return hits
 end
 
+local function dashSafe(fn, fallback)
+    local ok, res = pcall(fn)
+    if ok then return res end
+    return fallback
+end
+
+--- Light first paint only. Heavy recipe scans (CanCraftNow / Suggestions /
+--- NextUnlocks / MaintenanceHints) live in DashboardExtra so Accueil never stalls.
 function SurvivalBook.Dashboard(src)
     if not BookDB.Mod('Dashboard') then return {} end
     return {
-        progression = SurvivalBook.GetProgression(src),
-        nextUnlocks = SurvivalBook.NextUnlocks(src, 5),
-        pins = SurvivalBook.ListPins(src),
-        objectives = (function()
-            local all = SurvivalBook.ListObjectives(src)
+        progression = dashSafe(function()
+            return SurvivalBook.GetProgression(src)
+        end, { available = false, levels = {} }),
+        pins = dashSafe(function()
+            return SurvivalBook.ListPins(src)
+        end, {}),
+        objectives = dashSafe(function()
+            local all = SurvivalBook.ListObjectives(src) or {}
             local open = {}
             for i = 1, #all do
                 if not all[i].done then open[#open + 1] = all[i] end
                 if #open >= 5 then break end
             end
             return open
-        end)(),
-        canCraft = SurvivalBook.CanCraftNow(src, 8),
-        suggestions = SurvivalBook.Suggestions(src),
-        productions = SurvivalBook.Productions(src),
-        stats = SurvivalBook.Stats(src),
-        maintenance = SurvivalBook.MaintenanceHints(src),
-        modules = SurvivalBook.EnabledModules(),
+        end, {}),
+        stats = dashSafe(function()
+            return SurvivalBook.Stats(src)
+        end, {}),
+        productions = dashSafe(function()
+            return SurvivalBook.Productions(src)
+        end, { queue = {}, projects = {} }),
+        modules = dashSafe(function()
+            return SurvivalBook.EnabledModules()
+        end, {}),
+    }
+end
+
+function SurvivalBook.DashboardExtra(src)
+    return {
+        nextUnlocks = dashSafe(function()
+            return SurvivalBook.NextUnlocks(src, 5)
+        end, {}),
+        canCraft = dashSafe(function()
+            return SurvivalBook.CanCraftNow(src, 8)
+        end, {}),
+        suggestions = dashSafe(function()
+            return SurvivalBook.Suggestions(src)
+        end, { almost = {}, oneLevel = {} }),
+        maintenance = dashSafe(function()
+            return SurvivalBook.MaintenanceHints(src)
+        end, {}),
     }
 end
 
@@ -511,6 +542,25 @@ end
 
 function SurvivalBook.ShellMeta(src)
     local spec = (Specializations and Specializations.Resolve and Specializations.Resolve(src)) or nil
+    local charName
+    pcall(function()
+        local xPlayer = ESX and ESX.GetPlayerFromId and ESX.GetPlayerFromId(src)
+        if not xPlayer then return end
+        local fn, ln
+        if xPlayer.get then
+            fn = xPlayer.get('firstName') or xPlayer.get('firstname')
+            ln = xPlayer.get('lastName') or xPlayer.get('lastname')
+        end
+        if xPlayer.getFirstName and not fn then fn = xPlayer.getFirstName() end
+        if xPlayer.getLastName and not ln then ln = xPlayer.getLastName() end
+        if fn or ln then
+            charName = (tostring(fn or '') .. ' ' .. tostring(ln or '')):gsub('%s+', ' '):gsub('^%s+', ''):gsub('%s+$', '')
+        elseif xPlayer.getName then
+            charName = xPlayer.getName()
+        elseif xPlayer.name then
+            charName = xPlayer.name
+        end
+    end)
     return {
         accent = (Config.Book and Config.Book.Accent) or '#9a8866',
         theme = (Config.Book and Config.Book.Theme) or 'field_manual',
@@ -521,6 +571,8 @@ function SurvivalBook.ShellMeta(src)
         itemLabels = (OxItemCatalog and OxItemCatalog.UsedLabels and OxItemCatalog.UsedLabels()) or {},
         playerSpec = spec,
         specialization = spec and spec.label or nil,
+        characterName = charName,
+        playerName = charName,
     }
 end
 

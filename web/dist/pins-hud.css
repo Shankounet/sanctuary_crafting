@@ -6,16 +6,24 @@
   --ph-accent: #9a8866;
   --ph-text: #e6e0d4;
   --ph-muted: #9a9488;
-  --ph-ok: #6f9a6a;
-  --ph-almost: #c49a4a;
-  --ph-blocked: #b56a5c;
+  --ph-ok: #7aab74;
+  --ph-almost: #d4a84c;
+  --ph-blocked: #c46b5c;
   --ph-craft: #c4b07a;
   position: fixed;
   top: 22px;
   right: 22px;
   z-index: 2147481800;
-  width: 248px;
+  width: fit-content;
+  height: auto;
   max-width: calc(100vw - 28px);
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   font-family: "Segoe UI", Tahoma, sans-serif;
   color: var(--ph-text);
   pointer-events: none;
@@ -64,6 +72,8 @@
   padding: 0 !important;
 }
 #book-pins-hud .ph-shell {
+  width: 248px;
+  max-width: 100%;
   background: var(--ph-bg);
   border: 1px solid var(--ph-edge);
   border-radius: 4px;
@@ -71,17 +81,23 @@
     0 10px 22px rgba(0, 0, 0, 0.42),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   overflow: hidden;
-  backdrop-filter: blur(2px);
+  pointer-events: auto;
+}
+#book-pins-hud.is-collapsed .ph-shell {
+  width: fit-content;
+  min-width: 196px;
 }
 #book-pins-hud .ph-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px 7px;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px 9px;
   border-bottom: 1px solid var(--ph-line);
 }
 #book-pins-hud.is-collapsed .ph-header {
   border-bottom: 0;
+  cursor: pointer;
 }
 #book-pins-hud .ph-title {
   flex: 1;
@@ -123,6 +139,27 @@
 }
 #book-pins-hud .ph-btn.is-on {
   color: var(--ph-accent);
+  background: rgba(154, 136, 102, 0.2);
+}
+#book-pins-hud .ph-btn#ph-pin:not(.is-on) {
+  color: var(--ph-muted);
+  opacity: 0.72;
+}
+#book-pins-hud .ph-btn#ph-pin.is-on i {
+  transform: rotate(-18deg);
+}
+#book-pins-hud .ph-summary {
+  display: none;
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--ph-muted);
+  letter-spacing: 0.02em;
+  order: 20;
+}
+#book-pins-hud.is-collapsed .ph-summary {
+  display: block;
 }
 #book-pins-hud .ph-list {
   padding: 6px 8px 8px;
@@ -195,8 +232,15 @@
   background: var(--ph-craft);
 }
 #book-pins-hud .ph-more {
-  padding: 2px 8px 2px;
+  display: inline-flex;
+  align-self: flex-start;
+  width: fit-content;
+  margin: 2px 4px 0;
+  padding: 2px 8px;
   font-size: 10px;
   color: var(--ph-accent);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
+  background: rgba(154, 136, 102, 0.12);
+  border: 1px solid rgba(154, 136, 102, 0.22);
+  border-radius: 3px;
 }
