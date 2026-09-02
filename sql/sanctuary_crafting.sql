@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS `sanctuary_book_objectives` (
 
 CREATE TABLE IF NOT EXISTS `sanctuary_book_pins` (
     `identifier` VARCHAR(60) NOT NULL,
-    `recipe_id` VARCHAR(64) NOT NULL,
+    `recipe_id` VARCHAR(80) NOT NULL,
     `sort_order` INT NOT NULL DEFAULT 0,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`identifier`, `recipe_id`)
@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS `sanctuary_book_discovered_resources` (
     `identifier` VARCHAR(60) NOT NULL,
     `item` VARCHAR(64) NOT NULL,
     `discovered_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `note` TEXT NULL,
     PRIMARY KEY (`identifier`, `item`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -227,4 +228,6 @@ CREATE TABLE IF NOT EXISTS `sanctuary_schema_version` (
 --   DELETE gather/skill/blueprint objectives; DROP skill_watch;
 --   DROP discovered_resources.label; DELETE done projects;
 --   DELETE craft_completed history; purge admin_logs older than RetentionDays.
+-- v2.18 (218): ADD discovered_resources.note TEXT NULL (personal note only).
+--   Do NOT store labels/images. Do NOT seed ox items. New player = 0 rows.
 -- Live ALTER — tables are NOT renamed sanctuary_* → craft_*.

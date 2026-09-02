@@ -441,7 +441,9 @@ function SurvivalBook.Search(src, query)
         push('recipe', id, r.label, { category = r.category })
     end
     for _, res in ipairs(SurvivalBook.ListResources(src)) do
-        push('resource', res.item, res.label)
+        if res.state ~= 'spotted' and res.label then
+            push('resource', res.item, res.label)
+        end
     end
     for _, bp in ipairs(SurvivalBook.ListBlueprints(src)) do
         push('blueprint', bp.id, bp.label)

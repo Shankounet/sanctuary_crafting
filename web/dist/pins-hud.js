@@ -157,7 +157,7 @@
       <span class="ph-name"></span>
       <span class="ph-status"></span>
     `;
-    row.querySelector('.ph-name').textContent = p.label || p.recipeId || 'Recette';
+    row.querySelector('.ph-name').textContent = p.label || (p.kind === 'resource' ? 'Ressource' : 'Recette');
     row.querySelector('.ph-status').textContent = status;
     if (craft) {
       const bar = document.createElement('div');

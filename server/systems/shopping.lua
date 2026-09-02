@@ -193,16 +193,49 @@ function ShoppingList.BuildFromPins(src)
         return nil, "shopping_disabled"
     end
     local jobs = {}
+    local extraItems = {}
     if SurvivalBook and SurvivalBook.ListPins then
         local pins = SurvivalBook.ListPins(src) or {}
         for i = 1, #pins do
-            local rid = pins[i].recipeId or pins[i]
-            if type(rid) == "string" then
-                jobs[#jobs + 1] = { recipeId = rid, batch = 1, label = pins[i].label }
+            local pin = pins[i]
+            local rid = pin.recipeId or pin
+            if pin.kind == 'resource' or (type(rid) == 'string' and rid:sub(1, 4) == 'res:') then
+                local item = pin.item
+                if (not item or item == '') and type(rid) == 'string' then
+                    item = rid:sub(5)
+                end
+                if type(item) == 'string' and item ~= '' then
+                    extraItems[#extraItems + 1] = item
+                end
+            elseif type(rid) == 'string' then
+                jobs[#jobs + 1] = { recipeId = rid, batch = 1, label = pin.label }
             end
         end
     end
-    local list = ShoppingList.ExpandNeeds(src, jobs)
+    local list = ShoppingList.ExpandNeeds(src, jobs) or {}
+    local haveIdx = {}
+    for i = 1, #list do
+        if list[i].item then haveIdx[list[i].item] = i end
+    end
+    for i = 1, #extraItems do
+        local item = extraItems[i]
+        if not haveIdx[item] then
+            local owned = invCount(src, item)
+            local remaining = math.max(0, 1 - owned)
+            if remaining > 0 then
+                list[#list + 1] = {
+                    item = item,
+                    label = itemLab(item),
+                    need = 1,
+                    owned = owned,
+                    remaining = remaining,
+                    count = remaining,
+                    sources = {},
+                }
+                haveIdx[item] = #list
+            end
+        end
+    end
     -- also keep a flat map for legacy NUI shop panel
     local map = {}
     for i = 1, #list do

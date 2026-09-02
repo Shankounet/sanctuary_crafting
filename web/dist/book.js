@@ -12,7 +12,13 @@
     meta: {},
     planFilter: 'known',
     indexOpen: false,
+    resSelId: null,
+    resQ: '',
+    resPeek: null,
+    resList: [],
   };
+
+  const OX_IMG_BASE = 'nui://ox_inventory/web/images/';
 
   /* Primary edge tabs — short labels so they do not clip */
   const PRIMARY_TABS = [
@@ -109,6 +115,25 @@
     if (it.known === false || it.label === '???') return 'Ressource inconnue';
     if (it.label && it.label !== '???') return it.label;
     return humanizeItemId(it.item || it.id || it.recipeId) || 'Objet';
+  }
+
+  function oxImageUrl(entry) {
+    if (!entry || entry.state === 'spotted') return '';
+    const raw = entry.image && String(entry.image);
+    if (raw && /^(nui|https?):\/\//i.test(raw)) return raw;
+    if (raw && raw.indexOf('/') >= 0) return raw;
+    const file = raw || (entry.item ? String(entry.item) + '.png' : '');
+    if (!file) return '';
+    const base = file.replace(/\.png$/i, '');
+    return OX_IMG_BASE + encodeURIComponent(base) + '.png';
+  }
+
+  function encyDateFr(ts) {
+    const p = parisDateParts(ts);
+    if (!p) return '';
+    const months = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+    const name = months[Number(p.month) - 1] || '';
+    return (p.day + ' ' + name + ' ' + p.year).trim();
   }
 
   function emptyPhrase(kind) {
@@ -872,38 +897,246 @@
   }
 
 
-  /* ========== RESOURCES ========== */
+  /* ========== RESOURCES (encyclopédie de terrain) ========== */
+  function paintResources() {
+    const arr = state.resList || [];
+    const q = String(state.resQ || '').trim().toLowerCase();
+    const shown = arr.filter((x) => {
+      if (!q) return true;
+      if (x.state === 'spotted') return false;
+      const lab = String(x.label || '').toLowerCase();
+      return lab.indexOf(q) >= 0;
+    });
+    let selected = null;
+    if (state.resSelId != null) {
+      selected = arr.find((x) => x.id === state.resSelId) || null;
+    }
+
+    let left;
+    if (state.resPeek) {
+      const pk = state.resPeek;
+      const role = pk.role === 'result'
+        ? 'Résultat connu de cet assemblage.'
+        : 'Sert d’ingrédient dans cet assemblage.';
+      left = `
+        <div class="ency-fiche">
+          <span class="tape top-l"></span>
+          <p class="hand-note"><a href="#" class="hand-link" data-act="back-res">← retour à la fiche</a></p>
+          <p class="book-stamp">Schéma noté</p>
+          <h2 class="book-page-title">${esc(pk.label || 'Assemblage')}</h2>
+          <hr class="ink-rule" />
+          <p class="hand-note">${esc(role)}</p>
+        </div>${folio('50')}`;
+    } else if (!selected) {
+      left = `
+        <div class="ency-empty">
+          <p class="book-stamp">Encyclopédie de terrain</p>
+          <h2 class="book-page-title">Fiche</h2>
+          <p class="hand-note pencil">Rien de documenté pour l’instant.</p>
+          <span class="ink-sketch tool" aria-hidden="true"></span>
+        </div>${folio('50')}`;
+    } else if (selected.state === 'spotted') {
+      left = `
+        <div class="ency-fiche spotted">
+          <span class="tape top-r"></span>
+          <p class="book-stamp">Croquis incomplet</p>
+          <h2 class="book-page-title">Non identifié</h2>
+          <div class="ency-polaroid rot-sp">
+            <span class="tape top-l"></span>
+            <div class="ency-sil" aria-hidden="true"><span>?</span></div>
+          </div>
+          <p class="hand-note">Objet encore non identifié.</p>
+          <p class="ency-st">repéré</p>
+        </div>${folio('50')}`;
+    } else {
+      const documented = selected.state === 'documented';
+      const img = oxImageUrl(selected);
+      const annot = documented && selected.annot
+        ? `<span class="ency-annot">${esc(selected.annot)}</span>`
+        : '';
+      const obs = documented && selected.description
+        ? `<div class="ency-block"><p class="ency-sec">Observations</p><p class="hand-note">${esc(selected.description)}</p></div>`
+        : '';
+      const uses = (documented && Array.isArray(selected.knownUses) && selected.knownUses.length)
+        ? `<div class="ency-block"><p class="ency-sec">Utilisations connues</p><ul class="ency-uses">${selected.knownUses.map((u, ui) =>
+            `<li><a href="#" class="hand-link" data-act="use" data-ui="${ui}">${esc(u.label || 'assemblage')}</a></li>`
+          ).join('')}</ul></div>`
+        : '';
+      const found = documented && selected.discoveredAt
+        ? `<p class="hand-note">Dernière découverte : ${esc(encyDateFr(selected.discoveredAt))}</p>`
+        : (selected.discoveredAt ? `<p class="hand-note">Dernière découverte : ${esc(encyDateFr(selected.discoveredAt))}</p>` : '');
+      const noteVal = documented ? (selected.note || '') : (selected.note || '');
+      const noteBlock = (selected.state === 'identified' || documented) ? `
+          <div class="ency-note">
+            <p class="ency-sec">Note personnelle</p>
+            <textarea class="ency-note-ink" id="ency-note" rows="3" placeholder="quelques mots au crayon…">${esc(noteVal)}</textarea>
+            <button type="button" class="ency-ink-act" data-act="save-note">noter</button>
+          </div>` : '';
+      const follow = (selected.state === 'identified' || documented) ? `
+          <button type="button" class="note-stamp ency-follow" data-act="follow">${selected.pinned ? 'NE PLUS SUIVRE' : 'SUIVRE CETTE RESSOURCE'}</button>` : '';
+      left = `
+        <div class="ency-fiche">
+          <span class="tape top-l"></span>
+          <p class="book-stamp">Fiche de terrain</p>
+          <h2 class="book-page-title">${esc(selected.label || '')}</h2>
+          <p class="ency-st">${documented ? 'documenté' : 'identifié'}</p>
+          <div class="ency-polaroid">
+            <span class="tape top-r"></span>
+            ${img ? `<img class="ency-ox" alt="${esc(selected.label || '')}" />` : '<div class="ency-sil" aria-hidden="true"></div>'}
+            ${annot}
+          </div>
+          ${obs}
+          ${uses}
+          ${found}
+          ${noteBlock}
+          ${follow}
+        </div>${folio('50')}`;
+    }
+
+    const filterHtml = arr.length >= 8 ? `
+        <label class="ency-index-field">
+          <span>repères</span>
+          <input type="text" class="ency-ink-field" id="ency-q" value="${esc(state.resQ || '')}" autocomplete="off" />
+        </label>` : '';
+
+    let slips;
+    if (!arr.length) {
+      slips = `<p class="hand-note pencil">Les feuillets restent blancs. Rien vu de près.</p>
+        <span class="ink-sketch plant" aria-hidden="true"></span>`;
+    } else if (!shown.length) {
+      slips = `<p class="hand-note pencil">Rien sous ce repère.</p>`;
+    } else {
+      slips = `<div class="ency-index">${shown.map((x, i) => {
+        const on = x.id === state.resSelId ? ' is-on' : '';
+        const st = x.state === 'spotted' ? 'repéré' : (x.state === 'documented' ? 'documenté' : 'identifié');
+        if (x.state === 'spotted') {
+          return `<article class="ency-slip spotted${on}" data-idx="${i}">
+            <div class="ency-sil" aria-hidden="true"><span>?</span></div>
+            <div class="ency-name">???</div>
+            <div class="ency-st">${st}</div>
+          </article>`;
+        }
+        const img = oxImageUrl(x);
+        return `<article class="ency-slip${on}" data-idx="${i}">
+          <div class="ency-thumb">${img ? `<img class="ency-ox" alt="${esc(x.label || '')}" />` : '<div class="ency-sil" aria-hidden="true"></div>'}</div>
+          <div class="ency-name">${esc(x.label || '')}</div>
+          <div class="ency-st">${st}</div>
+        </article>`;
+      }).join('')}</div>`;
+    }
+
+    const right = `
+      <p class="book-stamp">Index des matériaux</p>
+      <h2 class="book-page-title">Ressources</h2>
+      <p class="hand-note">On n’inscrit que ce qu’on a vu de près.</p>
+      <hr class="ink-rule" />
+      ${filterHtml}
+      ${slips}${folio('51')}`;
+
+    setPages(left, right);
+    const L0 = leftEl();
+    const R0 = rightEl();
+    if (L0 && selected && selected.state !== 'spotted') {
+      const im = L0.querySelector('img.ency-ox');
+      if (im) {
+        const url = oxImageUrl(selected);
+        im.onerror = () => { im.hidden = true; };
+        if (url) im.src = url;
+        else im.hidden = true;
+      }
+    }
+    if (R0) {
+      R0.querySelectorAll('.ency-slip').forEach((el, i) => {
+        const row = shown[i];
+        const im = el.querySelector('img.ency-ox');
+        if (!im || !row) return;
+        const url = oxImageUrl(row);
+        im.onerror = () => { im.hidden = true; };
+        if (url) im.src = url;
+        else im.hidden = true;
+      });
+    }
+
+    const L = leftEl();
+    const R = rightEl();
+    if (R) {
+      R.querySelectorAll('.ency-slip').forEach((el) => {
+        el.onclick = () => {
+          const idx = Number(el.getAttribute('data-idx'));
+          const row = shown[idx];
+          if (!row) return;
+          state.resSelId = row.id;
+          state.resPeek = null;
+          paintResources();
+        };
+      });
+      const qEl = R.querySelector('#ency-q');
+      if (qEl) {
+        qEl.oninput = () => {
+          state.resQ = qEl.value || '';
+          state._resCaret = qEl.selectionStart;
+          paintResources();
+        };
+        if (state._resCaret != null) {
+          try {
+            qEl.focus();
+            const n = qEl.value.length;
+            const c = Math.max(0, Math.min(state._resCaret, n));
+            qEl.setSelectionRange(c, c);
+          } catch (_) {}
+        }
+      }
+    }
+    if (L) {
+      L.querySelectorAll('[data-act]').forEach((btn) => {
+        btn.onclick = async (ev) => {
+          ev.preventDefault();
+          const act = btn.getAttribute('data-act');
+          const cur = (state.resList || []).find((x) => x.id === state.resSelId);
+          if (act === 'back-res') {
+            state.resPeek = null;
+            paintResources();
+            return;
+          }
+          if (act === 'use') {
+            const ui = Number(btn.getAttribute('data-ui'));
+            const use = cur && Array.isArray(cur.knownUses) ? cur.knownUses[ui] : null;
+            if (use && use.label) {
+              state.resPeek = { label: use.label, role: use.role, recipeId: use.recipeId };
+              paintResources();
+            }
+            return;
+          }
+          if (!cur || cur.state === 'spotted' || !cur.item) return;
+          if (act === 'follow') {
+            await post('bookAction', {
+              action: cur.pinned ? 'unpin' : 'pin',
+              payload: { kind: 'resource', item: cur.item },
+            });
+            await renderResources();
+            return;
+          }
+          if (act === 'save-note') {
+            const ta = L.querySelector('#ency-note');
+            const note = ta ? ta.value : '';
+            await post('bookAction', {
+              action: 'saveResourceNote',
+              payload: { item: cur.item, note },
+            });
+            await renderResources();
+          }
+        };
+      });
+    }
+  }
+
   async function renderResources() {
     const r = await loadModule('resources');
-    const arr = (r && r.data) || [];
-    const left = `
-      <p class="book-stamp">Encyclopédie de terrain</p>
-      <h2 class="book-page-title">Ressources</h2>
-      <p class="hand-note">Silhouettes jusqu'à découverte — on n'écrit que ce qu'on a vu.</p>
-      <hr class="ink-rule" />
-      <p class="hand-note">Marquer « Non identifié » tant que l'objet n'a pas été vu de près.</p>
-      <span class="ink-sketch plant" aria-hidden="true"></span>
-      ${folio('50')}`;
-    let right;
-    if (!arr.length) {
-      right = emptyBox('fa-boxes-stacked', 'Codex vide', 'Craft et explorations révèlent les ressources.') +
-        `<div class="ency-grid" style="margin-top:10px">${Array.from({ length: 4 }).map(() => `
-          <article class="ency-entry unknown">
-            <div class="sil">?</div>
-            <div class="ency-label">Non identifié</div>
-            <div class="ency-id">???</div>
-          </article>`).join('')}</div>` + folio('51');
-    } else {
-      right = `<div class="ency-grid">${arr.map((x) => {
-        const unknown = !x.label || x.label === '???' || x.known === false;
-        return `<article class="ency-entry ${unknown ? 'unknown' : 'known'}">
-          <div class="sil">${unknown ? '?' : '◆'}</div>
-          <div class="ency-label">${unknown ? 'Non identifié' : esc(displayItem(x))}</div>
-          <div class="ency-id">${unknown ? '???' : ''}</div>
-        </article>`;
-      }).join('')}</div>${folio('51')}`;
+    state.resList = (r && r.data) || [];
+    if (state.resSelId && !(state.resList || []).some((x) => x.id === state.resSelId)) {
+      state.resSelId = null;
     }
-    setPages(left, right);
+    paintResources();
   }
 
 
@@ -1296,7 +1529,7 @@
     const right = `${arr.length ? arr.map((p) => `
       <article class="dossier-sheet">
         <span class="paperclip"></span>
-        <div class="dossier-mark">Épingle</div>
+        <div class="dossier-mark">${p.kind === 'resource' ? 'Ressource' : 'Épingle'}</div>
         <h4>${esc(p.label)}</h4>
         <div class="dossier-meta">${p.category ? `<span class="badge">${esc(prettySkill(p.category))}</span>` : ''}</div>
         <div class="row-actions">
