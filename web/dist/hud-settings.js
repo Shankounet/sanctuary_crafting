@@ -4,6 +4,7 @@
   const KEY_MODE = 'sanctuary_hud.trackerMode';
   const KEY_PINS = 'sanctuary_hud.pinsVisible';
   const KEY_POS = 'sanctuary_hud.trackerPos';
+  const KEY_XY = 'craftTrackerPosition';
   const OLD_MODE = 'sc_tracker_mode';
   const OLD_POS = 'sc_tracker_pos';
   const OLD_COLLAPSE = 'sanctuary_crafting:pinsHudCollapsed';
@@ -75,6 +76,15 @@
       const migrated = parsePos(lsGet(OLD_POS));
       if (migrated) lsSet(KEY_POS, JSON.stringify(migrated));
     }
+    if (!lsGet(KEY_XY)) {
+      const pos = parsePos(lsGet(KEY_POS));
+      if (pos) {
+        const w = 292;
+        const x = Math.round((window.innerWidth || 800) - (pos.right || 24) - w);
+        const y = Math.round(pos.top);
+        lsSet(KEY_XY, JSON.stringify({ x, y }));
+      }
+    }
     return { mode: normalizeMode(lsGet(KEY_MODE)), pinsVisible: parsePinsVisible(lsGet(KEY_PINS)) };
   }
 
@@ -125,6 +135,17 @@
   function writePos(pos, opts) {
     const parsed = parsePos(pos) || DEFAULT_POS;
     lsSet(KEY_POS, JSON.stringify(parsed));
+    let x = pos && Number(pos.x);
+    let y = pos && Number(pos.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      const w = 292;
+      x = Math.round((window.innerWidth || 800) - (parsed.right || 24) - w);
+      y = Math.round(parsed.top);
+    } else {
+      x = Math.round(x);
+      y = Math.round(y);
+    }
+    lsSet(KEY_XY, JSON.stringify({ x, y }));
     if (!(opts && opts.silent)) emit({ trackerPos: parsed, source: (opts && opts.source) || 'store' });
     return parsed;
   }
@@ -133,9 +154,15 @@
     lsDel(OLD_MODE);
     lsDel(OLD_POS);
     lsDel(OLD_COLLAPSE);
+    lsDel(KEY_XY);
     lsSet(KEY_MODE, 'expanded');
     lsSet(KEY_PINS, '1');
     lsSet(KEY_POS, JSON.stringify(DEFAULT_POS));
+    {
+      const w = 292;
+      const x = Math.round((window.innerWidth || 800) - (DEFAULT_POS.right || 24) - w);
+      lsSet(KEY_XY, JSON.stringify({ x, y: DEFAULT_POS.top }));
+    }
     post('hudReset', {});
     post('bookToggleHud', { enabled: true });
     post('hudSettingsPins', { visible: true });
@@ -231,8 +258,8 @@
   refreshPanel();
 
   /* Tests A–G (structurally true — no FiveM runtime):
-   * A compact: #ct-expand ↗ + shell click → expanded (tracker.js maybeExpandFromClick)
-   * B minimal: click shell/minimal → expanded; pointer-events auto; no overlay
+   * A compact: header [+] / reduced body click → expanded
+   * B minimal: same reduced chrome as compact; [+] returns to expanded (not trapped)
    * C hidden → settings Afficher tracker → writeMode('expanded')
    * D pins hide → pinsVisible=false only; settings Afficher épingles → true; Lua never pins=[]
    * E hidden pins/tracker: display:none + width/height 0 (no 248/292px CEF box)

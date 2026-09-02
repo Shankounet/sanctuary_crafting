@@ -3,11 +3,14 @@
   const IMG_BASE = 'nui://ox_inventory/web/images/';
   const LS_PIN = 'sc_tracker_pin';
   const LS_MODE = 'sc_tracker_mode'; /* legacy — mapped via SanctuaryHud */
-  const LS_POS = 'sc_tracker_pos'; /* legacy */
+  const LS_POS = 'sc_tracker_pos'; /* legacy top/right */
+  const LS_POS_XY = 'craftTrackerPosition'; /* {x, y} — required NUI key */
   const HUD = () => window.SanctuaryHud;
   const MODES = ['expanded', 'compact', 'minimal', 'hidden'];
-  const CYCLE = ['expanded', 'compact', 'minimal'];
   const DRAG_THRESHOLD = 6;
+  const DEFAULT_POS = { top: 24, right: 24 };
+  const EDGE = 8;
+  const MIN_VISIBLE = 40;
 
   const root = document.getElementById('craft-tracker');
   if (!root) return;
@@ -16,14 +19,12 @@
     list: root.querySelector('#ct-list'),
     count: root.querySelector('#ct-count'),
     pin: root.querySelector('#ct-pin'),
-    mode: root.querySelector('#ct-mode'),
-    reset: root.querySelector('#ct-reset'),
     header: root.querySelector('#ct-header'),
-    grip: root.querySelector('#ct-grip'),
-    expand: root.querySelector('#ct-expand'),
-    hide: root.querySelector('#ct-hide'),
-    minimal: root.querySelector('#ct-minimal'),
-    minimalCount: root.querySelector('#ct-minimal-count'),
+    reduce: root.querySelector('#ct-reduce'),
+    reduced: root.querySelector('#ct-reduced'),
+    reducedCount: root.querySelector('#ct-reduced-count'),
+    reducedPct: root.querySelector('#ct-reduced-pct'),
+    waiting: root.querySelector('#ct-waiting'),
   };
 
   let config = {
@@ -174,11 +175,7 @@
     mode = normalizeMode(next);
     root.classList.remove('mode-normal', 'mode-compact', 'mode-minimal', 'mode-expanded', 'mode-hidden');
     root.classList.add(`mode-${mode}`);
-    if (els.expand) els.expand.classList.toggle('is-shown', mode === 'compact');
-    if (els.mode) {
-      els.mode.setAttribute('aria-label', 'Changer le mode');
-      els.mode.title = mode === 'expanded' ? 'Passer en compact' : (mode === 'compact' ? 'Passer en minimal' : 'Agrandir');
-    }
+    syncReduceButton();
     if (config.persistMode !== false) {
       const hud = HUD();
       if (hud && typeof hud.writeMode === 'function') {
@@ -198,48 +195,207 @@
     updateVisibility();
   }
 
+  function syncReduceButton() {
+    if (!els.reduce) return;
+    const reduced = mode !== 'expanded';
+    els.reduce.title = reduced ? 'Agrandir' : 'Réduire';
+    els.reduce.setAttribute('aria-label', reduced ? 'Agrandir' : 'Réduire');
+    const ico = els.reduce.querySelector('i');
+    if (ico) ico.className = reduced ? 'fa-solid fa-plus' : 'fa-solid fa-minus';
+  }
+
+  function syncPinButton() {
+    if (!els.pin) return;
+    els.pin.classList.toggle('is-on', pinned);
+    els.pin.setAttribute('aria-pressed', pinned ? 'true' : 'false');
+    const tip = pinned ? 'Retirer l’épingle' : 'Épingler le widget';
+    els.pin.title = tip;
+    els.pin.setAttribute('aria-label', tip);
+  }
+
   function applyPin(next) {
     pinned = !!next;
-    if (els.pin) els.pin.classList.toggle('is-on', pinned);
-    if (els.pin) els.pin.setAttribute('aria-pressed', pinned ? 'true' : 'false');
+    syncPinButton();
     if (config.persistPin !== false) lsSet(LS_PIN, pinned ? '1' : '0');
     post('trackerPin', { pinned });
     updateVisibility();
   }
 
-  function applyPosition(pos) {
-    if (!pos) return;
-    if (pos.top != null) {
-      root.style.top = `${pos.top}px`;
-      root.style.bottom = 'auto';
+  function widgetSize() {
+    const rect = root.getBoundingClientRect();
+    const compact = mode === 'compact' || mode === 'minimal';
+    const w = rect.width > 1 ? rect.width : (compact ? 220 : 292);
+    const h = rect.height > 1 ? rect.height : 56;
+    return { w, h };
+  }
+
+  function isFiniteNum(n) {
+    return typeof n === 'number' && Number.isFinite(n);
+  }
+
+  function onScreen(x, y, w, h) {
+    if (!isFiniteNum(x) || !isFiniteNum(y) || !isFiniteNum(w) || !isFiniteNum(h)) return false;
+    const vw = window.innerWidth || 0;
+    const vh = window.innerHeight || 0;
+    if (vw < 2 || vh < 2) return true;
+    if (x + w < MIN_VISIBLE || y + h < MIN_VISIBLE) return false;
+    if (x > vw - MIN_VISIBLE || y > vh - MIN_VISIBLE) return false;
+    return true;
+  }
+
+  function clampXY(x, y) {
+    const { w, h } = widgetSize();
+    const vw = window.innerWidth || 800;
+    const vh = window.innerHeight || 600;
+    const maxX = Math.max(EDGE, vw - w - EDGE);
+    const maxY = Math.max(EDGE, vh - h - EDGE);
+    return {
+      x: Math.round(Math.max(EDGE, Math.min(maxX, x))),
+      y: Math.round(Math.max(EDGE, Math.min(maxY, y))),
+    };
+  }
+
+  function applyDefaultTopRight() {
+    const pos = (HUD() && HUD().DEFAULT_POS) || config.defaultPosition || DEFAULT_POS;
+    const top = isFiniteNum(Number(pos.top)) ? Number(pos.top) : 24;
+    const right = isFiniteNum(Number(pos.right)) ? Number(pos.right) : 24;
+    root.style.top = `${top}px`;
+    root.style.right = `${right}px`;
+    root.style.left = 'auto';
+    root.style.bottom = 'auto';
+  }
+
+  function applyXY(x, y) {
+    const { w, h } = widgetSize();
+    if (!onScreen(x, y, w, h)) {
+      applyDefaultTopRight();
+      return false;
     }
-    if (pos.right != null) {
-      root.style.right = `${pos.right}px`;
-      root.style.left = 'auto';
-    }
-    if (pos.left != null) {
-      root.style.left = `${pos.left}px`;
-      root.style.right = 'auto';
-    }
-    if (pos.bottom != null) {
-      root.style.bottom = `${pos.bottom}px`;
-      root.style.top = 'auto';
+    const c = clampXY(x, y);
+    root.style.left = `${c.x}px`;
+    root.style.top = `${c.y}px`;
+    root.style.right = 'auto';
+    root.style.bottom = 'auto';
+    return true;
+  }
+
+  function parseXY(raw) {
+    if (!raw) return null;
+    try {
+      const o = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!o || typeof o !== 'object') return null;
+      const x = Number(o.x);
+      const y = Number(o.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+      return { x, y };
+    } catch (_) {
+      return null;
     }
   }
 
-  function savePositionFromStyle() {
-    const top = parseInt(root.style.top || config.defaultPosition.top || 24, 10);
-    const right = parseInt(root.style.right || config.defaultPosition.right || 24, 10);
-    const payload = { top, right };
-    persistPos(payload);
-    post('trackerPosition', payload);
+  function parseLegacyPos(raw) {
+    if (!raw) return null;
+    try {
+      const o = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!o || typeof o !== 'object') return null;
+      if (Number.isFinite(Number(o.x)) && Number.isFinite(Number(o.y))) {
+        return { x: Number(o.x), y: Number(o.y) };
+      }
+      const top = Number(o.top);
+      const right = Number(o.right);
+      if (!Number.isFinite(top) || !Number.isFinite(right)) return null;
+      const { w } = widgetSize();
+      return { x: (window.innerWidth || 800) - right - w, y: top };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function applyPosition(pos) {
+    if (!pos) {
+      applyDefaultTopRight();
+      return;
+    }
+    const xy = parseXY(pos) || parseLegacyPos(pos);
+    if (!xy) {
+      applyDefaultTopRight();
+      return;
+    }
+    applyXY(xy.x, xy.y);
+  }
+
+  function currentXY() {
+    const rect = root.getBoundingClientRect();
+    if (rect.width > 1) return { x: Math.round(rect.left), y: Math.round(rect.top) };
+    const left = parseInt(root.style.left, 10);
+    const top = parseInt(root.style.top, 10);
+    if (Number.isFinite(left) && Number.isFinite(top)) return { x: left, y: top };
+    return null;
   }
 
   function persistPos(payload) {
     if (config.persistPosition === false) return;
     const hud = HUD();
     if (hud && typeof hud.writePos === 'function') hud.writePos(payload, { silent: true });
-    else lsSet(LS_POS, JSON.stringify(payload));
+    else lsSet(LS_POS, JSON.stringify({ top: payload.top, right: payload.right }));
+    if (isFiniteNum(payload.x) && isFiniteNum(payload.y)) {
+      lsSet(LS_POS_XY, JSON.stringify({ x: payload.x, y: payload.y }));
+    }
+  }
+
+  function persistAndPostXY(x, y) {
+    const { w, h } = widgetSize();
+    if (!onScreen(x, y, w, h)) {
+      applyDefaultTopRight();
+      const fallback = currentXY();
+      if (!fallback) {
+        const def = (HUD() && HUD().DEFAULT_POS) || config.defaultPosition || DEFAULT_POS;
+        const payload = {
+          top: def.top || 24,
+          right: def.right || 24,
+          x: (window.innerWidth || 800) - (def.right || 24) - w,
+          y: def.top || 24,
+        };
+        persistPos(payload);
+        post('trackerPosition', payload);
+        return;
+      }
+      x = fallback.x;
+      y = fallback.y;
+    }
+    const c = clampXY(x, y);
+    root.style.left = `${c.x}px`;
+    root.style.top = `${c.y}px`;
+    root.style.right = 'auto';
+    root.style.bottom = 'auto';
+    const { w: ww } = widgetSize();
+    const payload = {
+      x: c.x,
+      y: c.y,
+      top: c.y,
+      right: Math.round((window.innerWidth || 800) - c.x - ww),
+      left: c.x,
+    };
+    persistPos(payload);
+    post('trackerPosition', payload);
+  }
+
+  function restorePosition() {
+    const hud = HUD();
+    const stored = parseXY(lsGet(LS_POS_XY, ''));
+    if (stored) {
+      if (!applyXY(stored.x, stored.y)) applyDefaultTopRight();
+      return;
+    }
+    let legacy = null;
+    try {
+      const hudPos = hud && hud.readPos && hud.readPos();
+      legacy = parseLegacyPos(hudPos) || parseLegacyPos(lsGet(LS_POS, ''));
+    } catch (_) {
+      legacy = null;
+    }
+    if (legacy && applyXY(legacy.x, legacy.y)) return;
+    applyDefaultTopRight();
   }
 
   function activeJobCount() {
@@ -253,13 +409,18 @@
   function updateVisibility() {
     root.classList.remove('hidden-panel');
     const hasJobs = jobs.size > 0;
-    /* Explicit hidden mode is the only hide. Do not mix pin+hideWithMenuIfUnpinned
-       into a leftover 292px box. Pin stays pin; close sets mode=hidden. */
-    const shown = config.enabled !== false && hasJobs && mode !== 'hidden';
+    const hideUnpinned = config.hideWithMenuIfUnpinned !== false;
+    /* Pin = stay visible after menu close. Unpin hides when menu closes / idle.
+       HUD mode=hidden still hides. Never destroy the queue. */
+    let shown = config.enabled !== false && hasJobs && mode !== 'hidden';
+    if (shown && !pinned && hideUnpinned && !menuOpen) shown = false;
     root.classList.toggle('is-visible', !!shown);
     root.classList.toggle('is-hidden', !shown);
     root.setAttribute('aria-hidden', shown ? 'false' : 'true');
-    if (els.minimal) els.minimal.setAttribute('aria-hidden', mode === 'minimal' && shown ? 'false' : 'true');
+    if (els.reduced) {
+      const reduced = mode === 'compact' || mode === 'minimal';
+      els.reduced.setAttribute('aria-hidden', reduced && shown ? 'false' : 'true');
+    }
   }
 
   function phaseLabel(entry, progress) {
@@ -269,10 +430,10 @@
     if (st === 'done' || st === 'completed' || st === 'completing' || p >= 1) {
       return 'FABRICATION TERMINÉE';
     }
-    if (entry.stepLabel && (entry.totalSteps > 1 || st === 'queued')) {
+    if (st === 'queued') return 'EN ATTENTE';
+    if (entry.stepLabel && entry.totalSteps > 1) {
       return entry.stepLabel;
     }
-    if (st === 'queued') return entry.stepLabel || 'En file';
     const family = entry.phaseFamily || 'default';
     const phases = (config.phases && (config.phases[family] || config.phases.default)) || ['Préparation', 'Assemblage', 'Finition'];
     const idx = Math.min(phases.length - 1, Math.floor(Math.min(0.999, p) * phases.length));
@@ -429,7 +590,7 @@
     el.querySelector('.ct-time').textContent =
       entry.status === 'error' ? 'Échec'
         : visualDone ? 'Terminé'
-          : entry.status === 'queued' ? `File · ${formatRemain(remain)}`
+          : entry.status === 'queued' ? `EN ATTENTE · ${formatRemain(remain)}`
             : formatRemain(remain);
     const dismiss = el.querySelector('.ct-dismiss');
     // Hide cancel/dismiss while completing at 100% — card auto-removes after linger
@@ -453,12 +614,46 @@
     return el;
   }
 
+  function liveJobCount(arr) {
+    const n = arr.filter((j) => j.status !== 'done' && j.status !== 'error').length;
+    return n || arr.length;
+  }
+
+  function primaryProgressPct(arr) {
+    const live = arr.find((j) => j.status === 'active')
+      || arr.find((j) => j.status === 'queued' || j.status === 'paused')
+      || arr[0];
+    if (!live) return 0;
+    return Math.round(computeProgress(live).pct * 100);
+  }
+
+  function paintReduced(arr) {
+    const n = liveJobCount(arr);
+    const pct = primaryProgressPct(arr);
+    if (els.reducedCount) els.reducedCount.textContent = String(n);
+    if (els.reducedPct) els.reducedPct.textContent = `${pct}%`;
+  }
+
+  function paintWaiting(arr) {
+    if (!els.waiting) return;
+    const extra = Math.max(0, arr.length - 1);
+    if (extra > 0) {
+      els.waiting.hidden = false;
+      els.waiting.textContent = `+${extra} en attente`;
+    } else {
+      els.waiting.hidden = true;
+      els.waiting.textContent = '';
+    }
+  }
+
   function render() {
     if (!els.list) return;
     els.list.innerHTML = '';
     const arr = Array.from(jobs.values()).sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
-    if (els.count) els.count.textContent = String(arr.filter((j) => j.status !== 'done' && j.status !== 'error').length || arr.length);
-    if (els.minimalCount) els.minimalCount.textContent = String(activeJobCount());
+    const n = liveJobCount(arr);
+    if (els.count) els.count.textContent = String(n);
+    paintReduced(arr);
+    paintWaiting(arr);
 
     if (!arr.length) {
       const empty = document.createElement('div');
@@ -467,7 +662,10 @@
       els.list.appendChild(empty);
       return;
     }
-    arr.forEach((j) => els.list.appendChild(renderJob(j)));
+    const primary = arr.find((j) => j.status === 'active')
+      || arr.find((j) => j.status === 'queued' || j.status === 'paused')
+      || arr[0];
+    els.list.appendChild(renderJob(primary));
   }
 
   function tickVisual() {
@@ -484,12 +682,15 @@
         if (pctEl) pctEl.textContent = `${Math.round(pct * 100)}%`;
         if (time) {
           time.textContent = entry.status === 'queued'
-            ? `File · ${formatRemain(remain)}`
+            ? `EN ATTENTE · ${formatRemain(remain)}`
             : (remain <= 0 ? 'Terminé' : formatRemain(remain));
         }
         if (phase) phase.textContent = phaseLabel(entry, pct);
         const dismiss = node.querySelector('.ct-dismiss');
         if (dismiss && remain <= 0) dismiss.classList.add('hidden');
+      }
+      if (els.reducedPct && entry.status === 'active') {
+        els.reducedPct.textContent = `${Math.round(pct * 100)}%`;
       }
       if (remain <= 0 && !completing.has(entry.craftId)) {
         completing.add(entry.craftId);
@@ -589,11 +790,12 @@
     }
   }
 
-  // Drag — grip only. Threshold so a click-to-expand is not a drag.
+  // Drag from empty header (not PIN / reduce). Threshold so a click is not a drag.
   function onPointerDown(ev) {
     if (config.allowDrag === false) return;
-    if (mode === 'minimal') return;
+    if (ev.button != null && ev.button !== 0) return;
     if (ev.target.closest('button')) return;
+    if (!els.header || !els.header.contains(ev.target)) return;
     const rect = root.getBoundingClientRect();
     drag = {
       ox: ev.clientX - rect.left,
@@ -605,7 +807,6 @@
       moved: false,
     };
     dragMoved = false;
-    /* no preventDefault — expand click must still fire */
   }
 
   function onPointerMove(ev) {
@@ -614,11 +815,12 @@
     const dy = ev.clientY - drag.startY;
     if (!drag.moved && (dx * dx + dy * dy) >= DRAG_THRESHOLD * DRAG_THRESHOLD) {
       drag.moved = true;
+      root.classList.add('is-dragging');
     }
     if (!drag.moved) return;
     dragMoved = true;
-    const left = Math.max(8, Math.min(window.innerWidth - drag.w - 8, ev.clientX - drag.ox));
-    const top = Math.max(8, Math.min(window.innerHeight - drag.h - 8, ev.clientY - drag.oy));
+    const left = Math.max(EDGE, Math.min(window.innerWidth - drag.w - EDGE, ev.clientX - drag.ox));
+    const top = Math.max(EDGE, Math.min(window.innerHeight - drag.h - EDGE, ev.clientY - drag.oy));
     root.style.left = `${left}px`;
     root.style.top = `${top}px`;
     root.style.right = 'auto';
@@ -629,23 +831,15 @@
     if (!drag) return;
     const moved = drag.moved;
     drag = null;
+    root.classList.remove('is-dragging');
     if (!moved) return;
     dragMoved = true;
     const rect = root.getBoundingClientRect();
-    const top = Math.round(rect.top);
-    const right = Math.round(window.innerWidth - rect.right);
-    root.style.top = `${top}px`;
-    root.style.right = `${right}px`;
-    root.style.left = 'auto';
-    const payload = { top, right };
-    persistPos(payload);
-    post('trackerPosition', payload);
+    persistAndPostXY(Math.round(rect.left), Math.round(rect.top));
   }
 
-  const gripEl = els.grip || null;
-  if (gripEl) {
-    gripEl.addEventListener('mousedown', onPointerDown);
-    gripEl.addEventListener('click', (ev) => ev.stopPropagation());
+  if (els.header) {
+    els.header.addEventListener('mousedown', onPointerDown);
   }
   window.addEventListener('mousemove', onPointerMove);
   window.addEventListener('mouseup', onPointerUp);
@@ -657,63 +851,45 @@
 
   if (els.pin) {
     els.pin.addEventListener('click', (ev) => stopOwn(ev, () => applyPin(!pinned)));
+    els.pin.addEventListener('mousedown', (ev) => ev.stopPropagation());
   }
-  if (els.mode) {
-    els.mode.addEventListener('click', (ev) => stopOwn(ev, () => {
-      const cur = CYCLE.indexOf(mode) === -1 ? 0 : CYCLE.indexOf(mode);
-      applyMode(CYCLE[(cur + 1) % CYCLE.length]);
+  if (els.reduce) {
+    els.reduce.addEventListener('click', (ev) => stopOwn(ev, () => {
+      if (mode === 'expanded') applyMode('compact');
+      else applyMode('expanded');
     }));
-  }
-  if (els.expand) {
-    els.expand.addEventListener('click', (ev) => stopOwn(ev, () => applyMode('expanded')));
-  }
-  if (els.hide) {
-    els.hide.addEventListener('click', (ev) => stopOwn(ev, () => applyMode('hidden')));
-  }
-  if (els.reset) {
-    els.reset.addEventListener('click', (ev) => stopOwn(ev, () => {
-      const pos = (HUD() && HUD().DEFAULT_POS) || config.defaultPosition || { top: 24, right: 24 };
-      root.style.top = `${pos.top}px`;
-      root.style.right = `${pos.right}px`;
-      root.style.left = 'auto';
-      root.style.bottom = 'auto';
-      persistPos(pos);
-      try { localStorage.removeItem(LS_POS); } catch (_) { /* ignore */ }
-      post('trackerResetPosition', {});
-    }));
+    els.reduce.addEventListener('mousedown', (ev) => ev.stopPropagation());
   }
 
-  /* A/B: compact body click + chevron expand; minimal click anywhere → expanded.
-     Drag that moved is not an expand. Pin/close/mode already stopPropagation. */
-  function maybeExpandFromClick(ev) {
-    if (dragMoved) { dragMoved = false; return; }
-    if (ev.target.closest('button')) return;
-    if (mode === 'compact' || mode === 'minimal') applyMode('expanded');
+  if (els.reduced) {
+    els.reduced.addEventListener('click', (ev) => {
+      if (dragMoved) { dragMoved = false; return; }
+      if (ev.target.closest('button')) return;
+      if (mode === 'compact' || mode === 'minimal') applyMode('expanded');
+    });
   }
-  root.addEventListener('click', maybeExpandFromClick);
-  if (els.minimal) els.minimal.addEventListener('click', maybeExpandFromClick);
+
+  window.addEventListener('resize', () => {
+    const xy = currentXY();
+    if (!xy) return;
+    const { w, h } = widgetSize();
+    if (!onScreen(xy.x, xy.y, w, h)) applyDefaultTopRight();
+    else applyXY(xy.x, xy.y);
+  });
 
   // Restore prefs — F: invalid LS mode → expanded
   pinned = lsGet(LS_PIN, '0') === '1';
-  if (els.pin) {
-    els.pin.classList.toggle('is-on', pinned);
-    els.pin.setAttribute('aria-pressed', pinned ? 'true' : 'false');
-  }
+  syncPinButton();
   const hud = HUD();
   const bootMode = hud ? hud.readMode() : normalizeMode(lsGet(LS_MODE, config.defaultMode || 'expanded'));
   applyMode(bootMode, { silent: false });
-  try {
-    const pos = (hud && hud.readPos && hud.readPos()) || (lsGet(LS_POS, '') ? JSON.parse(lsGet(LS_POS, '')) : null);
-    applyPosition(pos || config.defaultPosition);
-  } catch (_) {
-    applyPosition(config.defaultPosition);
-  }
+  restorePosition();
 
   window.addEventListener('sanctuary-hud:change', (ev) => {
     const d = (ev && ev.detail) || {};
     if (d.reset) {
       applyMode('expanded', { silent: true, fromSettings: true });
-      applyPosition((HUD() && HUD().DEFAULT_POS) || config.defaultPosition);
+      applyDefaultTopRight();
       updateVisibility();
       return;
     }
@@ -767,7 +943,7 @@
     }
     if (action === 'hud:reset') {
       applyMode('expanded', { fromSettings: true });
-      applyPosition((HUD() && HUD().DEFAULT_POS) || config.defaultPosition);
+      applyDefaultTopRight();
       return;
     }
     if (action === 'craftFinished') {
@@ -810,9 +986,16 @@
     render,
     updateVisibility,
     applyMode,
+    applyPin,
     getMode: () => mode,
+    getPinned: () => pinned,
     setMode: (m) => applyMode(m),
     hide: () => applyMode('hidden'),
     expand: () => applyMode('expanded'),
+    restorePosition,
+    persistAndPostXY,
+    parseXY,
+    clampXY,
+    LS_POS_XY,
   };
 })();

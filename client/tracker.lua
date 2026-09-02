@@ -411,8 +411,20 @@ RegisterNUICallback('hudSettingsTracker', function(data, cb)
 end)
 
 RegisterNUICallback('trackerPosition', function(data, cb)
-    if data and data.top ~= nil and data.right ~= nil then
-        mirrorKvp('pos', json.encode({ top = data.top, right = data.right, left = data.left, bottom = data.bottom }))
+    if data then
+        local payload = {
+            top = data.top,
+            right = data.right,
+            left = data.left or data.x,
+            bottom = data.bottom,
+            x = data.x,
+            y = data.y,
+        }
+        if data.top ~= nil and data.right ~= nil then
+            mirrorKvp('pos', json.encode(payload))
+        elseif data.x ~= nil and data.y ~= nil then
+            mirrorKvp('pos', json.encode(payload))
+        end
     end
     cb({ ok = true })
 end)
