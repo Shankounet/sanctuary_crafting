@@ -16,6 +16,9 @@
     resQ: '',
     resPeek: null,
     resList: [],
+    noteEditId: null,
+    noteViewId: null,
+    notesList: [],
   };
 
   const OX_IMG_BASE = 'nui://ox_inventory/web/images/';
@@ -1256,6 +1259,7 @@
 
 
   const POSTIT_CYCLE = ['yellow', 'blue', 'green', 'pink'];
+  const NOTE_ROTS = ['rot-a', 'rot-b', 'rot-c', 'rot-d', 'rot-e'];
 
   function parisDateParts(ts) {
     const d = (ts != null && ts !== '')
@@ -1295,73 +1299,238 @@
     return (p.day + ' ' + name).trim();
   }
 
-  function noteTaskRow(index) {
+  function noteChecks(n) {
+    const raw = Array.isArray(n && n.checklist) ? n.checklist : [];
+    const out = [];
+    for (let i = 0; i < raw.length; i++) {
+      const c = raw[i];
+      if (typeof c === 'string') {
+        const text = c.trim();
+        if (text) out.push({ text, done: false });
+      } else if (c && typeof c === 'object') {
+        const text = String(c.text || '').trim();
+        if (text) out.push({ text, done: !!c.done });
+      }
+    }
+    return out;
+  }
+
+  function noteExistingLink(n) {
+    if (!n || typeof n !== 'object') return null;
+    const pick = (kind, label) => {
+      const lab = String(label || '').trim();
+      if (!lab || looksLikeId(lab)) return { kind, label: '' };
+      return { kind, label: lab };
+    };
+    if (n.link && typeof n.link === 'object') {
+      const kind = n.link.kind || n.link.type || '';
+      const label = n.link.label || n.link.name || n.link.title || '';
+      if (kind && label && !looksLikeId(String(label))) return { kind, label: String(label) };
+    }
+    const candidates = [
+      n.resourceLabel && pick('resource', n.resourceLabel),
+      n.itemLabel && pick('resource', n.itemLabel),
+      n.recipeLabel && pick('recipe', n.recipeLabel),
+      n.artisanName && pick('artisan', n.artisanName),
+      (n.artisan && n.artisan.displayName) && pick('artisan', n.artisan.displayName),
+    ];
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      if (c && c.label) return c;
+    }
+    const checks = noteChecks(n);
+    for (let i = 0; i < checks.length; i++) {
+      const c = (Array.isArray(n.checklist) ? n.checklist[i] : null);
+      if (!c || typeof c !== 'object') continue;
+      const lab = c.label || c.resourceLabel || c.recipeLabel || c.artisanName;
+      if (lab && !looksLikeId(String(lab))) {
+        const kind = c.kind || (c.recipeId ? 'recipe' : (c.artisanId ? 'artisan' : (c.item || c.resourceId ? 'resource' : '')));
+        if (kind) return { kind, label: String(lab) };
+      }
+    }
+    return null;
+  }
+
+  function noteLinkPhrase(link) {
+    if (!link || !link.label) return '';
+    if (link.kind === 'artisan') return 'Artisan · ' + link.label;
+    if (link.kind === 'recipe') return 'Assemblage · ' + link.label;
+    if (link.kind === 'resource') return 'Ressource · ' + link.label;
+    return link.label;
+  }
+
+  function noteExcerpt(body) {
+    const t = String(body || '').replace(/\s+/g, ' ').trim();
+    if (!t) return '';
+    const cut = t.length > 160 ? t.slice(0, 160) + '\u2026' : t;
+    return '\u00ab ' + esc(cut) + ' \u00bb';
+  }
+
+  function noteTaskRow(index, text, done) {
     const wrap = document.createElement('div');
-    wrap.className = 'note-task postit postit-' + POSTIT_CYCLE[(index || 0) % 4];
-    wrap.innerHTML = '<span class="note-check-box" aria-hidden="true">\u2610</span>'
+    wrap.className = 'note-task postit postit-' + POSTIT_CYCLE[(index || 0) % 4] + (done ? ' is-done' : '');
+    wrap.dataset.done = done ? '1' : '0';
+    wrap.innerHTML = '<button type="button" class="note-check-box" data-act="toggle-check" aria-label="cocher">'
+      + (done ? '\u2611' : '\u2610') + '</button>'
       + '<input type="text" class="note-task-input" />'
       + '<button type="button" class="note-task-remove" data-act="remove-task" aria-label="retirer">\u00d7</button>';
+    const inp = wrap.querySelector('.note-task-input');
+    if (inp && text) inp.value = text;
     return wrap;
   }
 
-  /* ========== NOTES ========== */
-  async function renderNotes() {
-    const r = await loadModule('notes');
-    const arr = (r && r.data) || [];
-    const today = notesTodayFr();
-    const left = `
-      <div class="note-leaf-wrap">
-        <span class="tape top-l"></span>
-        <span class="paperclip"></span>
-        <div class="note-leaf">
-          <p class="note-leaf-head">NOUVELLE NOTE</p>
-          <input id="note-title" type="text" placeholder="Titre" autocomplete="off" />
-          <p class="note-date" id="note-date">Date : ${esc(today)}</p>
-          <textarea id="note-body" rows="4"></textarea>
-          <div class="note-tasks" id="note-tasks"></div>
-          <button type="button" class="note-add-task" id="note-add-task">+ Ajouter une t\u00e2che</button>
-          <button type="button" class="note-stamp" id="note-save">ENREGISTRER</button>
-        </div>
-      </div>${folio('80')}`;
+  function collectNoteChecklist() {
+    const checklist = [];
+    document.querySelectorAll('#note-tasks .note-task').forEach((row) => {
+      const inp = row.querySelector('.note-task-input');
+      const text = ((inp && inp.value) || '').trim();
+      if (!text) return;
+      checklist.push({ text, done: row.dataset.done === '1' });
+    });
+    return checklist;
+  }
 
-    let listHtml;
-    if (!arr.length) {
-      listHtml = `
+  function growNoteBody(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    const h = Math.max(196, Math.min(280, el.scrollHeight));
+    el.style.height = h + 'px';
+  }
+
+  function fillComposer(note) {
+    const title = $('#note-title');
+    const body = $('#note-body');
+    const tasksEl = $('#note-tasks');
+    if (title) title.value = (note && note.title) || '';
+    if (body) {
+      body.value = (note && note.body) || '';
+      growNoteBody(body);
+    }
+    if (tasksEl) {
+      tasksEl.innerHTML = '';
+      const checks = noteChecks(note || {});
+      checks.forEach((c, i) => tasksEl.appendChild(noteTaskRow(i, c.text, c.done)));
+    }
+    state.noteEditId = note && note.id != null ? Number(note.id) : null;
+    if (title) title.focus();
+  }
+
+  function notesEmptyHtml() {
+    return `
         <div class="notes-empty">
           <h2 class="notes-empty-title">Carnet vide</h2>
-          <p class="hand-note">Les pens\u00e9es s\u2019effacent vite. Mieux vaut les coucher sur papier.</p>
-          <span class="ink-sketch tool" aria-hidden="true"></span>
-          <div class="postit postit-yellow notes-empty-cue">
-            <button type="button" class="note-stamp" id="note-empty-write">\u00c9crire une premi\u00e8re note</button>
-          </div>
+          <p class="hand-note">Rien n\u2019a encore \u00e9t\u00e9 \u00e9crit ici.</p>
+          <span class="ink-sketch pencil" aria-hidden="true"></span>
         </div>`;
-    } else {
-      listHtml = `<div id="note-list">${arr.map((n, idx) => {
-        const checks = Array.isArray(n.checklist) ? n.checklist : [];
-        const body = String(n.body || '');
-        const excerpt = body
-          ? `\u00ab ${esc(body.slice(0, 180))}${body.length > 180 ? '\u2026' : ''} \u00bb`
-          : '';
-        const checkHtml = checks.length ? `<ul class="note-clip-checks">${checks.map((c) => {
-          const text = typeof c === 'string' ? c : (c && c.text) || '';
-          if (!text) return '';
-          const done = typeof c === 'object' && c && c.done;
-          return `<li class="${done ? 'done' : ''}"><span class="note-check-box">${done ? '\u2611' : '\u2610'}</span><span>${esc(text)}</span></li>`;
-        }).join('')}</ul>` : '';
-        const rot = idx % 2 === 0 ? 'rot-l' : 'rot-r';
-        return `<article class="note-clip ${rot}" data-id="${n.id}">
-          <span class="tape top-l"></span>
-          <span class="paperclip"></span>
-          <button type="button" class="note-clip-del" data-act="del" aria-label="retirer">retirer</button>
+  }
+
+  function notesListHtml(arr) {
+    return `<div id="note-list">${arr.map((n, idx) => {
+      const checks = noteChecks(n).slice(0, 4);
+      const excerpt = noteExcerpt(n.body);
+      const checkHtml = checks.length ? `<ul class="note-clip-checks">${checks.map((c) =>
+        `<li class="${c.done ? 'done' : ''}"><span class="note-check-box">${c.done ? '\u2611' : '\u2610'}</span><span>${esc(c.text)}</span></li>`
+      ).join('')}</ul>` : '';
+      const rot = NOTE_ROTS[idx % NOTE_ROTS.length];
+      const tape = idx % 3 === 1 ? '<span class="tape top-r"></span>' : '<span class="tape top-l"></span>';
+      const clip = idx % 2 === 0 ? '<span class="paperclip"></span>' : '';
+      return `<article class="note-clip ${rot}" data-id="${n.id}" role="button">
+          ${tape}
+          ${clip}
           <p class="note-clip-date">${esc(noteClipDate(n.updatedAt || n.createdAt))}</p>
           <h3 class="note-clip-title">${esc(n.title || '')}</h3>
           ${excerpt ? `<p class="note-clip-excerpt">${excerpt}</p>` : ''}
           ${checkHtml}
         </article>`;
-      }).join('')}</div>`;
-    }
-    setPages(left, listHtml + folio('81'));
+    }).join('')}</div>`;
+  }
 
+  function noteDetailHtml(n) {
+    if (!n) return notesEmptyHtml();
+    const checks = noteChecks(n);
+    const checkHtml = checks.length ? `<ul class="note-clip-checks">${checks.map((c) =>
+      `<li class="${c.done ? 'done' : ''}"><span class="note-check-box">${c.done ? '\u2611' : '\u2610'}</span><span>${esc(c.text)}</span></li>`
+    ).join('')}</ul>` : '';
+    const body = String(n.body || '');
+    const link = noteExistingLink(n);
+    const linkHtml = (link && link.label)
+      ? `<p class="note-link">${esc(noteLinkPhrase(link))}</p>`
+      : '';
+    return `
+        <button type="button" class="note-back" data-act="back-notes">\u2190 les notes</button>
+        <article class="note-detail" data-id="${n.id}">
+          <span class="tape top-l"></span>
+          <span class="paperclip"></span>
+          <p class="note-clip-date">${esc(noteClipDate(n.updatedAt || n.createdAt))}</p>
+          <h3 class="note-clip-title">${esc(n.title || '')}</h3>
+          ${body ? `<div class="note-detail-body">${esc(body)}</div>` : ''}
+          ${checkHtml}
+          ${linkHtml}
+          <div class="note-detail-acts">
+            <button type="button" class="note-annot" data-act="edit">modifier</button>
+            <button type="button" class="note-stamp-sm" data-act="del">supprimer</button>
+          </div>
+        </article>`;
+  }
+
+  function notesRightHtml() {
+    const arr = state.notesList || [];
+    if (!arr.length) return notesEmptyHtml() + folio('81');
+    if (state.noteViewId != null) {
+      const n = arr.find((x) => Number(x.id) === Number(state.noteViewId));
+      if (n) return noteDetailHtml(n) + folio('81');
+      state.noteViewId = null;
+    }
+    return notesListHtml(arr) + folio('81');
+  }
+
+  function setNotesRight() {
+    const R = rightEl();
+    if (!R) return;
+    R.innerHTML = notesRightHtml();
+    R.classList.remove('page-turn');
+    void R.offsetWidth;
+    R.classList.add('page-turn');
+    bindNotesRight();
+  }
+
+  function bindNotesRight() {
+    const R = rightEl();
+    if (!R) return;
+    R.onclick = async (ev) => {
+      if (state.page !== 'notes') return;
+      const back = ev.target.closest('[data-act="back-notes"]');
+      if (back) {
+        state.noteViewId = null;
+        setNotesRight();
+        return;
+      }
+      const editBtn = ev.target.closest('[data-act="edit"]');
+      if (editBtn) {
+        const host = editBtn.closest('[data-id]');
+        const n = host && (state.notesList || []).find((x) => Number(x.id) === Number(host.dataset.id));
+        if (n) fillComposer(n);
+        return;
+      }
+      const delBtn = ev.target.closest('[data-act="del"]');
+      if (delBtn) {
+        const host = delBtn.closest('[data-id]');
+        if (!host) return;
+        await post('bookAction', { action: 'deleteNote', payload: { id: Number(host.dataset.id) } });
+        state.noteViewId = null;
+        if (state.noteEditId === Number(host.dataset.id)) state.noteEditId = null;
+        await renderNotes({ keepComposer: true });
+        return;
+      }
+      const clip = ev.target.closest('.note-clip[data-id]');
+      if (clip) {
+        state.noteViewId = Number(clip.dataset.id);
+        setNotesRight();
+      }
+    };
+  }
+
+  function bindNotesComposer() {
     const tasksEl = $('#note-tasks');
     const addTask = $('#note-add-task');
     if (addTask && tasksEl) {
@@ -1371,46 +1540,84 @@
         if (inp) inp.focus();
       };
       tasksEl.onclick = (ev) => {
+        const tog = ev.target.closest('[data-act="toggle-check"]');
+        if (tog) {
+          const row = tog.closest('.note-task');
+          if (!row) return;
+          const done = row.dataset.done !== '1';
+          row.dataset.done = done ? '1' : '0';
+          row.classList.toggle('is-done', done);
+          tog.textContent = done ? '\u2611' : '\u2610';
+          return;
+        }
         const rm = ev.target.closest('[data-act="remove-task"]');
         if (!rm) return;
         const row = rm.closest('.note-task');
         if (row) row.remove();
       };
     }
-
+    const body = $('#note-body');
+    if (body) {
+      body.addEventListener('input', () => growNoteBody(body));
+      growNoteBody(body);
+    }
     const save = $('#note-save');
     if (save) save.onclick = async () => {
-      const checklist = [];
-      document.querySelectorAll('#note-tasks .note-task-input').forEach((inp) => {
-        const text = (inp.value || '').trim();
-        if (text) checklist.push({ text, done: false });
-      });
+      save.classList.remove('is-inking');
+      void save.offsetWidth;
+      save.classList.add('is-inking');
+      const payload = {
+        title: ($('#note-title') || {}).value,
+        body: ($('#note-body') || {}).value,
+        checklist: collectNoteChecklist(),
+      };
+      if (state.noteEditId) payload.id = state.noteEditId;
       await post('bookAction', {
         action: 'saveNote',
-        payload: {
-          title: ($('#note-title') || {}).value,
-          body: ($('#note-body') || {}).value,
-          checklist,
-        },
+        payload,
       });
-      navigate('notes');
+      await new Promise((resolve) => setTimeout(resolve, 320));
+      state.noteEditId = null;
+      state.noteViewId = null;
+      await renderNotes();
     };
+  }
 
-    const list = $('#note-list');
-    if (list) list.onclick = async (ev) => {
-      const btn = ev.target.closest('[data-act="del"]');
-      if (!btn) return;
-      const host = btn.closest('[data-id]');
-      if (!host) return;
-      await post('bookAction', { action: 'deleteNote', payload: { id: Number(host.dataset.id) } });
-      navigate('notes');
-    };
+  /* ========== NOTES ========== */
+  async function renderNotes(opts) {
+    opts = opts || {};
+    const r = await loadModule('notes');
+    const arr = (r && r.data) || [];
+    state.notesList = arr;
+    const keep = !!opts.keepComposer;
+    const snap = keep ? {
+      title: (($('#note-title') || {}).value) || '',
+      body: (($('#note-body') || {}).value) || '',
+      checklist: collectNoteChecklist(),
+      id: state.noteEditId,
+    } : null;
+    const today = notesTodayFr();
+    const left = `
+      <div class="note-leaf-wrap">
+        <span class="tape top-l"></span>
+        <span class="paperclip"></span>
+        <div class="note-leaf">
+          <p class="note-leaf-head">NOUVELLE NOTE</p>
+          <input id="note-title" type="text" placeholder="Titre" autocomplete="off" />
+          <p class="note-date" id="note-date">Date : ${esc(today)}</p>
+          <textarea id="note-body" rows="8"></textarea>
+          <div class="note-tasks" id="note-tasks"></div>
+          <button type="button" class="note-add-task" id="note-add-task">+ Ajouter une t\u00e2che</button>
+          <button type="button" class="note-stamp" id="note-save">ENREGISTRER</button>
+        </div>
+      </div>${folio('80')}`;
 
-    const emptyWrite = $('#note-empty-write');
-    if (emptyWrite) emptyWrite.onclick = () => {
-      const t = $('#note-title');
-      if (t) t.focus();
-    };
+    setPages(left, notesRightHtml());
+    bindNotesComposer();
+    bindNotesRight();
+    if (snap && (snap.title || snap.body || (snap.checklist && snap.checklist.length) || snap.id)) {
+      fillComposer({ id: snap.id, title: snap.title, body: snap.body, checklist: snap.checklist });
+    }
   }
 
 
