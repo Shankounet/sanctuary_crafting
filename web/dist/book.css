@@ -2636,7 +2636,7 @@
      left + right pages          tex/paper_aged_new.png
      Accueil glued fiches        tex/paper_aged_new.png (LIGHT crop, not paper_dark)
      Resource fiche + index slips tex/paper_aged_new.png (LIGHT crop, not paper_dark)
-     Notes clips / other docs    tex/paper_dark.png
+     Notes clips / detail fiche  tex/paper_aged_new.png (LIGHT crop, not paper_dark)
      new note leaf               tex/paper_aged_new.png (different crop)
      post-its                    tex/postit_{yellow,blue,green,pink}.png
    ============================================================ */
@@ -2786,8 +2786,7 @@
 #book-app .dossier-sheet,
 #book-app .disc-card,
 #book-app .discovery-card,
-#book-app .tech-plan,
-#book-app .note-clip {
+#book-app .tech-plan {
   background-color: #c4ae86 !important;
   background-image: var(--alternatePageTexture) !important;
   background-size: cover !important;
@@ -2900,15 +2899,18 @@
     to bottom,
     transparent 0,
     transparent 27px,
-    rgba(42, 34, 24, 0.2) 27px,
-    rgba(42, 34, 24, 0.2) 28px
+    rgba(42, 34, 24, 0.11) 28px,
+    transparent 29px
   );
-  min-height: 112px;
+  background-attachment: local;
+  min-height: 196px;
+  max-height: 280px;
   line-height: 28px;
-  padding: 0;
+  padding: 2px 0 8px;
   margin-top: 4px;
   border: 0 !important;
   overflow: auto;
+  white-space: pre-wrap;
 }
 #book-app .note-add-task {
   display: inline-block;
@@ -2948,6 +2950,16 @@
 }
 #book-app .note-stamp:active {
   transform: rotate(-2deg) translateY(1px);
+}
+@keyframes note-stamp-press {
+  0% { transform: rotate(-3deg) scale(1); }
+  40% { transform: rotate(-5deg) scale(0.9) translateY(2px); }
+  100% { transform: rotate(-4deg) scale(1.03); }
+}
+#book-app .note-stamp.is-inking {
+  animation: note-stamp-press 320ms ease;
+  color: rgba(110, 48, 28, 0.95);
+  border-color: rgba(110, 48, 28, 0.88);
 }
 
 #book-app .note-tasks {
@@ -2991,9 +3003,18 @@
 }
 #book-app .note-check-box {
   flex: 0 0 auto;
-  font-size: 14px;
+  font-size: 15px;
   color: #2a2218;
   line-height: 1;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--book-hand);
+}
+#book-app .note-task.is-done .note-task-input {
+  text-decoration: line-through;
+  opacity: 0.72;
 }
 
 /* Real post-it PNGs — one texture, no fill, no mix-blend */
@@ -3029,8 +3050,12 @@
 }
 
 #book-app .notes-empty {
-  padding: 12px 8px 8px;
+  padding: 18px 6px 8px;
   text-align: left;
+  background: none !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border: 0 !important;
 }
 #book-app .notes-empty-title {
   font-family: var(--book-hand);
@@ -3039,29 +3064,56 @@
   color: #2a2218;
   margin: 8px 0 10px;
 }
-#book-app .notes-empty-cue {
-  display: inline-block;
-  margin-top: 14px;
-  padding: 28px 18px 20px;
-  min-width: 168px;
-  min-height: 92px;
-  transform: rotate(2.2deg);
-  box-shadow: 1px 3px 6px rgba(40, 24, 10, 0.2);
-  text-align: center;
+#book-app .notes-empty .hand-note {
+  color: #2a2218;
+  margin: 0 0 12px;
 }
-#book-app .notes-empty-cue .note-stamp {
-  margin: 8px 0 0;
+#book-app .ink-sketch.pencil {
+  width: 7px;
+  height: 38px;
+  margin: 10px 18px 4px 8px;
+  border-radius: 1px 1px 2px 2px;
+  background: rgba(42, 34, 24, 0.42);
+  transform: rotate(-28deg);
+  box-shadow: none;
+}
+#book-app .ink-sketch.pencil::before {
+  content: "";
+  position: absolute;
+  top: -7px; left: -1px;
+  width: 9px; height: 8px;
+  background: rgba(42, 34, 24, 0.38);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+#book-app .ink-sketch.pencil::after {
+  content: "";
+  position: absolute;
+  bottom: -5px; left: -2px;
+  width: 11px; height: 7px;
+  border-radius: 1px;
+  background: rgba(140, 80, 50, 0.35);
 }
 
-#book-app .note-clip {
+#book-app .note-clip,
+#book-app .note-detail {
   position: relative;
   margin: 14px 6px 18px;
   padding: 16px 16px 14px;
   color: #2a2218;
-  box-shadow: 2px 4px 8px rgba(40, 24, 10, 0.22);
+  background-color: #e8dcc4 !important;
+  background-image: var(--lightSheetTexture) !important;
+  background-repeat: no-repeat !important;
+  background-size: 175% 175% !important;
+  box-shadow: 2px 4px 9px rgba(40, 24, 10, 0.22);
+  cursor: pointer;
 }
-#book-app .note-clip.rot-l { transform: rotate(-1.3deg); background-position: 28% 36% !important; }
-#book-app .note-clip.rot-r { transform: rotate(1.5deg); background-position: 72% 62% !important; }
+#book-app .note-clip.rot-a { transform: rotate(-1.8deg); background-position: 18% 28% !important; background-size: 168% 190% !important; }
+#book-app .note-clip.rot-b { transform: rotate(1.6deg); background-position: 78% 22% !important; background-size: 190% 165% !important; }
+#book-app .note-clip.rot-c { transform: rotate(-0.7deg); background-position: 42% 74% !important; background-size: 210% 180% !important; }
+#book-app .note-clip.rot-d { transform: rotate(2.1deg); background-position: 64% 48% !important; background-size: 155% 200% !important; }
+#book-app .note-clip.rot-e { transform: rotate(-2.4deg); background-position: 30% 60% !important; background-size: 185% 155% !important; }
+#book-app .note-clip.rot-l { transform: rotate(-1.3deg); background-position: 24% 34% !important; }
+#book-app .note-clip.rot-r { transform: rotate(1.5deg); background-position: 76% 58% !important; }
 #book-app .note-clip-date {
   font-family: var(--book-hand);
   font-size: 12px;
@@ -3254,4 +3306,130 @@
 #book-app .ency-fiche .book-stamp,
 #book-app .ency-empty .hand-note {
   color: #2a2218;
+}
+
+/* ============================================================
+   v2.18.1 — Notes right page: light paper slips, never leather
+   ============================================================ */
+#book-app .note-clip {
+  clip-path: polygon(
+    0.8% 1.8%, 16% 0.4%, 44% 1.4%, 76% 0.2%, 99.2% 2%,
+    100% 34%, 98.7% 66%, 100% 97.6%,
+    74% 99.3%, 41% 98.4%, 2.1% 100%,
+    0% 69%, 1.1% 30%
+  );
+}
+#book-app .note-clip:nth-child(3n) {
+  clip-path: polygon(
+    0% 2.4%, 22% 0.2%, 51% 1.8%, 81% 0.6%, 100% 1.4%,
+    99.1% 38%, 100% 71%, 98.6% 100%,
+    68% 98.2%, 33% 100%, 0.6% 97.4%,
+    1.4% 62%, 0% 28%
+  );
+}
+#book-app .note-detail {
+  cursor: default;
+  background-position: 88% 16% !important;
+  background-size: 160% 160% !important;
+  transform: rotate(-0.6deg);
+  clip-path: polygon(
+    0.5% 1.2%, 19% 0.3%, 58% 1%, 91% 0.4%, 99.4% 1.6%,
+    100% 29%, 99% 64%, 100% 98%,
+    71% 99.6%, 36% 98.5%, 1.4% 100%,
+    0% 70%, 0.7% 33%
+  );
+}
+#book-app .note-detail-body {
+  font-family: var(--book-hand);
+  font-size: 15px;
+  line-height: 1.55;
+  color: #2a2218;
+  white-space: pre-wrap;
+  margin: 8px 0 10px;
+}
+#book-app .note-detail-acts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+#book-app .note-annot {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: var(--book-hand);
+  font-size: 14px;
+  color: #2a2218;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transform: rotate(-2deg);
+  opacity: 0.82;
+}
+#book-app .note-annot:hover { opacity: 1; transform: rotate(-4deg); }
+#book-app .note-stamp-sm {
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1.5px solid rgba(140, 80, 50, 0.7);
+  color: rgba(140, 80, 50, 0.88);
+  font-family: var(--book-ui);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: transparent;
+  cursor: pointer;
+  transform: rotate(3deg);
+  line-height: 1.2;
+}
+#book-app .note-stamp-sm:hover { transform: rotate(6deg); }
+#book-app .note-back {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--book-hand);
+  font-size: 14px;
+  color: #2a2218;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+#book-app .note-link {
+  font-family: var(--book-hand);
+  font-size: 13px;
+  color: #2a2218;
+  margin: 8px 0 0;
+}
+#book-app .note-link a {
+  color: #2a2218;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Hunt: Notes content must never paint leather / paper_dark / coverTexture */
+#book-app .note-leaf,
+#book-app .note-leaf-wrap,
+#book-app .note-clip,
+#book-app .note-detail,
+#book-app .notes-empty,
+#book-app #note-list {
+  background-image: var(--lightSheetTexture, var(--mainPageTexture));
+}
+#book-app .note-leaf {
+  background-image: var(--mainPageTexture) !important;
+  background-size: 170% 170% !important;
+  background-position: 74% 18% !important;
+}
+#book-app .note-leaf-wrap,
+#book-app .notes-empty,
+#book-app #note-list {
+  background: none !important;
+  background-image: none !important;
+}
+#book-app .note-clip,
+#book-app .note-detail {
+  background-image: var(--lightSheetTexture) !important;
+  background-color: #e8dcc4 !important;
 }
