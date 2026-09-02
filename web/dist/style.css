@@ -4886,3 +4886,673 @@ button, input { font: inherit; color: inherit; }
 }
 #app .instr-temp.warn .t-l5, #app #stat-temp.warn { color: var(--color-warning); }
 #app .instr-temp.bad .t-l5, #app #stat-temp.bad { color: #c07060; }
+
+/* ============================================================
+   v2.19.0 — Craft UI polish: composition, pas de refonte
+   Layout / callbacks / card size / palette locked.
+   ============================================================ */
+
+/* —— 8. HEADER: one continuous station console —— */
+#app .ctrl-console {
+  min-height: 72px !important;
+  background:
+    linear-gradient(180deg, #242424 0%, #1f1f1f 52%, #1a1a1a 100%) !important;
+  border-bottom: 1px solid #3a332b !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 0 -1px 0 rgba(0,0,0,0.35) !important;
+}
+#app .ctrl-console::after {
+  height: 1px !important;
+  bottom: -1px !important;
+  background: linear-gradient(90deg, transparent, rgba(154,136,102,0.4) 18%, rgba(154,136,102,0.55) 50%, rgba(154,136,102,0.4) 82%, transparent) !important;
+  opacity: 0.7 !important;
+}
+#app .ctrl-deck {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: stretch;
+}
+#app .ctrl-identity {
+  flex: 0 1 280px;
+  min-width: 200px;
+  background: transparent !important;
+  border-right: 1px solid #3a332b !important;
+  box-shadow: none !important;
+}
+#app .ctrl-identity::after { display: none !important; }
+#app .ctrl-id-body { padding: 10px 16px 10px 14px !important; gap: 2px !important; }
+#app .ctrl-instruments {
+  flex: 1 1 auto !important;
+  padding: 0 6px !important;
+  background: transparent !important;
+  gap: 0 !important;
+}
+#app .instr-group {
+  display: flex;
+  align-items: stretch;
+  gap: 0 !important;
+}
+#app .instr-divider {
+  width: 1px !important;
+  margin: 10px 0 !important;
+  background: linear-gradient(180deg, transparent, #3a332b, transparent) !important;
+}
+#app .instr-plate,
+#app .instr-primary,
+#app .instr-secondary {
+  background: transparent !important;
+  border: none !important;
+  border-right: 1px solid rgba(58,51,43,0.85) !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  min-width: 76px;
+  padding: 10px 12px 9px !important;
+  clip-path: none !important;
+}
+#app .instr-plate:last-child { border-right: none !important; }
+#app .instr-group.instr-meta .instr-plate:last-child { border-right: none !important; }
+#app .instr-primary .t-l4 {
+  color: rgba(154,136,102,0.62) !important;
+}
+#app .ctrl-actions {
+  background: transparent !important;
+  border-left: 1px solid #3a332b !important;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* —— 1. RIGHT PANEL: 4 composed sections, fewer inner boxes —— */
+#app .detail-fiche {
+  gap: 8px !important;
+}
+#app .fiche-sec {
+  background: #202020;
+  border: 1px solid #3a332b;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  padding: 8px 9px 9px;
+  clip-path: polygon(0 4px, 4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px));
+}
+#app .fiche-sec .fiche-section-label,
+#app .fiche-sec .fiche-l1-label {
+  margin: 0 0 7px !important;
+  color: rgba(154,136,102,0.7) !important;
+  font-size: 0.52rem !important;
+  letter-spacing: 0.16em;
+}
+#app .fiche-sec-id { padding: 0; background: transparent; border: none; box-shadow: none; clip-path: none; }
+#app .fiche-sec-id .fiche-hero {
+  margin: 0 !important;
+  padding: 10px 12px 12px !important;
+  background: #232323 !important;
+  border: 1px solid #3a332b !important;
+}
+#app .fiche-sec-params {
+  padding: 8px 0 0;
+}
+#app .fiche-sec-params .fiche-section-label { padding: 0 9px; }
+#app .fiche-sec-params .instr-cluster,
+#app .fiche-sec-params .detail-meta-grid {
+  border: none !important;
+  border-top: 1px solid #3a332b !important;
+  background: transparent !important;
+  clip-path: none !important;
+  box-shadow: none !important;
+}
+#app .fiche-sec-req {
+  padding: 8px 0 0;
+}
+#app .fiche-sec-req .fiche-section-label { padding: 0 9px 6px; }
+#app .fiche-req-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+#app .fiche-sec-req .block {
+  margin: 0;
+  padding: 8px 10px;
+  border: none !important;
+  border-top: 1px solid rgba(58,51,43,0.7) !important;
+  border-left: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#app .fiche-sec-req .block.dual {
+  padding: 0;
+  background: transparent !important;
+}
+#app .fiche-sec-req .block.dual > div {
+  border: none !important;
+  border-top: 1px solid rgba(58,51,43,0.7) !important;
+  background: transparent !important;
+}
+#app .fiche-sec-prod {
+  padding: 8px 9px 9px;
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  background: #202020;
+}
+#app .fiche-sec-prod .block-xp {
+  display: flex;
+  gap: 16px;
+  padding: 4px 2px 8px;
+  border: none !important;
+  border-left: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#app .fiche-sec-prod .block-xp .kv-row { flex: 1; padding: 0; }
+
+/* Production console + lot/XP composed, no second FABRIQUER */
+#app #fab-module.panel-action,
+#app #fab-module.actions {
+  margin-top: 0 !important;
+  position: relative !important;
+  padding: 10px !important;
+  background:
+    linear-gradient(180deg, #262624 0%, #20201e 48%, #1c1c1a 100%) !important;
+  border: 1px solid #3a332b !important;
+  border-top: 2px solid #9a8866 !important;
+  clip-path: polygon(0 5px, 5px 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%) !important;
+}
+#app .fab-readouts {
+  display: flex !important;
+  grid-template-columns: none !important;
+  gap: 0 !important;
+  margin-top: 4px !important;
+  border: 1px solid #3a332b;
+  background: #1c1c1c;
+}
+#app .fab-readouts .fab-chip {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px !important;
+  background: transparent !important;
+  border: none !important;
+  border-right: 1px solid #3a332b !important;
+  box-shadow: none !important;
+  clip-path: none !important;
+}
+#app .fab-readouts .fab-chip:last-child { border-right: none !important; }
+#app #fab-chip-lot { display: none !important; }
+
+/* —— 11. STATION READY: compact, slightly more alive —— */
+#app .fab-idle-console {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px 12px;
+  padding: 6px 8px !important;
+  margin-bottom: 4px !important;
+  background: #1a1a1a;
+  border: 1px solid rgba(58,51,43,0.85);
+}
+#app .fab-idle-ready {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#app .fab-idle-ready .led-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+}
+#app .fab-idle-ready .fab-idle-k {
+  color: rgba(138, 154, 112, 0.85) !important;
+}
+#app .empty-prod {
+  padding: 10px 8px !important;
+}
+
+/* —— 3. LOT: industrial segmented rail —— */
+#app .action-primary-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+#app .lot-rail-wrap,
+#app .batch.lot-rail-wrap {
+  display: flex !important;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  align-self: stretch;
+  margin: 0;
+  flex-wrap: nowrap !important;
+  font-size: 0.62rem;
+  color: rgba(154,148,138,0.8);
+}
+#app .lot-k {
+  display: inline-flex;
+  align-items: center;
+  letter-spacing: 0.16em;
+  font-weight: 750;
+  color: rgba(154,136,102,0.75);
+  flex: 0 0 auto;
+  padding: 0 2px;
+}
+#app .lot-input,
+#app .lot-rail-wrap #batch {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  clip: rect(0 0 0 0);
+}
+#app .lot-seg,
+#app .batch-presets.lot-seg {
+  display: flex !important;
+  flex: 1;
+  align-items: stretch;
+  gap: 0 !important;
+  margin: 0 !important;
+  height: 32px;
+  background: #181818;
+  border: 1px solid #3a332b;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.45);
+}
+#app .lot-seg-btn {
+  flex: 1;
+  margin: 0;
+  height: 100%;
+  padding: 0 6px !important;
+  font-size: 0.68rem !important;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9a9a9a;
+  background: transparent;
+  border: none;
+  border-right: 1px solid #3a332b;
+  cursor: pointer;
+  clip-path: none !important;
+  box-shadow: none !important;
+  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+#app .lot-seg-btn:last-child { border-right: none; }
+#app .lot-seg-btn:hover {
+  color: #d8d0c4;
+  background: #222220;
+}
+#app .lot-seg-btn.active {
+  color: #e8e0d2;
+  background:
+    linear-gradient(180deg, #2a2824 0%, #1e1c1a 100%);
+  box-shadow:
+    inset 0 2px 5px rgba(0,0,0,0.55),
+    inset 0 -1px 0 rgba(154,136,102,0.35),
+    inset 0 0 0 1px rgba(154,136,102,0.28);
+  color: #d4c4a0;
+}
+
+/* —— 2. FABRIQUER: push industrial command plate further —— */
+#app #btn-craft.primary,
+#app #btn-craft.craft-engage {
+  width: 100%;
+  flex: 1 1 auto !important;
+  min-height: 54px !important;
+  padding: 0 28px !important;
+  letter-spacing: 0.18em !important;
+  font-size: 0.92rem !important;
+  color: #ece4d4 !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-top-color: #8a7a62 !important;
+  border-left-color: #6a6254 !important;
+  border-right-color: #3e3a32 !important;
+  border-bottom-color: #1c1a16 !important;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 7px,
+      rgba(255,255,255,0.015) 7px 8px
+    ),
+    linear-gradient(180deg, rgba(255,255,255,0.09) 0%, transparent 18%),
+    linear-gradient(180deg, rgba(0,0,0,0.08) 0%, transparent 30%),
+    linear-gradient(180deg, #524e46 0%, #3e3a36 28%, #2c2a28 62%, #1e1c1a 100%) !important;
+  box-shadow:
+    0 4px 0 #0e0c0a,
+    0 8px 16px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(220,210,180,0.16),
+    inset 0 -3px 8px rgba(0,0,0,0.5),
+    inset 0 0 0 1px rgba(154,136,102,0.28),
+    inset 10px 0 10px rgba(0,0,0,0.12),
+    inset -10px 0 10px rgba(0,0,0,0.12) !important;
+  clip-path: polygon(
+    0 5px, 5px 0, calc(100% - 5px) 0, 100% 5px,
+    100% calc(100% - 5px), calc(100% - 5px) 100%, 5px 100%, 0 calc(100% - 5px)
+  ) !important;
+  transition:
+    background 130ms ease,
+    border-color 130ms ease,
+    box-shadow 130ms ease,
+    transform 100ms ease,
+    color 130ms ease !important;
+}
+#app #btn-craft.craft-engage::before {
+  background:
+    repeating-linear-gradient(
+      100deg,
+      transparent 0 2px,
+      rgba(255,255,255,0.018) 2px 3px
+    ),
+    linear-gradient(90deg, rgba(0,0,0,0.28), transparent 12%, transparent 88%, rgba(0,0,0,0.28)) !important;
+}
+#app #btn-craft.craft-engage::after {
+  left: 18px; right: 18px; top: 6px;
+  height: 1px !important;
+  background: linear-gradient(90deg, transparent, rgba(210,190,150,0.38), transparent) !important;
+}
+#app #btn-craft .craft-engage-face { gap: 12px; }
+#app #btn-craft .craft-engage-ico,
+#app #btn-craft i.craft-engage-ico {
+  font-size: 0.86rem !important;
+  color: #c8b894 !important;
+}
+#app #btn-craft .craft-engage-screws i {
+  width: 5px !important;
+  height: 5px !important;
+  opacity: 0.7 !important;
+  background:
+    radial-gradient(circle at 32% 28%, #b0a890, #6a6458 52%, #1a1814 100%) !important;
+}
+#app #btn-craft .craft-engage-screws i:nth-child(1) { top: 7px; left: 9px; }
+#app #btn-craft .craft-engage-screws i:nth-child(2) { top: 7px; right: 9px; }
+#app #btn-craft .craft-engage-screws i:nth-child(3),
+#app #btn-craft .craft-engage-screws i:nth-child(4) {
+  display: block !important;
+}
+#app #btn-craft .craft-engage-screws i:nth-child(3) { bottom: 7px; left: 9px; }
+#app #btn-craft .craft-engage-screws i:nth-child(4) { bottom: 7px; right: 9px; }
+#app #btn-craft.craft-engage:hover:not(:disabled) {
+  color: #f4eee2 !important;
+  border-top-color: #b09a74 !important;
+  border-left-color: #9a8866 !important;
+  border-right-color: #5a5244 !important;
+  border-bottom-color: #2a241c !important;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 7px,
+      rgba(255,255,255,0.02) 7px 8px
+    ),
+    linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 22%),
+    linear-gradient(180deg, #5e5a50 0%, #48443c 32%, #36342e 68%, #2a2824 100%) !important;
+  box-shadow:
+    0 4px 0 #0e0c0a,
+    0 8px 16px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,240,210,0.18),
+    inset 0 -3px 8px rgba(0,0,0,0.42),
+    inset 0 0 0 1px rgba(154,136,102,0.45) !important;
+  transform: none !important;
+  filter: none !important;
+}
+#app #btn-craft.craft-engage:active:not(:disabled) {
+  transform: translateY(2px) !important;
+  box-shadow:
+    0 1px 0 #12100c,
+    inset 0 4px 12px rgba(0,0,0,0.7),
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    inset 0 0 0 1px rgba(154,136,102,0.18) !important;
+}
+#app #btn-craft.craft-engage:disabled {
+  color: #6e6a62 !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 28%),
+    linear-gradient(180deg, #323230 0%, #262624 55%, #1c1c1a 100%) !important;
+  border-color: #3a3834 !important;
+  box-shadow:
+    0 3px 0 #10100e,
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    inset 0 -2px 6px rgba(0,0,0,0.45) !important;
+}
+
+/* —— 10. FILE / COURSES / ARBRE / SUIVI: one secondary bar —— */
+#app .action-secondary-row {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  height: 34px;
+  margin-top: 2px;
+  background: #1c1c1c;
+  border: 1px solid #3a332b;
+}
+#app .ghost.action-tool {
+  flex: 1 1 0;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0 6px !important;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.58rem !important;
+  letter-spacing: 0.08em;
+  background: transparent !important;
+  border: none !important;
+  border-right: 1px solid #3a332b !important;
+  clip-path: none !important;
+  box-shadow: none !important;
+  color: #9a968c;
+}
+#app .ghost.action-tool i {
+  font-size: 0.68rem !important;
+  color: inherit;
+}
+#app .ghost.action-tool:hover {
+  color: #9a8866;
+  background: #222220 !important;
+}
+#app .action-more {
+  margin-left: 0 !important;
+  height: 34px;
+  display: flex;
+  align-items: stretch;
+}
+#app .action-more > summary {
+  width: 34px !important;
+  height: 34px !important;
+  border: none !important;
+  background: transparent !important;
+  clip-path: none !important;
+}
+
+/* —— 4. RÉCEMMENT FABRIQUÉS: compact horizontal strip —— */
+#app .recent-strip {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 4px;
+}
+#app .recent-strip .catalog-group-title {
+  margin: 4px 2px 0;
+}
+#app .recent-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0 2px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(154,136,102,0.4) rgba(0,0,0,0.15);
+}
+#app .recent-mini {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 168px;
+  height: 44px;
+  padding: 4px 8px 4px 4px;
+  background: #202020;
+  border: 1px solid #3a332b;
+  color: #e4e4e4;
+  cursor: pointer;
+  text-align: left;
+  clip-path: polygon(0 3px, 3px 0, calc(100% - 3px) 0, 100% 3px, 100% calc(100% - 3px), calc(100% - 3px) 100%, 3px 100%, 0 calc(100% - 3px));
+  transition: border-color 120ms ease, background 120ms ease;
+}
+#app .recent-mini:hover {
+  border-color: rgba(154,136,102,0.55);
+  background: #242424;
+}
+#app .recent-mini.selected {
+  border-color: #9a8866;
+  box-shadow: inset 2px 0 0 #9a8866;
+}
+#app .recent-img {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  background: #232323;
+  border: 1px solid rgba(58,51,43,0.8);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+#app .recent-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 3px;
+}
+#app .recent-img .ph {
+  position: absolute;
+  font-size: 0.7rem;
+  color: #6a6a6a;
+  opacity: 0.5;
+}
+#app .recent-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+#app .recent-name {
+  font-size: 0.7rem;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+#app .recent-qty {
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  color: rgba(154,136,102,0.75);
+  font-variant-numeric: tabular-nums;
+}
+
+/* —— 5. SELECTED catalog card: immediate, no glow —— */
+#app .recipe-card.selected {
+  border-color: #9a8866 !important;
+  background: #252525 !important;
+  box-shadow:
+    inset 3px 0 0 #9a8866,
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 8px 16px rgba(0,0,0,0.38) !important;
+  transform: translateY(-1px);
+}
+#app .recipe-card.selected .card-img-zone {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    inset 0 -8px 14px rgba(0,0,0,0.22),
+    inset 0 0 0 1px rgba(154,136,102,0.32) !important;
+}
+
+/* —— 6. PRESQUE: soft ochre, readable, not a huge badge —— */
+#app .card-state-badge.almost {
+  color: #c4a070 !important;
+  border-color: rgba(176, 122, 72, 0.5) !important;
+  background: rgba(36, 28, 18, 0.92) !important;
+  filter: none !important;
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+  padding: 2px 5px;
+}
+#app .recipe-card.state-almost {
+  border-color: rgba(120, 96, 64, 0.7);
+}
+#app .recipe-card.selected.state-almost {
+  border-color: #9a8866 !important;
+}
+
+/* —— 7. RARITY: stronger liseré, no full-card recolor —— */
+#app .recipe-card.rarity-common {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+#app .recipe-card.rarity-rare .card-img-zone::after,
+#app .recipe-card.rarity-epic .card-img-zone::after,
+#app .recipe-card.rarity-legendary .card-img-zone::after {
+  width: 3px !important;
+  opacity: 0.95 !important;
+}
+#app .recipe-card.rarity-rare {
+  box-shadow: inset 0 1px 0 rgba(90, 112, 136, 0.28);
+}
+#app .recipe-card.rarity-epic {
+  box-shadow: inset 0 1px 0 rgba(122, 90, 130, 0.28);
+}
+#app .recipe-card.rarity-legendary {
+  box-shadow: inset 0 1px 0 rgba(154, 136, 102, 0.32);
+}
+#app .recipe-card.rarity-legendary.selected {
+  box-shadow:
+    inset 3px 0 0 #9a8866,
+    inset 0 1px 0 rgba(154,136,102,0.28),
+    0 8px 16px rgba(0,0,0,0.38) !important;
+}
+
+/* —— 9. LEFT COLUMN: primary filters, secondary folded —— */
+#app .filters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#app .filters-primary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+#app .filters-more {
+  margin: 0;
+}
+#app .filters-more-toggle {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(154,148,138,0.7);
+  cursor: pointer;
+  padding: 3px 2px;
+}
+#app .filters-more-toggle::-webkit-details-marker { display: none; }
+#app .filters-more-toggle::after {
+  content: "+";
+  font-size: 0.72rem;
+  color: rgba(154,136,102,0.7);
+}
+#app .filters-more[open] > .filters-more-toggle::after { content: "–"; }
+#app .filters-more-toggle:hover { color: #9a8866; }
+#app .filters-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+}
+#app .filters-secondary .chip {
+  opacity: 0.9;
+  font-size: 0.58rem;
+}
+#app .nav-rarity { margin-top: 8px; }
+
+#app .rarity-filters.filters { flex-direction: row; flex-wrap: wrap; gap: 3px; }
