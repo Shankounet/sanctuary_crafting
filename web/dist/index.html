@@ -609,34 +609,27 @@
 </div>
 
 
-<!-- Craft Tracker v2.6.0 — floating productions HUD (outside #app / #book-app) -->
+<!-- Craft Tracker — floating productions HUD (outside #app / #book-app) -->
 <div id="craft-tracker" class="mode-expanded" aria-live="polite" aria-label="Suivi des productions">
   <div class="ct-shell">
     <header class="ct-header" id="ct-header">
-      <span class="ct-grip" id="ct-grip" title="Déplacer" aria-hidden="true"><i class="fa-solid fa-grip-vertical"></i></span>
       <p class="ct-title">Productions</p>
       <span class="ct-count" id="ct-count">0</span>
-      <button type="button" class="ct-btn" id="ct-pin" title="Épingler" aria-label="Épingler le tracker" aria-pressed="false">
+      <button type="button" class="ct-btn" id="ct-pin" title="Épingler le widget" aria-label="Épingler le widget" aria-pressed="false">
         <i class="fa-solid fa-thumbtack" aria-hidden="true"></i>
       </button>
-      <button type="button" class="ct-btn ct-btn-expand" id="ct-expand" title="Agrandir" aria-label="Agrandir">
-        <span class="ct-expand-ico" aria-hidden="true">↗</span>
-      </button>
-      <button type="button" class="ct-btn ct-btn-mode" id="ct-mode" title="Mode d'affichage" aria-label="Changer le mode">
-        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
-      </button>
-      <button type="button" class="ct-btn ct-btn-reset" id="ct-reset" title="Réinitialiser la position" aria-label="Réinitialiser la position">
-        <i class="fa-solid fa-crosshairs" aria-hidden="true"></i>
-      </button>
-      <button type="button" class="ct-btn ct-btn-hide" id="ct-hide" title="Masquer" aria-label="Masquer le tracker">
-        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      <button type="button" class="ct-btn ct-btn-reduce" id="ct-reduce" title="Réduire" aria-label="Réduire">
+        <i class="fa-solid fa-minus" aria-hidden="true"></i>
       </button>
     </header>
-    <div class="ct-minimal" id="ct-minimal" aria-hidden="true">
+    <div class="ct-reduced" id="ct-reduced" aria-hidden="true">
       <i class="fa-solid fa-hammer" aria-hidden="true"></i>
-      <span id="ct-minimal-count">0</span>
+      <span id="ct-reduced-count">0</span>
+      <span class="ct-reduced-sep" aria-hidden="true">•</span>
+      <span id="ct-reduced-pct">0%</span>
     </div>
     <div class="ct-list" id="ct-list"></div>
+    <p class="ct-waiting" id="ct-waiting" hidden></p>
   </div>
 </div>
 

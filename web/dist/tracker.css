@@ -93,19 +93,11 @@
   padding: 8px 10px;
   border-bottom: 1px solid var(--ct-line);
   background: linear-gradient(180deg, #242424, #1b1b1b);
-}
-
-#craft-tracker .ct-grip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  color: var(--ct-muted);
   cursor: grab;
-  flex-shrink: 0;
 }
-#craft-tracker .ct-grip:active { cursor: grabbing; }
-#craft-tracker.mode-minimal .ct-grip { display: none; }
+#craft-tracker .ct-header:active { cursor: grabbing; }
+#craft-tracker .ct-header .ct-btn { cursor: pointer; }
+#craft-tracker.is-dragging .ct-header { cursor: grabbing; }
 
 #craft-tracker .ct-title {
   flex: 1;
@@ -265,8 +257,7 @@
 #craft-tracker .ct-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, #7a6b4e, var(--ct-accent));
-  box-shadow: 0 0 8px rgba(154, 136, 102, 0.35);
+  background: var(--ct-accent);
   transition: width 0.2s linear;
 }
 
@@ -300,59 +291,13 @@
 #craft-tracker .ct-job:hover .ct-dismiss { opacity: 1; }
 #craft-tracker .ct-dismiss:hover { color: var(--ct-text); }
 
-/* Modes */
+/* Modes — header stays (pin + reduce). Compact/minimal share reduced body. */
 #craft-tracker.mode-normal,
 #craft-tracker.mode-expanded { width: 292px; }
-#craft-tracker.mode-compact { width: 240px; cursor: pointer; }
-#craft-tracker.mode-compact .ct-job { padding: 8px; grid-template-columns: 32px 1fr; }
-#craft-tracker.mode-compact .ct-thumb { width: 32px; height: 32px; }
-#craft-tracker.mode-compact .ct-phase { display: none; }
-#craft-tracker.mode-compact .ct-meta .ct-pct { display: none; }
-#craft-tracker.mode-compact .ct-btn-reset { display: none; }
-#craft-tracker .ct-btn-expand { display: none; }
-#craft-tracker.mode-compact .ct-btn-expand {
-  display: inline-flex;
-  color: var(--ct-accent);
-}
-#craft-tracker.mode-compact .ct-btn-expand .ct-expand-ico {
-  font-size: 13px;
-  line-height: 1;
-  font-weight: 700;
-}
+#craft-tracker.mode-compact,
+#craft-tracker.mode-minimal { width: 220px; }
 
-#craft-tracker.mode-minimal {
-  width: auto;
-  min-width: 0;
-  cursor: pointer;
-  pointer-events: auto;
-}
-#craft-tracker.mode-minimal.is-visible {
-  pointer-events: auto;
-}
-#craft-tracker.mode-minimal .ct-shell {
-  background: rgba(26, 26, 26, 0.92);
-  pointer-events: auto;
-  cursor: pointer;
-}
-#craft-tracker.mode-minimal .ct-header {
-  display: none;
-}
-#craft-tracker.mode-minimal .ct-title,
-#craft-tracker.mode-minimal .ct-btn-mode,
-#craft-tracker.mode-minimal .ct-btn-expand,
-#craft-tracker.mode-minimal .ct-btn-hide,
-#craft-tracker.mode-minimal .ct-list,
-#craft-tracker.mode-minimal .ct-btn-reset,
-#craft-tracker.mode-minimal .ct-btn,
-#craft-tracker.mode-minimal .ct-count {
-  display: none;
-}
-#craft-tracker.mode-minimal.is-visible .ct-minimal {
-  display: inline-flex;
-  pointer-events: auto;
-  cursor: pointer;
-}
-#craft-tracker .ct-minimal {
+#craft-tracker .ct-reduced {
   display: none;
   align-items: center;
   gap: 8px;
@@ -361,9 +306,44 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   font-size: 11px;
-  pointer-events: auto;
 }
-#craft-tracker .ct-minimal i { font-size: 14px; }
+#craft-tracker .ct-reduced i { font-size: 14px; color: var(--ct-accent); }
+#craft-tracker .ct-reduced-sep { color: var(--ct-muted); font-weight: 400; }
+#craft-tracker #ct-reduced-pct {
+  color: var(--ct-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+#craft-tracker.mode-compact .ct-list,
+#craft-tracker.mode-minimal .ct-list,
+#craft-tracker.mode-compact .ct-waiting,
+#craft-tracker.mode-minimal .ct-waiting {
+  display: none;
+}
+#craft-tracker.mode-compact .ct-reduced,
+#craft-tracker.mode-minimal .ct-reduced {
+  display: flex;
+}
+#craft-tracker.mode-compact .ct-header,
+#craft-tracker.mode-minimal .ct-header {
+  display: flex;
+}
+
+#craft-tracker .ct-waiting {
+  margin: 0;
+  padding: 6px 10px 8px;
+  color: var(--ct-warn);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+#craft-tracker .ct-waiting[hidden] { display: none !important; }
+
+#craft-tracker .ct-btn-reduce { color: var(--ct-muted); }
+#craft-tracker.mode-compact .ct-btn-reduce,
+#craft-tracker.mode-minimal .ct-btn-reduce { color: var(--ct-accent); }
 
 /* Compact overlay — Paramètres HUD (not a layout rewrite) */
 #hud-settings {
