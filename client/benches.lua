@@ -192,3 +192,13 @@ RegisterNetEvent('sanctuary_crafting:client:adminPreviewBench', function(categor
         if DoesEntityExist(obj) then DeleteEntity(obj) end
     end)
 end)
+
+-- Heat particles (Config.Stations.Heat.Particles, default off)
+RegisterNetEvent('sanctuary_crafting:client:heatFx', function(coords, temp)
+    local h = Config.Stations and Config.Stations.Heat
+    if not h or h.Particles ~= true then return end
+    if not coords then return end
+    -- Light smoke only when explicitly enabled; no mix-blend / extra assets.
+    UseParticleFxAssetNextCall('core')
+    StartParticleFxNonLoopedAtCoord('ent_sht_steam', coords.x or coords[1], coords.y or coords[2], (coords.z or coords[3] or 0) + 0.4, 0.0, 0.0, 0.0, 0.4, false, false, false)
+end)

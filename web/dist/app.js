@@ -982,6 +982,23 @@
         rowL.classList.add('hidden');
       }
     }
+    const ventRow = $('#row-station-vent');
+    const ventEl = $('#d-station-vent');
+    const qRow = $('#row-station-queue');
+    const qEl2 = $('#d-station-queue');
+    const meta = state.menuMeta || {};
+    if (ventRow && ventEl) {
+      if (meta.ventilation != null) {
+        ventRow.classList.remove('hidden');
+        ventEl.textContent = String(meta.ventilation);
+      } else ventRow.classList.add('hidden');
+    }
+    if (qRow && qEl2) {
+      const used = meta.queue != null ? meta.queue : ((state.queue && state.queue.length) || 0);
+      const cap = meta.queueSize || state.queueMax || 5;
+      qEl2.textContent = `${used}/${cap}`;
+      qRow.classList.remove('hidden');
+    }
 
     // —— Materials ——
     const ings = $('#d-ings');
@@ -1021,6 +1038,11 @@
           <span class="wear-bar" aria-hidden="true"><i></i></span>
         `;
         bindItemImg(li.querySelector('img'), t.item, null);
+        const bar = li.querySelector('.wear-bar i');
+        if (bar) {
+          const dur = (r.toolDurability != null) ? Number(r.toolDurability) : null;
+          bar.style.width = (dur != null && !Number.isNaN(dur)) ? `${Math.max(0, Math.min(100, dur))}%` : '0%';
+        }
         toolsUl.appendChild(li);
       });
     }
@@ -1349,10 +1371,47 @@
     bindItemImg($('#fab-active-img'), resultItem, $('#fab-active-img-fallback'));
   }
 
+  function batchCap(recipe) {
+    const cfg = state.batch || {};
+    const hard = Number(cfg.hardCap) || 100;
+    const maxB = Number(cfg.maxBatch) || 50;
+    let cap = Math.min(maxB, hard);
+    if (recipe) {
+      const rec = Number(recipe.batchMax || recipe.maxQuantity);
+      if (!Number.isNaN(rec) && rec > 0) cap = Math.min(cap, rec);
+      (recipe.ingredients || []).forEach((ing) => {
+        const need = Number(ing.count) || 1;
+        const owned = Number(ing.owned) || 0;
+        if (need > 0) cap = Math.min(cap, Math.floor(owned / need));
+      });
+      if (recipe.toolDurability != null && Number(recipe.toolDurability) <= 0 && (recipe.tools || recipe.requireTool)) {
+        cap = 0;
+      }
+    }
+    if (cap < 0 || !Number.isFinite(cap)) cap = 0;
+    return cap;
+  }
+
+  function clampBatchInput(recipe) {
+    const el = $('#batch');
+    if (!el) return 1;
+    let n = parseInt(el.value, 10);
+    if (!Number.isFinite(n) || n < 1) n = 1;
+    const cap = Math.max(1, batchCap(recipe || state.selected) || 1);
+    const hard = (state.batch && state.batch.hardCap) || 100;
+    if (n > hard) n = hard;
+    if (n > cap) n = cap;
+    if (n < 1) n = 1;
+    el.value = String(n);
+    el.max = String(Math.min(hard, Math.max(1, cap)));
+    return n;
+  }
+
   function updateActionBar(r) {
+
     const recipe = r || state.selected;
     const batchEl = $('#batch');
-    const batch = Math.max(1, parseInt(batchEl && batchEl.value, 10) || 1);
+    const batch = clampBatchInput(recipe);
 
     const lotEl = $('#fab-ready-lot');
     if (lotEl) lotEl.textContent = `×${batch}`;
@@ -1377,6 +1436,13 @@
           xpEl.textContent = '—';
         }
       }
+      const matsEl = $('#fab-ready-mats');
+      if (matsEl) {
+        const ings = recipe.ingredients || [];
+        const missing = ings.filter((ing) => (ing.owned || 0) < ((ing.count || 1) * batch)).length;
+        const ok = ings.length - missing;
+        matsEl.textContent = ings.length ? `${ok}/${ings.length}` : '—';
+      }
       const noiseChip = $('#fab-chip-noise');
       const noiseVal = $('#fab-ready-noise');
       if (noiseChip && noiseVal) {
@@ -1392,7 +1458,7 @@
       if (energyChip && energyVal) {
         if (recipe.powerCost != null) {
           energyChip.classList.remove('hidden');
-          energyVal.textContent = String(recipe.powerCost);
+          energyVal.textContent = String((Number(recipe.powerCost) || 0) * (state.flags.batch ? batch : 1));
         } else {
           energyChip.classList.add('hidden');
         }
@@ -1735,17 +1801,79 @@
     }
   }
 
+  function fillStationOps(data) {
+    const wrap = $('#station-ops');
+    if (!wrap) return;
+    const show = !!(data && (data.canUpgrade || data.canModule || data.conditionEnabled));
+    wrap.classList.toggle('hidden', !show);
+    if (!show) return;
+    const btnM = $('#btn-maintain');
+    const btnR = $('#btn-repair');
+    const btnU = $('#btn-upgrade');
+    if (btnM) btnM.classList.toggle('hidden', !data.conditionEnabled);
+    if (btnR) btnR.classList.toggle('hidden', !data.conditionEnabled);
+    if (btnU) {
+      const lvl = data.stationLevel || 1;
+      const max = data.maxLevel || 3;
+      btnU.classList.toggle('hidden', !data.canUpgrade || lvl >= max);
+    }
+    const ul = $('#station-modules');
+    if (!ul) return;
+    ul.innerHTML = '';
+    const catalog = data.moduleCatalog || [];
+    const installed = Array.isArray(data.modules) ? data.modules : Object.keys(data.modules || {});
+    const instSet = {};
+    installed.forEach((id) => { instSet[id] = true; });
+    const rows = catalog.length ? catalog : installed.map((id) => ({ id, label: id, installed: true }));
+    rows.forEach((mod) => {
+      const li = document.createElement('li');
+      const on = mod.installed || instSet[mod.id];
+      li.innerHTML = `<span class="${on ? 'mod-on' : 'mod-off'}">${escapeHtml(mod.label || mod.id)}</span>`;
+      if (!on && data.canModule) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'ghost compact';
+        b.textContent = 'Installer';
+        b.addEventListener('click', async (ev) => {
+          ev.stopPropagation();
+          const r = await post('addStationModule', { benchKey: state.benchKey, moduleId: mod.id });
+          if (r && r.ok) showToast('Module installé', 'ok');
+          else showToast('Installation impossible', 'err');
+          await refresh();
+        });
+        li.appendChild(b);
+      }
+      ul.appendChild(li);
+    });
+    if (!rows.length) {
+      ul.innerHTML = '<li class="mod-off">Aucun module</li>';
+    }
+  }
+
   function updateStationHeader(data) {
+
     state.menuMeta = {
       label: data.label,
       category: data.category,
       stationLevel: data.stationLevel,
       powered: data.powered,
-      modules: data.modules || {},
+      modules: data.modules || [],
       energy: data.energy,
       efficiency: data.efficiency,
       condition: data.condition || data.etat,
+      temp: data.temp,
+      ventilation: data.ventilation,
+      queue: data.queue,
+      queueSize: data.queueSize,
+      moduleCatalog: data.moduleCatalog || [],
+      canUpgrade: data.canUpgrade,
+      canModule: data.canModule,
+      conditionEnabled: data.conditionEnabled,
+      heatEnabled: data.heatEnabled,
+      brokenParts: data.brokenParts || [],
+      maxLevel: data.maxLevel,
     };
+    if (data.batch) state.batch = data.batch;
     const title = data.label || 'Atelier';
     $('#station-title').textContent = title;
     const powered = data.powered !== false;
@@ -1805,9 +1933,8 @@
     if (ledState) ledState.className = `led-dot ${stateCls}`;
     if (gaugeState) gaugeState.style.width = `${statePct}%`;
 
-    const mods = data.modules || {};
-    const modCount = Array.isArray(mods) ? mods.length : Object.keys(mods).length;
-    const eff = data.efficiency != null ? data.efficiency : (100 + modCount * 5);
+    const mods = data.modules || [];
+    const eff = data.efficiency;
     const effEl = $('#stat-eff');
     const gaugeEff = $('#gauge-eff');
     const plateEff = $('#plate-eff');
@@ -1821,6 +1948,23 @@
     } else if (plateEff) {
       plateEff.classList.add('hidden');
     }
+
+    const plateTemp = $('#plate-temp');
+    const tempEl = $('#stat-temp');
+    const gaugeTemp = $('#gauge-temp');
+    if (data.heatEnabled && data.temp != null && plateTemp) {
+      plateTemp.classList.remove('hidden');
+      const temp = Number(data.temp);
+      tempEl.textContent = Number.isNaN(temp) ? String(data.temp) : `${Math.round(temp)}°`;
+      tempEl.className = 't-l5' + (temp >= 95 ? ' bad' : temp >= 85 ? ' warn' : '');
+      plateTemp.classList.toggle('bad', temp >= 95);
+      plateTemp.classList.toggle('warn', temp >= 85 && temp < 95);
+      if (gaugeTemp && !Number.isNaN(temp)) gaugeTemp.style.width = `${Math.max(5, Math.min(100, temp))}%`;
+    } else if (plateTemp) {
+      plateTemp.classList.add('hidden');
+    }
+
+    fillStationOps(data);
 
     const energyWrap = $('#stat-energy-wrap');
     const led = $('#led-power');
@@ -1867,6 +2011,8 @@
     const rarityNav = $('#rarity-filters');
     if (rarityNav) rarityNav.hidden = !uxOn('rarityFilters', true);
     state.flags = data.flags || {};
+    if (data.batch) state.batch = data.batch;
+    if (data.queueSize != null) state.queueMax = data.queueSize;
     state.ux = (data.ui && data.ui.Ux) || data.ux || state.ux || {};
     state.compare = data.compare || { enabled: !!(state.flags && state.flags.compare), map: {} };
     if (data.queueMax != null) state.queueMax = data.queueMax;
@@ -1915,13 +2061,29 @@
         <div class="qlabel">${escapeHtml(e.label || e.recipeId)}</div>
         <div class="qmeta"><span>Lot ×${escapeHtml(qty)} · ${Math.round(done * 100)}%</span><span>${eta}</span></div>
         <div class="qbar"><div class="qfill" style="width:${Math.round(done * 100)}%"></div></div>
+        <div class="qactions">
+          <button type="button" class="ghost compact qcancel" data-qid="${escapeHtml(e.craftId)}">Annuler</button>
+        </div>
       `;
-      card.addEventListener('click', async () => {
+      card.addEventListener('click', async (ev) => {
+        if (ev.target && ev.target.closest && ev.target.closest('.qcancel')) return;
         if (left <= 0) {
           await post('queueCollect', { craftId: e.craftId });
           await loadQueue();
+          await refresh();
         }
       });
+      const cancelBtn = card.querySelector('.qcancel');
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', async (ev) => {
+          ev.stopPropagation();
+          const r = await post('queueCancel', { craftId: e.craftId });
+          if (r && r.ok) showToast('Retiré de la file', 'ok');
+          else showToast('Annulation impossible', 'err');
+          await loadQueue();
+          await refresh();
+        });
+      }
       track.appendChild(card);
     });
     syncFabQueueMini();
@@ -2101,6 +2263,38 @@
       if (state.selected) updateActionBar(state.selected);
     });
   }
+  const presets = $('#batch-presets');
+  if (presets) {
+    presets.addEventListener('click', (ev) => {
+      const btn = ev.target && ev.target.closest && ev.target.closest('[data-batch]');
+      if (!btn || !batchInput) return;
+      const v = btn.getAttribute('data-batch');
+      if (v === 'max') {
+        batchInput.value = String(Math.max(1, batchCap(state.selected)));
+      } else {
+        batchInput.value = String(v);
+      }
+      if (state.selected) updateActionBar(state.selected);
+    });
+  }
+  bindUi('#btn-maintain', 'click', async () => {
+    const r = await post('maintainStation', { benchKey: state.benchKey });
+    if (r && r.ok) showToast('Station entretenue', 'ok');
+    else showToast('Entretien impossible', 'err');
+    await refresh();
+  });
+  bindUi('#btn-repair', 'click', async () => {
+    const r = await post('repairStation', { benchKey: state.benchKey });
+    if (r && r.ok) showToast('Station réparée', 'ok');
+    else showToast('Réparation impossible', 'err');
+    await refresh();
+  });
+  bindUi('#btn-upgrade', 'click', async () => {
+    const r = await post('upgradeStation', { benchKey: state.benchKey });
+    if (r && r.ok) showToast('Station améliorée', 'ok');
+    else showToast('Amélioration impossible', 'err');
+    await refresh();
+  });
   bindUi('#btn-fav', 'click', async () => {
     if (!state.selected) return;
     const was = isFavorite(state.selected.id);

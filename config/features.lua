@@ -2,23 +2,7 @@
 
 Config = Config or {}
 
-Config.Stations = {
-    UpgradesEnabled = true,
-    DefaultLevel = 1,
-    MaxLevel = 5,
-    Upgrades = {
-        scrap = {
-            [2] = { label = 'Établi renforcé', requireLevel = 2, costItems = { { item = 'scrap_metal', count = 20 } } },
-            [3] = { label = 'Établi industriel', requireLevel = 4, costItems = { { item = 'metal_plate', count = 5 } } },
-        },
-        mechanic = {
-            [2] = { label = 'Pont basique', requireLevel = 2, costItems = { { item = 'metal_plate', count = 3 } } },
-        },
-    },
-    Modules = {
-        'power_cell', 'storage_rack', 'precision_kit',
-    },
-}
+-- Config.Stations : voir config/stations.lua (v2.15 modules / niveaux / usure / chaleur)
 
 Config.Blueprints = {
     Enabled = true,
@@ -37,13 +21,21 @@ Config.Tools = {
     Enabled = true,
     DurabilityKey = 'durability',
     DefaultDurability = 100,
+    WearPerCraft = 1,
 }
 
 Config.Byproducts = { Enabled = true }
 
 Config.Batch = {
     Enabled = true,
-    MaxBatch = 10,
+    MaxBatch = 50,
+    HardCap = 100,
+    Presets = { 1, 5, 10, 'max' },
+}
+
+Config.Signature = {
+    Enabled = true,
+    DefaultMode = 'batch', -- none | batch | individual
 }
 
 Config.Noise = {

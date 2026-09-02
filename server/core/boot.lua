@@ -100,6 +100,10 @@ local function autoMigrate()
     for i = 1, #statements do
         MySQL.query.await(statements[i])
     end
+    -- v2.15 placed-bench columns (ignore duplicate)
+    pcall(function() MySQL.query.await('ALTER TABLE sanctuary_placed_benches ADD COLUMN condition_pct FLOAT NOT NULL DEFAULT 100') end)
+    pcall(function() MySQL.query.await('ALTER TABLE sanctuary_placed_benches ADD COLUMN heat FLOAT NOT NULL DEFAULT 20') end)
+    pcall(function() MySQL.query.await('ALTER TABLE sanctuary_placed_benches ADD COLUMN broken_parts LONGTEXT NULL') end)
 end
 
 CreateThread(function()

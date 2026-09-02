@@ -210,6 +210,34 @@ RegisterNUICallback('queueCollect', function(data, cb)
     cb(r or { ok = false })
 end)
 
+RegisterNUICallback('queueCancel', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:queueCancel', false, data.craftId)
+    if trackerEnabled() and data.craftId and r and r.ok then
+        CraftTracker.Remove(data.craftId)
+    end
+    cb(r or { ok = false })
+end)
+
+RegisterNUICallback('addStationModule', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:addStationModule', false, data.benchKey or lastBenchKey, data.moduleId)
+    cb(r or { ok = false })
+end)
+
+RegisterNUICallback('upgradeStation', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:upgradeStation', false, data.benchKey or lastBenchKey)
+    cb(r or { ok = false })
+end)
+
+RegisterNUICallback('repairStation', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:repairStation', false, data.benchKey or lastBenchKey)
+    cb(r or { ok = false })
+end)
+
+RegisterNUICallback('maintainStation', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:maintainStation', false, data.benchKey or lastBenchKey)
+    cb(r or { ok = false })
+end)
+
 RegisterNUICallback('shopping', function(data, cb)
     local r = lib.callback.await('sanctuary_crafting:shoppingBuild', false, data.recipeId, data.batch)
     cb(r or { ok = false })

@@ -259,7 +259,19 @@ local function rollQuality(src, recipe)
         if m >= 50 then idx = math.min(#tiers, idx + 1) end
         if m >= 90 then idx = math.min(#tiers, idx + 1) end
     end
+    if StationRuntime and StationRuntime.QualityNudge then
+        -- bench optional via recipe._benchHint set by caller
+        local nudge = StationRuntime.QualityNudge(recipe._benchHint)
+        idx = math.min(#tiers, math.max(1, idx + nudge))
+    end
     return tiers[idx] or Config.Quality.DefaultTier or 'normal'
+end
+
+function CraftingPipeline.RollQuality(src, recipe, bench)
+    if recipe and bench then recipe._benchHint = bench end
+    local q = rollQuality(src, recipe)
+    if recipe then recipe._benchHint = nil end
+    return q
 end
 
 local function applyToolCost(src, recipe)
@@ -335,22 +347,18 @@ local function checkIdentityGates(src, recipe, bench)
     return true
 end
 
-local function validateStart(src, recipeId, benchKey, batch)
-    batch = math.floor(tonumber(batch) or 1)
-    if batch < 1 then batch = 1 end
-    if Config.Batch and Config.Batch.Enabled then
-        local maxB = Config.Batch.MaxBatch or 10
-        local recipe = Config.RecipeById[recipeId]
-        if recipe and recipe.batchMax then maxB = math.min(maxB, recipe.batchMax) end
-        if batch > maxB then return nil, 'craft_batch_max' end
-    else
-        batch = 1
-    end
+function CraftingPipeline.CheckIdentityGates(src, recipe, bench)
+    return checkIdentityGates(src, recipe, bench)
+end
+
+local function validateStart(src, recipeId, benchKey, batch, opts)
+    opts = opts or {}
+    local queued = opts.queued == true
 
     if type(recipeId) ~= 'string' or type(benchKey) ~= 'string' then
         return nil, 'craft_invalid'
     end
-    if not Validation.CanStartAnotherCraft(src) then
+    if not queued and not Validation.CanStartAnotherCraft(src) then
         return nil, 'craft_busy'
     end
     local okRate, rateReason = Validation.CheckRateLimit(src)
@@ -379,6 +387,34 @@ local function validateStart(src, recipeId, benchKey, batch)
 
     if CraftingPower and CraftingPower.CanRunRecipe and not CraftingPower.CanRunRecipe(bench, recipe) then return nil, 'craft_no_power' end
     if not Benches.MeetsStationLevel(bench, recipe) then return nil, 'craft_station_level' end
+    if StationRuntime and StationRuntime.CanRun then
+        local okRun, runReason = StationRuntime.CanRun(bench, recipe)
+        if not okRun then return nil, runReason or 'craft_failed' end
+    end
+
+    if CraftBatch and CraftBatch.Clamp then
+        local clamped, lim = CraftBatch.Clamp(src, recipe, bench, batch, { queued = queued })
+        if Config.Batch and Config.Batch.Enabled == false then
+            clamped = 1
+        end
+        if clamped < 1 then
+            if lim and lim.queue == 0 and queued then return nil, 'queue_full' end
+            if lim and lim.tools == 0 then return nil, 'craft_tool_required' end
+            if lim and lim.energy == 0 then return nil, 'craft_no_power' end
+            if lim and lim.mats == 0 then return nil, 'craft_no_ingredients' end
+            return nil, 'craft_batch_max'
+        end
+        local hard = CraftBatch.HardCap and CraftBatch.HardCap() or 100
+        local req = math.floor(tonumber(batch) or 1)
+        if req > hard or req > (lim and lim.recipe or hard) then
+            -- requested above cap
+            batch = clamped
+        else
+            batch = clamped
+        end
+    else
+        batch = math.max(1, math.floor(tonumber(batch) or 1))
+    end
 
     local okSkill, skillReason, skillArgs = true, nil, nil
     if CraftingSkills and CraftingSkills.CheckRecipeGates then
@@ -415,12 +451,18 @@ local function validateStart(src, recipeId, benchKey, batch)
         return nil, 'craft_inventory_full'
     end
 
-    if not applyToolCost(src, recipe) then return nil, 'craft_tool_required' end
+    if Tools and Tools.HasRecipe and not Tools.HasRecipe(src, recipe) then
+        return nil, 'craft_tool_required'
+    end
 
     return {
         recipe = recipe, bench = bench, batch = batch,
         ingredients = ingredients,
     }
+end
+
+function CraftingPipeline.ValidateStart(src, recipeId, benchKey, batch, opts)
+    return validateStart(src, recipeId, benchKey, batch, opts)
 end
 
 lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, benchKey, batch)
@@ -433,17 +475,10 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
 
     local recipe, bench = ctx.recipe, ctx.bench
     local removed = false
-    if Config.Crafting and Config.Crafting.RemoveIngredientsOnStart ~= false then
-        for i = 1, #ctx.ingredients do
-            local ing = ctx.ingredients[i]
-            if not exports.ox_inventory:RemoveItem(src, ing.item, ing.count) then
-                -- refund partial
-                for j = 1, i - 1 do
-                    local p = ctx.ingredients[j]
-                    exports.ox_inventory:AddItem(src, p.item, p.count)
-                end
-                return { ok = false, reason = 'craft_no_ingredients' }
-            end
+    if CraftingMaterials and CraftingMaterials.ConsumeOnStart and CraftingMaterials.ConsumeOnStart() then
+        local okTake = CraftingMaterials.Take(src, ctx.ingredients)
+        if not okTake then
+            return { ok = false, reason = 'craft_no_ingredients' }
         end
         removed = true
     end
@@ -452,6 +487,9 @@ lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, b
     local totalSteps = recipeHasSteps(recipe) and #recipe.steps or 1
     local rawDur = stepDuration(recipe, stepIndex)
     local duration = CraftingSkills.ApplyCraftTimeBonus(rawDur, src)
+    if StationRuntime and StationRuntime.ApplyDuration then
+        duration = StationRuntime.ApplyDuration(duration, bench)
+    end
     if ctx.batch > 1 then
         duration = math.floor(duration * ctx.batch * 0.85) -- slight batch efficiency
     end
@@ -587,6 +625,23 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
         return { ok = false, reason = 'craft_failed' }
     end
 
+    -- Optional wear/heat fail (not frustrating; small chance when damaged/overheat)
+    if StationRuntime then
+        local fail = StationRuntime.FailChance and StationRuntime.FailChance(bench) or 0
+        if StationRuntime.HeatEnabled and StationRuntime.HeatEnabled(bench) then
+            local h = Config.Stations and Config.Stations.Heat or {}
+            if StationRuntime.GetTemp(bench) >= (h.OverheatAt or 85) then
+                fail = fail + (h.BreakdownChanceOverheat or 0.04)
+            end
+        end
+        if fail > 0 and math.random() < math.min(0.25, fail) then
+            craft.state = 'failed'
+            clearActive(craftId, craft.removed)
+            if StationRuntime.Degrade then StationRuntime.Degrade(bench, recipe, craft.batch or 1) end
+            return { ok = false, reason = 'craft_failed' }
+        end
+    end
+
     -- Lock BEFORE rewards so a second call cannot grant twice
     craft.state = 'completing'
     craft.completed = true
@@ -653,6 +708,9 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
         local nextStep = recipe.steps[nextIndex]
         local rawDur = stepDuration(recipe, nextIndex)
         local duration = CraftingSkills.ApplyCraftTimeBonus(rawDur, src)
+        if StationRuntime and StationRuntime.ApplyDuration then
+            duration = StationRuntime.ApplyDuration(duration, bench)
+        end
         if (craft.batch or 1) > 1 then
             duration = math.floor(duration * craft.batch * 0.85)
         end
@@ -694,25 +752,38 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
             end
         end
     else
-        local meta = { craftUID = craft.craftUID, craftedBy = GetPlayerIdentifierSafe(src) }
-        local quality = rollQuality(src, recipe)
-        if quality then meta.quality = quality end
+        local quality = CraftingPipeline.RollQuality(src, recipe, bench)
 
         if not Validation.CanCarry(src, resultItem, resultCount) then
-            for i = 1, #craft.ingredients do
-                local ing = craft.ingredients[i]
-                exports.ox_inventory:AddItem(src, ing.item, ing.count)
+            if CraftingMaterials and CraftingMaterials.Give then
+                CraftingMaterials.Give(src, craft.ingredients)
+            else
+                for i = 1, #craft.ingredients do
+                    local ing = craft.ingredients[i]
+                    exports.ox_inventory:AddItem(src, ing.item, ing.count)
+                end
             end
             craft.state = 'failed'
             clearActive(craftId, false)
             return { ok = false, reason = 'craft_inventory_full' }
         end
 
-        local added = exports.ox_inventory:AddItem(src, resultItem, resultCount, meta)
-        if not added then
-            for i = 1, #craft.ingredients do
-                local ing = craft.ingredients[i]
-                exports.ox_inventory:AddItem(src, ing.item, ing.count)
+        local okGive = false
+        if CraftSignature and CraftSignature.GiveResult then
+            okGive = CraftSignature.GiveResult(src, recipe, bench, quality, craft.craftId, resultCount)
+        else
+            local meta = { craftedBy = GetPlayerIdentifierSafe(src) }
+            if quality then meta.quality = quality end
+            okGive = exports.ox_inventory:AddItem(src, resultItem, resultCount, meta) and true or false
+        end
+        if not okGive then
+            if CraftingMaterials and CraftingMaterials.Give then
+                CraftingMaterials.Give(src, craft.ingredients)
+            else
+                for i = 1, #craft.ingredients do
+                    local ing = craft.ingredients[i]
+                    exports.ox_inventory:AddItem(src, ing.item, ing.count)
+                end
             end
             craft.state = 'failed'
             clearActive(craftId, false)
@@ -720,6 +791,12 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
         end
         given[#given + 1] = { item = resultItem, count = resultCount, quality = quality }
         giveByproducts(src, recipe)
+        if Tools and Tools.WearRecipe then
+            Tools.WearRecipe(src, recipe, batch)
+        end
+        if StationRuntime and StationRuntime.Degrade then
+            StationRuntime.Degrade(bench, recipe, batch)
+        end
     end
 
     craftLog(('[CRAFT] reward granted id=%s item=%s count=%s'):format(
@@ -1434,22 +1511,33 @@ local function buildRecipeEntry(src, r, ctx)
         end
     end
 
+    local bench = ctx and ctx.bench
+    if bench and Benches and Benches.MeetsStationLevel and not Benches.MeetsStationLevel(bench, r) then
+        canCraft, lockReason, lockArgs = false, 'craft_station_level', { r.stationLevel, bench.stationLevel or 1 }
+    end
+    if StationRuntime and StationRuntime.CanRun and bench then
+        local okRun, runReason = StationRuntime.CanRun(bench, r)
+        if not okRun then
+            canCraft, lockReason, lockArgs = false, runReason or 'craft_failed', nil
+        end
+    end
+    if Tools and Tools.HasRecipe and not Tools.HasRecipe(src, r) then
+        if canCraft then
+            canCraft, lockReason, lockArgs = false, 'craft_tool_required', nil
+        end
+    end
+
     local toolDurability = nil
-    if Config.Tools and Config.Tools.Enabled and r.requireTool then
-        local toolItem = type(r.requireTool) == 'string' and r.requireTool or r.requireTool.item
-        if toolItem and GetResourceState('ox_inventory') == 'started' then
-            local slots = exports.ox_inventory:Search(src, 'slots', toolItem) or {}
-            local key = (Config.Tools.DurabilityKey) or 'durability'
-            for _, it in pairs(slots) do
-                if it then
-                    local meta = it.metadata or {}
-                    toolDurability = meta[key]
-                    if toolDurability == nil then
-                        toolDurability = Config.Tools.DefaultDurability or 100
-                    end
-                    break
-                end
-            end
+    local toolItem = nil
+    if r.tools and type(r.tools) == 'table' and r.tools[1] then
+        local t0 = r.tools[1]
+        toolItem = type(t0) == 'string' and t0 or t0.item
+    elseif r.requireTool then
+        toolItem = type(r.requireTool) == 'string' and r.requireTool or r.requireTool.item
+    end
+    if Config.Tools and Config.Tools.Enabled and toolItem then
+        if Tools and Tools.Durability then
+            toolDurability = Tools.Durability(src, toolItem)
         end
     end
 
@@ -1543,8 +1631,12 @@ local function buildRecipeEntry(src, r, ctx)
             return outT
         end)(), station = r.station, rarity = r.rarity,
         hideIfSkillLocked = r.hideIfSkillLocked, quality = r.quality, byproducts = r.byproducts,
-        queueable = r.queueable, batchMax = r.batchMax, dismantle = r.dismantle,
+        queueable = r.queueable, batchMax = r.batchMax or r.maxQuantity, maxQuantity = r.maxQuantity or r.batchMax,
+        dismantle = r.dismantle,
         stationLevel = r.stationLevel, powerCost = r.powerCost, noiseLevel = r.noiseLevel,
+        heat = r.heat, needsVentilation = r.needsVentilation, smoke = r.smoke,
+        signatureMode = (CraftSignature and CraftSignature.Mode and CraftSignature.Mode(r)) or r.signatureMode,
+        trackCrafter = r.trackCrafter, trackLot = r.trackLot,
         steps = stepsOut, chain = r.chain,
         canCraft = canCraft and hasItems, locked = not canCraft,
         missingItems = not hasItems, lockReason = lockReason, lockArgs = lockArgs,
@@ -1629,7 +1721,7 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
     if SurvivalBook and SurvivalBook.ListOrders and BookDB and BookDB.Mod and BookDB.Mod('Orders') then
         orders = SurvivalBook.ListOrders(src) or {}
     end
-    local ctx = { artisans = artisans, orders = orders, includeHints = true }
+    local ctx = { artisans = artisans, orders = orders, includeHints = true, bench = bench }
     local out = {}
     for i = 1, #recipes do
         out[#out + 1] = buildRecipeEntry(src, recipes[i], ctx)
@@ -1681,11 +1773,24 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
 
     local session = CraftingPipeline.GetSession(src, benchKey)
 
+    local snap = (StationRuntime and StationRuntime.Snapshot and StationRuntime.Snapshot(bench, src)) or {}
+    local realEff = snap.efficiency
+    local modsArr = snap.modules or bench.modules or {}
+    if type(modsArr) ~= 'table' then modsArr = {} end
+
     return {
         ok = true, benchKey = benchKey, category = bench.category,
         label = bench.label or _(Config.BenchLabels[bench.category] or 'bench_scrap'),
-        stationLevel = benchLevel, modules = bench.modules or {},
-        powered = (CraftingPower and CraftingPower.HasPower and CraftingPower.HasPower(bench)) or false,
+        stationLevel = snap.level or benchLevel, modules = modsArr,
+        powered = snap.powered,
+        condition = snap.condition, temp = snap.temp, ventilation = snap.ventilation,
+        efficiency = realEff, energy = snap.powered and 'OK' or 'Off',
+        queue = snap.queue, queueSize = snap.queueSize,
+        brokenParts = snap.brokenParts, moduleCatalog = snap.moduleCatalog,
+        canUpgrade = snap.canUpgrade, canModule = snap.canModule,
+        heatEnabled = snap.heatEnabled, conditionEnabled = snap.conditionEnabled,
+        overheat = snap.overheat, stationKind = snap.kind,
+        maxLevel = snap.maxLevel,
         recipes = out, favorites = favorites, pinned = pinned,
         playerSpec = (Specializations and Specializations.Resolve and Specializations.Resolve(src)) or nil,
         recentlyCrafted = (RecentlyCrafted and RecentlyCrafted.List and RecentlyCrafted.List(src)) or {},
@@ -1699,7 +1804,13 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
             enabled = compareCfg.Enabled == true,
             map = compareCfg.Map or {},
         },
-        queueMax = (Config.Queue and Config.Queue.MaxQueuePerPlayer) or 5,
+        queueMax = snap.queueSize or ((Config.Queue and Config.Queue.MaxQueuePerPlayer) or 5),
+        batch = {
+            enabled = Config.Batch and Config.Batch.Enabled,
+            maxBatch = (CraftBatch and CraftBatch.ConfiguredMax and CraftBatch.ConfiguredMax()) or (Config.Batch and Config.Batch.MaxBatch) or 50,
+            hardCap = (CraftBatch and CraftBatch.HardCap and CraftBatch.HardCap()) or 100,
+            presets = (Config.Batch and Config.Batch.Presets) or { 1, 5, 10, 'max' },
+        },
         flags = {
             quality = Config.Quality and Config.Quality.Enabled,
             blueprints = Config.Blueprints and Config.Blueprints.Enabled,

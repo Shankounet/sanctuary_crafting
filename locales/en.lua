@@ -111,5 +111,16 @@ Locales['en'] = {
     ['teach_success_student'] = 'You learned %s from %s',
     ['teach_progress_teacher'] = 'Teaching: %s',
     ['teach_progress_student'] = 'Learning: %s',
+    ['craft_overheat'] = 'Station overheating — wait for it to cool',
+    ['craft_station_broken'] = 'Station out of order — repair it',
+    ['module_denied'] = 'Module not allowed',
+    ['module_world_skip'] = 'Modules unavailable on this world bench',
+    ['station_world_skip'] = 'Maintenance unavailable on this world bench',
+    ['station_repaired'] = 'Station repaired',
+    ['station_maintained'] = 'Station maintained',
+    ['station_upgraded'] = 'Station upgraded (level %s)',
+    ['module_installed'] = 'Module installed: %s',
+    ['queue_cancelled'] = 'Craft removed from queue',
 }
+
 
