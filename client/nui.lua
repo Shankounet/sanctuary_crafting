@@ -13,6 +13,16 @@ local function trackerEnabled()
     return Config.CraftTracker and Config.CraftTracker.Enabled ~= false and CraftTracker
 end
 
+local function wallMs()
+    if type(os) == 'table' and type(os.time) == 'function' then
+        return os.time() * 1000
+    end
+    if GetCloudTimeAsInt then
+        return GetCloudTimeAsInt() * 1000
+    end
+    return GetGameTimer()
+end
+
 function CloseCraftNui()
     if not nuiOpen then return end
     nuiOpen = false
@@ -131,7 +141,7 @@ RegisterNUICallback('complete', function(data, cb)
                 stepLabel = result.stepLabel or result.label,
                 label = result.label,
                 clientTimer = started,
-                wallNow = (os.time and os.time() or 0) * 1000,
+                wallNow = wallMs(),
             })
         elseif result and (result.ok or result.already) then
             CraftTracker.Upsert({
@@ -302,7 +312,7 @@ RegisterNetEvent('sanctuary_crafting:client:craftAdvanced', function(payload)
             stepLabel = payload.stepLabel or payload.label,
             label = payload.label,
             clientTimer = started,
-            wallNow = (os.time and os.time() or 0) * 1000,
+            wallNow = wallMs(),
             useWallClock = false,
         })
     end

@@ -26,7 +26,14 @@ local function nowMs()
 end
 
 local function wallMs()
-    return (os.time and os.time() or 0) * 1000
+    -- FiveM client has no `os` library (`os` is nil → cannot index os.time)
+    if type(os) == 'table' and type(os.time) == 'function' then
+        return os.time() * 1000
+    end
+    if GetCloudTimeAsInt then
+        return GetCloudTimeAsInt() * 1000
+    end
+    return GetGameTimer()
 end
 
 local function phaseFamilyFor(category)
