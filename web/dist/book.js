@@ -1107,9 +1107,23 @@
   async function renderPins() {
     const r = await loadModule('pins');
     const arr = (r && r.data) || [];
-    const left = pageHead('Épingles', 'Raccourcis + mini HUD') + `
-      <div class="row-actions" style="margin-top:0">
-        <button type="button" class="ghost" id="hud-toggle"><i class="fa-solid fa-eye"></i> Basculer mini HUD</button>
+    const hud = window.SanctuaryHud;
+    const pinsOn = hud ? hud.readPinsVisible() : true;
+    const trackerOn = hud ? hud.readMode() !== 'hidden' : true;
+    const left = pageHead('Épingles', 'Widget HUD + raccourcis') + `
+      <div class="hud-settings-inline" style="margin-top:4px">
+        <p class="hand-note">Paramètres HUD</p>
+        <label class="hud-set-row" style="display:flex;gap:8px;align-items:center;margin:8px 0">
+          <input type="checkbox" id="hud-book-pins" ${pinsOn ? 'checked' : ''} />
+          Afficher le widget épingles
+        </label>
+        <label class="hud-set-row" style="display:flex;gap:8px;align-items:center;margin:8px 0">
+          <input type="checkbox" id="hud-book-tracker" ${trackerOn ? 'checked' : ''} />
+          Afficher le tracker
+        </label>
+        <div class="row-actions" style="margin-top:8px">
+          <button type="button" class="ghost" id="hud-book-reset">RÉINITIALISER LES WIDGETS</button>
+        </div>
       </div>${folio('110')}`;
     const right = `${arr.length ? arr.map((p) => `
       <article class="dossier-sheet">
@@ -1129,8 +1143,22 @@
         navigate('pins');
       };
     });
-    const ht = $('#hud-toggle');
-    if (ht) ht.onclick = () => post('bookToggleHud', { toggle: true });
+    const hudApi = window.SanctuaryHud;
+    const bp = $('#hud-book-pins');
+    if (bp) {
+      bp.onchange = () => {
+        if (hudApi) hudApi.writePinsVisible(bp.checked, { source: 'book' });
+        else post('bookToggleHud', { enabled: !!bp.checked });
+      };
+    }
+    const bt = $('#hud-book-tracker');
+    if (bt) {
+      bt.onchange = () => {
+        if (hudApi) hudApi.writeMode(bt.checked ? 'expanded' : 'hidden', { source: 'book' });
+      };
+    }
+    const br = $('#hud-book-reset');
+    if (br) br.onclick = () => { if (hudApi) hudApi.reset(); };
   }
 
   async function renderCanCraft() {

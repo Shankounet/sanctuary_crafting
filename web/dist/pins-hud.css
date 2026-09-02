@@ -20,16 +20,48 @@
   color: var(--ph-text);
   pointer-events: none;
   user-select: none;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-6px);
-  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
-}
-#book-pins-hud.is-visible {
   opacity: 1;
   visibility: visible;
   transform: none;
+}
+#book-pins-hud.is-visible:not(.is-hidden) {
+  display: block;
   pointer-events: auto;
+}
+
+/* E: hidden pins — no 248px leftover box (CEF black square) */
+#book-pins-hud:not(.is-visible),
+#book-pins-hud.is-hidden {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  max-width: 0 !important;
+  min-width: 0 !important;
+}
+#book-pins-hud:not(.is-visible)::before,
+#book-pins-hud:not(.is-visible)::after,
+#book-pins-hud.is-hidden::before,
+#book-pins-hud.is-hidden::after {
+  content: none !important;
+  display: none !important;
+}
+#book-pins-hud:not(.is-visible) .ph-shell,
+#book-pins-hud.is-hidden .ph-shell {
+  display: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
 }
 #book-pins-hud .ph-shell {
   background: var(--ph-bg);

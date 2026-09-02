@@ -2,9 +2,12 @@
   const resName = typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'sanctuary_crafting';
   const IMG_BASE = 'nui://ox_inventory/web/images/';
   const LS_PIN = 'sc_tracker_pin';
-  const LS_MODE = 'sc_tracker_mode';
-  const LS_POS = 'sc_tracker_pos';
-  const MODES = ['normal', 'compact', 'minimal'];
+  const LS_MODE = 'sc_tracker_mode'; /* legacy — mapped via SanctuaryHud */
+  const LS_POS = 'sc_tracker_pos'; /* legacy */
+  const HUD = () => window.SanctuaryHud;
+  const MODES = ['expanded', 'compact', 'minimal', 'hidden'];
+  const CYCLE = ['expanded', 'compact', 'minimal'];
+  const DRAG_THRESHOLD = 6;
 
   const root = document.getElementById('craft-tracker');
   if (!root) return;
@@ -16,6 +19,9 @@
     mode: root.querySelector('#ct-mode'),
     reset: root.querySelector('#ct-reset'),
     header: root.querySelector('#ct-header'),
+    grip: root.querySelector('#ct-grip'),
+    expand: root.querySelector('#ct-expand'),
+    hide: root.querySelector('#ct-hide'),
     minimal: root.querySelector('#ct-minimal'),
     minimalCount: root.querySelector('#ct-minimal-count'),
   };
@@ -23,9 +29,10 @@
   let config = {
     enabled: true,
     defaultPosition: { top: 24, right: 24 },
-    defaultMode: 'normal',
+    defaultMode: 'expanded',
     autoShowOnStart: true,
     hideWithMenuIfUnpinned: true,
+    showOnNewCraftIfHidden: true,
     persistPin: true,
     persistMode: true,
     persistPosition: true,
@@ -46,11 +53,12 @@
   const jobs = new Map(); // craftId -> entry (+ local timing)
   let menuOpen = false;
   let pinned = false;
-  let mode = 'normal';
+  let mode = 'expanded';
   let tickTimer = null;
   let audioCtx = null;
   let completing = new Set();
   let drag = null;
+  let dragMoved = false;
 
   function post(name, data) {
     return fetch(`https://${resName}/${name}`, {
@@ -79,6 +87,8 @@
     if (cfg.phases) config.phases = { ...config.phases, ...cfg.phases };
     if (cfg.sounds) config.sounds = { ...config.sounds, ...cfg.sounds };
     if (cfg.uiSounds) config.uiSounds = { ...config.uiSounds, ...cfg.uiSounds };
+    if (cfg.defaultMode === 'normal') config.defaultMode = 'expanded';
+    if (cfg.showOnNewCraftIfHidden == null) config.showOnNewCraftIfHidden = true;
   }
 
   function itemImageUrl(item) {
@@ -151,12 +161,41 @@
     } catch (_) { /* ignore */ }
   }
 
-  function applyMode(next) {
-    mode = MODES.includes(next) ? next : 'normal';
-    root.classList.remove('mode-normal', 'mode-compact', 'mode-minimal');
+  function normalizeMode(next) {
+    const hud = HUD();
+    if (hud && typeof hud.normalizeMode === 'function') return hud.normalizeMode(next);
+    if (next === 'normal') return 'expanded';
+    return MODES.includes(next) ? next : 'expanded';
+  }
+
+  function applyMode(next, opts) {
+    const silent = opts && opts.silent;
+    const fromSettings = opts && opts.fromSettings;
+    mode = normalizeMode(next);
+    root.classList.remove('mode-normal', 'mode-compact', 'mode-minimal', 'mode-expanded', 'mode-hidden');
     root.classList.add(`mode-${mode}`);
-    if (config.persistMode !== false) lsSet(LS_MODE, mode);
-    post('trackerMode', { mode });
+    if (els.expand) els.expand.classList.toggle('is-shown', mode === 'compact');
+    if (els.mode) {
+      els.mode.setAttribute('aria-label', 'Changer le mode');
+      els.mode.title = mode === 'expanded' ? 'Passer en compact' : (mode === 'compact' ? 'Passer en minimal' : 'Agrandir');
+    }
+    if (config.persistMode !== false) {
+      const hud = HUD();
+      if (hud && typeof hud.writeMode === 'function') {
+        hud.writeMode(mode, { silent: true, silentPost: true, source: 'widget' });
+      } else {
+        lsSet(LS_MODE, mode === 'expanded' ? 'normal' : mode);
+      }
+    }
+    if (!silent) post('trackerMode', { mode });
+    if (!fromSettings && !silent) {
+      const hud = HUD();
+      if (hud && typeof hud.writeMode === 'function') {
+        /* LS already written; notify overlay */
+        hud.refreshPanel && hud.refreshPanel();
+      }
+    }
+    updateVisibility();
   }
 
   function applyPin(next) {
@@ -192,8 +231,15 @@
     const top = parseInt(root.style.top || config.defaultPosition.top || 24, 10);
     const right = parseInt(root.style.right || config.defaultPosition.right || 24, 10);
     const payload = { top, right };
-    if (config.persistPosition !== false) lsSet(LS_POS, JSON.stringify(payload));
+    persistPos(payload);
     post('trackerPosition', payload);
+  }
+
+  function persistPos(payload) {
+    if (config.persistPosition === false) return;
+    const hud = HUD();
+    if (hud && typeof hud.writePos === 'function') hud.writePos(payload, { silent: true });
+    else lsSet(LS_POS, JSON.stringify(payload));
   }
 
   function activeJobCount() {
@@ -205,21 +251,15 @@
   }
 
   function updateVisibility() {
-    const hasJobs = jobs.size > 0;
-    const hideUnpinned = config.hideWithMenuIfUnpinned !== false;
-    let visible = config.enabled !== false && hasJobs;
-
-    if (visible && !menuOpen && !pinned && hideUnpinned) {
-      // Hide panel but keep jobs / tick running for complete callbacks
-      root.classList.add('hidden-panel');
-      root.classList.add('is-visible');
-      return;
-    }
-
     root.classList.remove('hidden-panel');
-    if (!visible && menuOpen && config.autoShowOnStart && pinned) visible = true;
-    if (visible) root.classList.add('is-visible');
-    else root.classList.remove('is-visible');
+    const hasJobs = jobs.size > 0;
+    /* Explicit hidden mode is the only hide. Do not mix pin+hideWithMenuIfUnpinned
+       into a leftover 292px box. Pin stays pin; close sets mode=hidden. */
+    const shown = config.enabled !== false && hasJobs && mode !== 'hidden';
+    root.classList.toggle('is-visible', !!shown);
+    root.classList.toggle('is-hidden', !shown);
+    root.setAttribute('aria-hidden', shown ? 'false' : 'true');
+    if (els.minimal) els.minimal.setAttribute('aria-hidden', mode === 'minimal' && shown ? 'false' : 'true');
   }
 
   function phaseLabel(entry, progress) {
@@ -305,6 +345,14 @@
 
     const isNew = !jobs.has(raw.craftId);
     jobs.set(raw.craftId, entry);
+
+    /* G: new active craft while tracker hidden → compact (config, default on) */
+    if (isNew && (entry.status === 'active' || entry.status === 'queued') && mode === 'hidden') {
+      if (config.showOnNewCraftIfHidden !== false) {
+        applyMode('compact');
+      }
+    }
+
     render();
     updateVisibility();
     ensureTick();
@@ -541,9 +589,10 @@
     }
   }
 
-  // Drag
+  // Drag — grip only. Threshold so a click-to-expand is not a drag.
   function onPointerDown(ev) {
     if (config.allowDrag === false) return;
+    if (mode === 'minimal') return;
     if (ev.target.closest('button')) return;
     const rect = root.getBoundingClientRect();
     drag = {
@@ -551,12 +600,23 @@
       oy: ev.clientY - rect.top,
       w: rect.width,
       h: rect.height,
+      startX: ev.clientX,
+      startY: ev.clientY,
+      moved: false,
     };
-    ev.preventDefault();
+    dragMoved = false;
+    /* no preventDefault — expand click must still fire */
   }
 
   function onPointerMove(ev) {
     if (!drag) return;
+    const dx = ev.clientX - drag.startX;
+    const dy = ev.clientY - drag.startY;
+    if (!drag.moved && (dx * dx + dy * dy) >= DRAG_THRESHOLD * DRAG_THRESHOLD) {
+      drag.moved = true;
+    }
+    if (!drag.moved) return;
+    dragMoved = true;
     const left = Math.max(8, Math.min(window.innerWidth - drag.w - 8, ev.clientX - drag.ox));
     const top = Math.max(8, Math.min(window.innerHeight - drag.h - 8, ev.clientY - drag.oy));
     root.style.left = `${left}px`;
@@ -567,7 +627,10 @@
 
   function onPointerUp() {
     if (!drag) return;
+    const moved = drag.moved;
     drag = null;
+    if (!moved) return;
+    dragMoved = true;
     const rect = root.getBoundingClientRect();
     const top = Math.round(rect.top);
     const right = Math.round(window.innerWidth - rect.right);
@@ -575,51 +638,90 @@
     root.style.right = `${right}px`;
     root.style.left = 'auto';
     const payload = { top, right };
-    if (config.persistPosition !== false) lsSet(LS_POS, JSON.stringify(payload));
+    persistPos(payload);
     post('trackerPosition', payload);
   }
 
-  if (els.header) {
-    els.header.addEventListener('mousedown', onPointerDown);
+  const gripEl = els.grip || null;
+  if (gripEl) {
+    gripEl.addEventListener('mousedown', onPointerDown);
+    gripEl.addEventListener('click', (ev) => ev.stopPropagation());
   }
   window.addEventListener('mousemove', onPointerMove);
   window.addEventListener('mouseup', onPointerUp);
 
+  function stopOwn(ev, fn) {
+    ev.stopPropagation();
+    fn(ev);
+  }
+
   if (els.pin) {
-    els.pin.addEventListener('click', () => applyPin(!pinned));
+    els.pin.addEventListener('click', (ev) => stopOwn(ev, () => applyPin(!pinned)));
   }
   if (els.mode) {
-    els.mode.addEventListener('click', () => {
-      const idx = MODES.indexOf(mode);
-      applyMode(MODES[(idx + 1) % MODES.length]);
-    });
+    els.mode.addEventListener('click', (ev) => stopOwn(ev, () => {
+      const cur = CYCLE.indexOf(mode) === -1 ? 0 : CYCLE.indexOf(mode);
+      applyMode(CYCLE[(cur + 1) % CYCLE.length]);
+    }));
+  }
+  if (els.expand) {
+    els.expand.addEventListener('click', (ev) => stopOwn(ev, () => applyMode('expanded')));
+  }
+  if (els.hide) {
+    els.hide.addEventListener('click', (ev) => stopOwn(ev, () => applyMode('hidden')));
   }
   if (els.reset) {
-    els.reset.addEventListener('click', () => {
-      const pos = config.defaultPosition || { top: 24, right: 24 };
+    els.reset.addEventListener('click', (ev) => stopOwn(ev, () => {
+      const pos = (HUD() && HUD().DEFAULT_POS) || config.defaultPosition || { top: 24, right: 24 };
       root.style.top = `${pos.top}px`;
       root.style.right = `${pos.right}px`;
       root.style.left = 'auto';
       root.style.bottom = 'auto';
+      persistPos(pos);
       try { localStorage.removeItem(LS_POS); } catch (_) { /* ignore */ }
       post('trackerResetPosition', {});
-    });
+    }));
   }
 
-  // Restore prefs
+  /* A/B: compact body click + chevron expand; minimal click anywhere → expanded.
+     Drag that moved is not an expand. Pin/close/mode already stopPropagation. */
+  function maybeExpandFromClick(ev) {
+    if (dragMoved) { dragMoved = false; return; }
+    if (ev.target.closest('button')) return;
+    if (mode === 'compact' || mode === 'minimal') applyMode('expanded');
+  }
+  root.addEventListener('click', maybeExpandFromClick);
+  if (els.minimal) els.minimal.addEventListener('click', maybeExpandFromClick);
+
+  // Restore prefs — F: invalid LS mode → expanded
   pinned = lsGet(LS_PIN, '0') === '1';
   if (els.pin) {
     els.pin.classList.toggle('is-on', pinned);
     els.pin.setAttribute('aria-pressed', pinned ? 'true' : 'false');
   }
-  applyMode(lsGet(LS_MODE, config.defaultMode || 'normal'));
+  const hud = HUD();
+  const bootMode = hud ? hud.readMode() : normalizeMode(lsGet(LS_MODE, config.defaultMode || 'expanded'));
+  applyMode(bootMode, { silent: false });
   try {
-    const rawPos = lsGet(LS_POS, '');
-    if (rawPos) applyPosition(JSON.parse(rawPos));
-    else applyPosition(config.defaultPosition);
+    const pos = (hud && hud.readPos && hud.readPos()) || (lsGet(LS_POS, '') ? JSON.parse(lsGet(LS_POS, '')) : null);
+    applyPosition(pos || config.defaultPosition);
   } catch (_) {
     applyPosition(config.defaultPosition);
   }
+
+  window.addEventListener('sanctuary-hud:change', (ev) => {
+    const d = (ev && ev.detail) || {};
+    if (d.reset) {
+      applyMode('expanded', { silent: true, fromSettings: true });
+      applyPosition((HUD() && HUD().DEFAULT_POS) || config.defaultPosition);
+      updateVisibility();
+      return;
+    }
+    if (d.trackerMode && normalizeMode(d.trackerMode) !== mode) {
+      applyMode(d.trackerMode, { silent: true, fromSettings: true });
+    }
+    if (d.trackerPos) applyPosition(d.trackerPos);
+  });
 
   window.addEventListener('message', (event) => {
     const msg = event.data || {};
@@ -643,7 +745,11 @@
     if (action === 'tracker:setVisible') {
       if (msg.resetPosition) applyPosition(msg.resetPosition);
       if (typeof msg.visible === 'boolean') {
-        root.classList.toggle('is-visible', msg.visible);
+        if (msg.visible && mode === 'hidden') applyMode('expanded', { fromSettings: true });
+        if (!msg.visible && mode !== 'hidden') {
+          /* Lua setVisible false is not explicit hidden mode — just visual */
+        }
+        updateVisibility();
         if (msg.visible) root.classList.remove('hidden-panel');
       } else {
         updateVisibility();
@@ -657,6 +763,11 @@
         msg.jobs.forEach((j) => upsertJob(j));
       }
       updateVisibility();
+      return;
+    }
+    if (action === 'hud:reset') {
+      applyMode('expanded', { fromSettings: true });
+      applyPosition((HUD() && HUD().DEFAULT_POS) || config.defaultPosition);
       return;
     }
     if (action === 'craftFinished') {
@@ -693,10 +804,15 @@
     }
   });
 
-  // Expose tiny debug hook
+  // Expose for settings overlay + structural tests A–G
   window.__craftTracker = {
     jobs,
     render,
     updateVisibility,
+    applyMode,
+    getMode: () => mode,
+    setMode: (m) => applyMode(m),
+    hide: () => applyMode('hidden'),
+    expand: () => applyMode('expanded'),
   };
 })();

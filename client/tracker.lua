@@ -70,9 +70,10 @@ local function buildConfigPayload()
     return {
         enabled = enabled(),
         defaultPosition = c.DefaultPosition or { top = 24, right = 24 },
-        defaultMode = c.DefaultMode or 'normal',
+        defaultMode = (c.DefaultMode == 'normal' and 'expanded') or (c.DefaultMode or 'expanded'),
         autoShowOnStart = c.AutoShowOnStart ~= false,
         hideWithMenuIfUnpinned = c.HideWithMenuIfUnpinned ~= false,
+        showOnNewCraftIfHidden = c.ShowOnNewCraftIfHidden ~= false,
         persistPin = c.PersistPin ~= false,
         persistMode = c.PersistMode ~= false,
         persistPosition = c.PersistPosition ~= false,
@@ -396,9 +397,17 @@ RegisterNUICallback('trackerPin', function(data, cb)
 end)
 
 RegisterNUICallback('trackerMode', function(data, cb)
-    local mode = data and data.mode or 'normal'
+    local mode = data and data.mode or 'expanded'
+    if mode == 'normal' then mode = 'expanded' end
     mirrorKvp('mode', mode)
-    cb({ ok = true })
+    cb({ ok = true, mode = mode })
+end)
+
+RegisterNUICallback('hudSettingsTracker', function(data, cb)
+    local mode = data and data.mode or 'expanded'
+    if mode == 'normal' then mode = 'expanded' end
+    mirrorKvp('mode', mode)
+    cb({ ok = true, mode = mode })
 end)
 
 RegisterNUICallback('trackerPosition', function(data, cb)

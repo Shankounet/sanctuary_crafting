@@ -11,11 +11,15 @@ local function bookEnabled()
     return Config.Book and Config.Book.Enabled ~= false
 end
 
-local function pinsHudEnabled()
+local function pinsFeatureOn()
     return bookEnabled()
         and Config.Book.Pins and Config.Book.Pins.Enabled ~= false
         and Config.Book.Pins.MiniHud ~= false
-        and miniHud
+end
+
+-- Kept for command / keybind; NUI owns hide via pinsVisible. Settings restore sets miniHud=true.
+local function pinsHudEnabled()
+    return pinsFeatureOn() and miniHud
 end
 
 function CloseSurvivalBook()
@@ -174,8 +178,31 @@ RegisterNUICallback('bookToggleHud', function(data, cb)
             prefs = { miniHud = miniHud },
         })
     end)
+    pushPinsHud() -- real pins even if miniHud is false (NUI hides via display:none)
+    cb({ ok = true, miniHud = miniHud })
+end)
+
+RegisterNUICallback('hudSettingsPins', function(data, cb)
+    miniHud = not (data and data.visible == false)
+    pcall(function()
+        lib.callback.await('sanctuary_crafting:book:action', false, 'setPrefs', {
+            prefs = { miniHud = miniHud },
+        })
+    end)
     pushPinsHud()
     cb({ ok = true, miniHud = miniHud })
+end)
+
+RegisterNUICallback('hudReset', function(_, cb)
+    miniHud = true
+    pcall(function()
+        lib.callback.await('sanctuary_crafting:book:action', false, 'setPrefs', {
+            prefs = { miniHud = true },
+        })
+    end)
+    pushPinsHud()
+    SendNUIMessage({ action = 'hud:reset' })
+    cb({ ok = true, miniHud = true })
 end)
 
 -- Craft UI bridges: pin / objective / open book
@@ -207,17 +234,19 @@ local function collectActiveCrafts()
 end
 
 pushPinsHud = function()
-    if not pinsHudEnabled() or bookOpen or not pins or #pins == 0 then
-        SendNUIMessage({ action = 'pinsHud', visible = false, pins = {} })
-        return
-    end
+    local list = pins or {}
     local maxN = (Config.Book.Pins and Config.Book.Pins.HudMax) or 4
+    local feature = pinsFeatureOn()
+    -- Always send real pins + visible flag. Do NOT send pins=[] just because HUD hidden.
     SendNUIMessage({
         action = 'pinsHud',
-        visible = true,
-        pins = pins,
+        visible = feature and miniHud and not bookOpen and #list > 0,
+        pins = list,
         crafts = collectActiveCrafts(),
         max = maxN,
+        bookOpen = bookOpen,
+        miniHud = miniHud,
+        feature = feature,
     })
 end
 
@@ -236,13 +265,13 @@ CreateThread(function()
     refreshPinsFromServer()
     pushPinsHud()
     while true do
-        if pinsHudEnabled() and not bookOpen then
+        if pinsFeatureOn() then
             refreshPinsFromServer()
             pushPinsHud()
-            Wait(4000)
+            Wait(bookOpen and 800 or 4000)
         else
-            SendNUIMessage({ action = 'pinsHud', visible = false, pins = pins or {} })
-            Wait(800)
+            pushPinsHud()
+            Wait(2000)
         end
     end
 end)
@@ -287,6 +316,7 @@ end, false)
 
 RegisterCommand('carnet_pins', function()
     miniHud = not miniHud
+    SendNUIMessage({ action = 'pinsHud:setVisible', visible = miniHud })
     pushPinsHud()
 end, false)
 RegisterKeyMapping('carnet_pins', 'Carnet — afficher/masquer épingles', 'keyboard', '')

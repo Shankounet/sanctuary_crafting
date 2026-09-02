@@ -4,6 +4,7 @@
   if (!root) return;
   const COLLAPSE_KEY = 'sanctuary_crafting:pinsHudCollapsed';
   const PINNED_KEY = 'sanctuary_crafting:pinsHudPinned';
+  const HUD = () => window.SanctuaryHud;
   const els = {
     list: document.getElementById('ph-list'),
     count: document.getElementById('ph-count'),
@@ -34,6 +35,13 @@
 
   let collapsed = loadFlag(COLLAPSE_KEY, false);
   let pinned = loadFlag(PINNED_KEY, true);
+  /* NUI-owned visibility. Unknown → true. Close/hide never unpins / never empties SQL. */
+  let pinsVisible = HUD() ? HUD().readPinsVisible() : true;
+  let bookOpen = false;
+  let lastPins = [];
+  let lastCrafts = [];
+  let lastMax = 4;
+  let lastFeature = true;
 
   function applyChrome() {
     root.classList.toggle('is-collapsed', collapsed);
@@ -47,6 +55,36 @@
     }
   }
 
+  function shouldShow() {
+    if (!pinsVisible) return false;
+    if (bookOpen) return false;
+    if (!lastFeature) return false;
+    if (!lastPins.length) return false;
+    return true;
+  }
+
+  function applyVisibility() {
+    const shown = shouldShow();
+    root.classList.toggle('is-visible', shown);
+    root.classList.toggle('is-hidden', !shown);
+    root.setAttribute('aria-hidden', shown ? 'false' : 'true');
+  }
+
+  function setPinsVisible(on, opts) {
+    pinsVisible = !!on;
+    const hud = HUD();
+    if (hud && typeof hud.writePinsVisible === 'function') {
+      hud.writePinsVisible(pinsVisible, { silent: true, silentPost: true, source: 'pins' });
+      hud.refreshPanel && hud.refreshPanel();
+    }
+    /* Hide: NUI-owned pinsVisible only. Never persist miniHud=false as the only path. */
+    if (pinsVisible && !(opts && opts.skipPost)) {
+      post('hudSettingsPins', { visible: true });
+      post('bookToggleHud', { enabled: true });
+    }
+    applyVisibility();
+  }
+
   function craftFor(recipeId, crafts) {
     if (!recipeId || !Array.isArray(crafts)) return null;
     return crafts.find((c) => c && c.recipeId === recipeId) || null;
@@ -58,7 +96,6 @@
     if (dur <= 0) return 0;
     const started = Number(c.startedAt) || 0;
     const now = Date.now();
-    /* startedAt from client GetGameTimer is not Date.now — prefer pct if sent */
     if (typeof c.pct === 'number') return Math.max(0, Math.min(1, c.pct));
     if (c.endsAt && started) {
       const t = Number(c.endsAt) - started;
@@ -90,26 +127,23 @@
     return row;
   }
 
-  function render(payload) {
-    const pins = (payload && payload.pins) || [];
-    const crafts = (payload && payload.crafts) || [];
-    const max = Math.max(1, Number((payload && payload.max) || 4));
-    const visible = payload && payload.visible !== false && pins.length > 0;
-    root.classList.toggle('is-visible', !!visible);
-    if (!visible) return;
+  function paintList() {
+    const pins = lastPins;
+    const crafts = lastCrafts;
+    const max = lastMax;
+    if (els.count) els.count.textContent = String(pins.length);
+    if (!els.list) return;
+    els.list.innerHTML = '';
+    if (!pins.length) return;
 
     const craftingIds = new Set(crafts.map((c) => c && c.recipeId).filter(Boolean));
     const inProgress = pins.filter((p) => craftingIds.has(p.recipeId));
     const followed = pins.filter((p) => !craftingIds.has(p.recipeId));
-
     const shown = [];
     inProgress.forEach((p) => { if (shown.length < max) shown.push({ p, craft: craftFor(p.recipeId, crafts) }); });
     followed.forEach((p) => { if (shown.length < max) shown.push({ p, craft: null }); });
     const hiddenN = Math.max(0, pins.length - shown.length);
 
-    if (els.count) els.count.textContent = String(pins.length);
-    if (!els.list) return;
-    els.list.innerHTML = '';
     const hasCraft = shown.some((x) => x.craft);
     if (hasCraft) {
       const g = document.createElement('div');
@@ -136,6 +170,19 @@
     }
   }
 
+  function render(payload) {
+    if (payload) {
+      /* Always keep real pins — Lua no longer sends [] just because HUD hidden. */
+      if (Array.isArray(payload.pins)) lastPins = payload.pins;
+      if (Array.isArray(payload.crafts)) lastCrafts = payload.crafts;
+      if (payload.max != null) lastMax = Math.max(1, Number(payload.max) || 4);
+      if (typeof payload.bookOpen === 'boolean') bookOpen = payload.bookOpen;
+      if (typeof payload.feature === 'boolean') lastFeature = payload.feature;
+    }
+    paintList();
+    applyVisibility();
+  }
+
   if (els.collapse) {
     els.collapse.addEventListener('click', (ev) => {
       ev.stopPropagation();
@@ -150,21 +197,61 @@
       pinned = !pinned;
       saveFlag(PINNED_KEY, pinned);
       applyChrome();
-      post('bookToggleHud', { enabled: true });
+      /* Pin stays pin — does not hide, does not empty SQL. */
     });
   }
   if (els.hide) {
     els.hide.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      root.classList.remove('is-visible');
-      post('bookToggleHud', { enabled: false });
+      /* D: hide → pinsVisible=false ONLY. Never unpin, never empty SQL, never miniHud=false-only. */
+      setPinsVisible(false);
     });
   }
 
   window.addEventListener('message', (ev) => {
     const data = ev.data || {};
     if (data.action === 'pinsHud') render(data);
+    if (data.action === 'pinsHud:setVisible') {
+      setPinsVisible(!!data.visible, { skipPost: true });
+    }
+    if (data.action === 'bookOpen') {
+      bookOpen = true;
+      applyVisibility();
+    }
+    if (data.action === 'bookClose') {
+      bookOpen = false;
+      applyVisibility();
+    }
+    if (data.action === 'hud:reset') {
+      collapsed = false;
+      saveFlag(COLLAPSE_KEY, false);
+      applyChrome();
+      setPinsVisible(true, { skipPost: true });
+    }
+  });
+
+  window.addEventListener('sanctuary-hud:change', (ev) => {
+    const d = (ev && ev.detail) || {};
+    if (typeof d.pinsVisible === 'boolean' && d.pinsVisible !== pinsVisible) {
+      pinsVisible = d.pinsVisible;
+      applyVisibility();
+    }
+    if (d.reset) {
+      collapsed = false;
+      saveFlag(COLLAPSE_KEY, false);
+      applyChrome();
+      pinsVisible = true;
+      applyVisibility();
+    }
   });
 
   applyChrome();
+  applyVisibility();
+
+  window.__pinsHud = {
+    setVisible: setPinsVisible,
+    getVisible: () => pinsVisible,
+    applyVisibility,
+    /* D: SQL pins live in Lua/server — this widget never sends empty pins on hide. */
+  };
 })();
