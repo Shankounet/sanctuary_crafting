@@ -1,6 +1,6 @@
 /* =============================================================================
-   Survival Book v2.20.0 — textures calées sur les refs vintage
-   Leather cover/spine only. Yellowed pages + distinct insert papers.
+   Survival Book v2.20.1 — papiers fournis (page, tan, worn, ligné)
+   Leather cover/spine only. Real paper PNGs on pages + distinct insert sheets.
    CEF-safe: system fonts, no @import, no feTurbulence, no mix-blend.
    ============================================================================= */
 
@@ -2630,23 +2630,24 @@
    ONE principal texture per element. No overlays. No gradients on PNGs.
    NEVER transparent pages/inserts over leather.
 
-   MAPPING v2.20.0 (crops from docs/refs/)
-     cover / outer / binding     tex/ref_cover.png
-     left + right pages          tex/ref_page.png
-     notes leaf / clips          tex/ref_sheet_lined.png
-     projet / déblocage / slips  tex/ref_sheet_tan.png
-     découverte / polaroid/fiches tex/ref_sheet_worn.png (LIGHT)
+   MAPPING v2.20.1 (user-supplied papers)
+     cover / outer / binding     tex/ref_cover.png  (leather ONLY)
+     left + right pages          tex/paper_page.png  (vignette portrait, unlined)
+     alt page family             tex/paper_page_alt.png  (blackbg knockout)
+     notes leaf / clips / day    tex/paper_sheet_lined.png
+     projet / déblocage / slips  tex/paper_sheet_tan.png  (wrinkles)
+     découverte / polaroid       tex/paper_sheet_worn.png  (stains)
      post-its                    tex/postit_{yellow,blue,green,pink}.png
      tabs                        CSS colors only (no paper PNG)
    ============================================================ */
 #book-app {
   --bookCoverTexture: url("tex/ref_cover.png");
-  --mainPageTexture: url("tex/ref_page.png");
-  --linedSheetTexture: url("tex/ref_sheet_lined.png");
-  --tanSheetTexture: url("tex/ref_sheet_tan.png");
-  --wornSheetTexture: url("tex/ref_sheet_worn.png");
-  --alternatePageTexture: url("tex/ref_sheet_tan.png");
-  --lightSheetTexture: url("tex/ref_sheet_worn.png");
+  --mainPageTexture: url("tex/paper_page.png");
+  --linedSheetTexture: url("tex/paper_sheet_lined.png");
+  --tanSheetTexture: url("tex/paper_sheet_tan.png");
+  --wornSheetTexture: url("tex/paper_sheet_worn.png");
+  --alternatePageTexture: url("tex/paper_page_alt.png");
+  --lightSheetTexture: url("tex/paper_sheet_worn.png");
   --postitBlue: url("tex/postit_blue.png");
   --postitGreen: url("tex/postit_green.png");
   --postitPink: url("tex/postit_pink.png");
@@ -3434,10 +3435,11 @@
 
 
 /* ============================================================
-   v2.20.0 — STRICT ref mapping (wins over earlier material rules)
+   v2.20.1 — STRICT user-paper mapping (wins over earlier material rules)
    cover = ref_cover (leather outer/spine only)
-   pages = ref_page (direct PNG, no beige overlay)
-   inserts = lined / tan / worn — one texture each
+   pages = paper_page (direct PNG, no beige overlay, no leather under text)
+   inserts = lined / tan / worn — one DISTINCT file each (never page paper)
+   polaroid = worn (stains), never the page texture
    tabs = muted distinct CSS colors, never page paper
    CEF-safe: no mix-blend, no feTurbulence, no Google Fonts
    ============================================================ */
@@ -3473,7 +3475,7 @@
   border: 1.5px solid #2a2218;
 }
 
-/* Pages: PNG only, no solid beige hiding the crop */
+/* Pages: paper_page PNG direct, no beige overlay, no leather under text */
 #book-app .book-page,
 #book-app .book-page-left,
 #book-app .book-page-right,
@@ -3483,9 +3485,9 @@
 #book-app:not(.hidden) .book-page,
 #book-app:not(.hidden) .book-page-left,
 #book-app:not(.hidden) .book-page-right {
-  background-color: #d8c49a !important;
+  background-color: #ead6b3 !important;
   background-image: var(--mainPageTexture) !important;
-  background-size: 130% 130% !important;
+  background-size: cover !important;
   background-repeat: no-repeat !important;
 }
 #book-app .book-page-left,
