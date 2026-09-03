@@ -25,14 +25,14 @@
 
   /* Primary edge tabs — short labels so they do not clip */
   const PRIMARY_TABS = [
-    { id: 'dashboard', label: 'Accueil', mod: 'Dashboard' },
-    { id: 'progression', label: 'Progrès', mod: 'Progression' },
-    { id: 'objectives', label: 'Objectifs', mod: 'Objectives' },
-    { id: 'projects', label: 'Projets', mod: 'Projects' },
-    { id: 'resources', label: 'Ressources', mod: 'Resources' },
-    { id: 'blueprints', label: 'Plans', mod: 'Blueprints' },
-    { id: 'artisans', label: 'Artisans', mod: 'Artisans' },
-    { id: 'notes', label: 'Notes', mod: 'Notes' },
+    { id: 'dashboard', label: 'Accueil', mod: 'Dashboard', icon: 'fa-house' },
+    { id: 'progression', label: 'Progrès', mod: 'Progression', icon: 'fa-chart-simple' },
+    { id: 'objectives', label: 'Objectifs', mod: 'Objectives', icon: 'fa-bullseye' },
+    { id: 'projects', label: 'Projets', mod: 'Projects', icon: 'fa-screwdriver-wrench' },
+    { id: 'resources', label: 'Ressources', mod: 'Resources', icon: 'fa-box' },
+    { id: 'blueprints', label: 'Plans', mod: 'Blueprints', icon: 'fa-map' },
+    { id: 'artisans', label: 'Artisans', mod: 'Artisans', icon: 'fa-hammer' },
+    { id: 'notes', label: 'Notes', mod: 'Notes', icon: 'fa-book' },
   ];
 
   /* Secondary tools via Index */
@@ -386,7 +386,7 @@
       const b = document.createElement('button');
       b.type = 'button';
       b.dataset.page = n.id;
-      b.textContent = n.label;
+      b.innerHTML = '<i class="fa-solid ' + n.icon + '" aria-hidden="true"></i><span>' + n.label + '</span>';
       b.classList.add(TAB_MATERIALS[ti % TAB_MATERIALS.length]);
       ti += 1;
       if (state.page === n.id) b.classList.add('active');
