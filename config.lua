@@ -46,7 +46,7 @@ Config = {}
 
 Config.Locale = 'fr'
 Config.Debug = false
-Config.Version = '2.22.0'
+Config.Version = '2.23.0'
 
 --------------------------------------------------------------------------------
 -- Feature flags (Phase 2–7) — stubs uniquement, aucun comportement Phase 1
@@ -109,7 +109,7 @@ Config.Admin = {
     CustomCallback = nil, -- optional function(src) -> boolean (OR with ACE / ESX group)
 }
 
-Config.SchemaVersion = 218
+Config.SchemaVersion = 223
 
 Config.EnableWorldBenchCommand = true
 Config.WorldBenchCommand = 'placeworldbench'

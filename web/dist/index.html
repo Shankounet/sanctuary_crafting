@@ -217,17 +217,23 @@
           <span class="t-l4">Sous-systèmes station</span>
         </div>
         <div class="tabs" role="tablist">
-          <button type="button" class="tab active" data-tab="queue" role="tab" title="Console de production"><i class="fa-solid fa-industry"></i><span>Production</span></button>
+          <button type="button" class="tab active" data-tab="queue" role="tab" title="Console de production"><i class="fa-solid fa-industry"></i><span>Production</span><span id="output-badge" class="tab-badge hidden" aria-label="À récupérer">RÉCUP.</span></button>
           <button type="button" class="tab" data-tab="tree" role="tab" title="Schéma technique / dépendances"><i class="fa-solid fa-diagram-project"></i><span>Schéma</span></button>
           <button type="button" class="tab" data-tab="shop" role="tab" title="Checklist récupération"><i class="fa-solid fa-clipboard-list"></i><span>Récup.</span></button>
         </div>
         <div id="tab-queue" class="tab-body">
           <p class="side-caption"><i class="fa-solid fa-industry" aria-hidden="true"></i> Console de production</p>
+          <div class="prod-split-label" id="file-label">FILE</div>
           <div id="queue-list" class="queue-track"></div>
           <div class="empty-state empty-prod" id="queue-empty">
             <span class="empty-kicker">STATION READY</span>
             <p>File vide</p>
             <span class="empty-sys"><i class="led-dot ok" aria-hidden="true"></i> Système en veille</span>
+          </div>
+          <div class="prod-split-label sortie-label" id="sortie-label">SORTIE</div>
+          <div id="output-list" class="output-track"></div>
+          <div class="output-actions hidden" id="output-actions">
+            <button type="button" id="btn-collect-all" class="ghost compact">RÉCUPÉRER TOUT</button>
           </div>
         </div>
         <div id="tab-tree" class="tab-body hidden">

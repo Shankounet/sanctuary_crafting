@@ -389,7 +389,7 @@ function SurvivalBook.MaintenanceHints(src)
 end
 
 function SurvivalBook.Productions(src)
-    if not BookDB.Mod('Productions') then return { queue = {}, projects = {} } end
+    if not BookDB.Mod('Productions') then return { queue = {}, projects = {}, toCollect = 0, stations = {} } end
     local queue = {}
     if CraftQueue and CraftQueue.List then
         for _, e in ipairs(CraftQueue.List(src) or {}) do
@@ -400,8 +400,15 @@ function SurvivalBook.Productions(src)
                 label = (r and OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or (r and r.label) or e.recipeId,
                 finishAt = e.finishAt,
                 batch = e.batch,
+                state = e.state,
             }
         end
+    end
+    local toCollect, stations = 0, {}
+    if StationOutput and StationOutput.Enabled and StationOutput.Enabled() and StationOutput.ListReadyForPlayer then
+        local ready, bySt = StationOutput.ListReadyForPlayer(src)
+        toCollect = #(ready or {})
+        stations = bySt or {}
     end
     local projects = {}
     if Projects and BookDB.Mod('Projects') then
@@ -420,7 +427,7 @@ function SurvivalBook.Productions(src)
             }
         end
     end
-    return { queue = queue, projects = projects }
+    return { queue = queue, projects = projects, toCollect = toCollect, stations = stations }
 end
 
 function SurvivalBook.ListBlueprints(src)
@@ -503,7 +510,7 @@ function SurvivalBook.Dashboard(src)
         end, {}),
         productions = dashSafe(function()
             return SurvivalBook.Productions(src)
-        end, { queue = {}, projects = {} }),
+        end, { queue = {}, projects = {}, toCollect = 0, stations = {} }),
         modules = dashSafe(function()
             return SurvivalBook.EnabledModules()
         end, {}),

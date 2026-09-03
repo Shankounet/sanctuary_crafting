@@ -113,10 +113,17 @@ function StartCraft(recipeId, benchKey, batch)
 
     if result and result.ok then
         local res = result.result or {}
-        lib.notify({
-            type = 'success',
-            description = _('craft_success', res.count or 1, result.label or res.item or '?'),
-        })
+        if result.stationOutput or result.output then
+            lib.notify({
+                type = 'success',
+                description = _('craft_output_ready', result.label or res.item or '?', res.count or 1, result.stationLabel or 'station'),
+            })
+        else
+            lib.notify({
+                type = 'success',
+                description = _('craft_success', res.count or 1, result.label or res.item or '?'),
+            })
+        end
     else
         lib.notify({ type = 'error', description = _(result and result.reason or 'craft_failed') })
     end

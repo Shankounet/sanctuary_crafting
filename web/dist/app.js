@@ -22,6 +22,7 @@
     progressGen: 0,
     craftDurationMs: null,
     queue: [],
+    output: [],
     shop: {},
     flags: {},
     ux: {},
@@ -1883,7 +1884,9 @@
     });
     const activeList = scoped(session.active);
     state.queue = scoped(session.queued);
+    state.output = scoped(session.output || []);
     renderQueue();
+    renderOutput();
     updateFabIdleConsole();
 
     const active = activeList[0];
@@ -2058,11 +2061,16 @@
       setFabState('ready');
     }
     if (!alreadyDone && data && !data.timeout) {
-      await post('notify', {
-        type: success ? 'success' : 'error',
-        reason: success ? 'craft_success' : ((data && data.reason) || 'craft_failed'),
-        label: data && data.label,
-      });
+      const output = !!(data && (data.stationOutput || data.output));
+      if (success && output) {
+        // server ox_lib notify is the source of truth ("Disponible à la Station")
+      } else {
+        await post('notify', {
+          type: success ? 'success' : 'error',
+          reason: success ? 'craft_success' : ((data && data.reason) || 'craft_failed'),
+          label: data && data.label,
+        });
+      }
     }
     await refresh();
     if (!success && state.selected) {
@@ -2337,24 +2345,93 @@
     if (session) hydrateSession(session);
   }
 
+  function updateOutputBadge() {
+    const badge = $('#output-badge');
+    const n = (state.output || []).length;
+    if (!badge) return;
+    if (n > 0) {
+      badge.classList.remove('hidden');
+      badge.textContent = n > 9 ? '● ' + n : 'RÉCUP. ' + n;
+      badge.classList.toggle('dot', n <= 9);
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  function formatFinished(ts) {
+    if (!ts) return '';
+    const d = new Date((Number(ts) > 1e12 ? Number(ts) : Number(ts) * 1000));
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  function renderOutput() {
+    const track = $('#output-list');
+    const actions = $('#output-actions');
+    const sortieLab = $('#sortie-label');
+    if (!track) return;
+    track.innerHTML = '';
+    const list = state.output || [];
+    if (sortieLab) sortieLab.classList.toggle('hidden', list.length === 0 && !(state.flags && state.flags.stationOutput));
+    if (actions) actions.classList.toggle('hidden', list.length === 0);
+    list.forEach((e) => {
+      const qty = e.resultCount || e.count || e.batch || 1;
+      const card = document.createElement('div');
+      card.className = 'output-card';
+      const img = document.createElement('img');
+      img.className = 'othumb';
+      img.alt = '';
+      bindItemImg(img, e.resultItem || e.item || e.recipeId, null);
+      const mid = document.createElement('div');
+      const bits = [];
+      if (e.quality) bits.push(e.quality);
+      if (e.craftedBy) bits.push(e.craftedBy);
+      if (e.lot) bits.push('LOT ' + e.lot);
+      if (e.finishedAt) bits.push(formatFinished(e.finishedAt));
+      mid.innerHTML = '<div class="olabel"></div><div class="ometa"></div>';
+      mid.querySelector('.olabel').textContent = (e.label || e.recipeId || 'Objet') + ' ×' + qty;
+      mid.querySelector('.ometa').textContent = bits.join(' · ') || 'Prêt';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ghost compact qrecup';
+      btn.textContent = 'RÉCUPÉRER';
+      btn.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const r = await post('collectCraft', { craftId: e.craftId, benchKey: state.benchKey });
+        if (r && r.ok) showToast('Récupéré', 'ok');
+        else showToast((r && r.reason === 'craft_inventory_insufficient') ? 'Inventaire insuffisant.' : 'Récupération impossible', 'err');
+        await loadQueue();
+        await refresh();
+      });
+      card.appendChild(img);
+      card.appendChild(mid);
+      card.appendChild(btn);
+      track.appendChild(card);
+    });
+    updateOutputBadge();
+  }
+
   function renderQueue() {
     const track = $('#queue-list');
     const empty = $('#queue-empty');
     if (!track) return;
     track.innerHTML = '';
-    const has = state.queue && state.queue.length > 0;
+    const file = (state.queue || []).filter((e) => e.state !== 'completed' && e.state !== 'collected');
+    const has = file.length > 0;
     setEmpty(empty, !has);
-    (state.queue || []).forEach((e) => {
+    file.forEach((e) => {
       const now = Math.floor(Date.now() / 1000);
       const finishAt = e.finishAt || 0;
-      const startAt = e.startAt || (finishAt - Math.round((e.duration || 0) / 1000));
+      const startAt = e.startAt || e.createdAt || (finishAt - Math.round((e.duration || 0) / 1000));
       const left = Math.max(0, finishAt - now);
       const total = Math.max(1, finishAt - startAt);
       const done = finishAt ? Math.min(1, Math.max(0, 1 - left / total)) : (left <= 0 ? 1 : 0);
       const qty = e.batch || e.count || e.qty || 1;
+      const paused = e.paused || e.state === 'paused';
       const card = document.createElement('div');
-      card.className = `queue-card${left <= 0 ? ' ready' : ''}`;
-      const eta = left > 0 ? `ETA ${left}s` : 'PRÊT';
+      card.className = 'queue-card' + (paused ? ' paused' : '');
+      const eta = paused ? 'EN PAUSE' : (left > 0 ? ('ETA ' + left + 's') : 'FINALISATION');
       card.innerHTML = `
         <div class="qlabel">${escapeHtml(e.label || e.recipeId)}</div>
         <div class="qmeta"><span>Lot ×${escapeHtml(qty)} · ${Math.round(done * 100)}%</span><span>${eta}</span></div>
@@ -2363,21 +2440,13 @@
           <button type="button" class="ghost compact qcancel" data-qid="${escapeHtml(e.craftId)}">Annuler</button>
         </div>
       `;
-      card.addEventListener('click', async (ev) => {
-        if (ev.target && ev.target.closest && ev.target.closest('.qcancel')) return;
-        if (left <= 0) {
-          await post('queueCollect', { craftId: e.craftId });
-          await loadQueue();
-          await refresh();
-        }
-      });
       const cancelBtn = card.querySelector('.qcancel');
       if (cancelBtn) {
         cancelBtn.addEventListener('click', async (ev) => {
           ev.stopPropagation();
           const r = await post('queueCancel', { craftId: e.craftId });
           if (r && r.ok) showToast('Retiré de la file', 'ok');
-          else showToast('Annulation impossible', 'err');
+          else showToast((r && r.reason === 'craft_must_collect') ? 'Récupérez-la à la station' : 'Annulation impossible', 'err');
           await loadQueue();
           await refresh();
         });
@@ -2385,6 +2454,7 @@
       track.appendChild(card);
     });
     syncFabQueueMini();
+    renderOutput();
   }
 
   async function loadQueue() {
@@ -2393,6 +2463,7 @@
       if (sess && sess.ok && sess.session) {
         const stationId = sess.session.stationId || state.benchKey;
         state.queue = (sess.session.queued || []).filter((e) => !stationId || !e.benchKey || e.benchKey === stationId);
+        state.output = (sess.session.output || []).filter((e) => !stationId || !e.benchKey || !e.stationUid || e.benchKey === stationId || e.stationUid === stationId);
         renderQueue();
         return;
       }
@@ -2729,6 +2800,18 @@
     updateFabIdleConsole();
     openTab('queue');
   });
+  bindUi('#btn-collect-all', 'click', async () => {
+    const r = await post('collectAll', { benchKey: state.benchKey });
+    if (r && r.ok) {
+      const n = r.collected || 0;
+      if (n > 0) showToast('Récupéré ×' + n, 'ok');
+      if (r.reason === 'craft_inventory_insufficient') showToast('Inventaire insuffisant.', 'err');
+    } else {
+      showToast('Récupération impossible', 'err');
+    }
+    await loadQueue();
+    await refresh();
+  });
   bindUi('#btn-shop', 'click', async () => {
     if (!state.selected) return;
     if (!isPinned(state.selected.id)) {
@@ -2938,6 +3021,32 @@
     } else if (msg.action === 'queue') {
       state.queue = msg.queue || [];
       renderQueue();
+    } else if (msg.action === 'outputReady') {
+      const d = msg.data || {};
+      if (d.craftId) {
+        state.output = (state.output || []).filter((e) => e.craftId !== d.craftId);
+        state.output.push({
+          craftId: d.craftId,
+          label: d.label,
+          resultItem: d.result && d.result.item,
+          resultCount: d.result && d.result.count,
+          quality: d.quality,
+          lot: d.lot,
+          craftedBy: d.craftedBy,
+          finishedAt: d.finishedAt,
+          benchKey: d.benchKey,
+          stationUid: d.stationUid,
+          stationLabel: d.stationLabel,
+        });
+        state.queue = (state.queue || []).filter((e) => e.craftId !== d.craftId);
+        renderQueue();
+      }
+    } else if (msg.action === 'outputCollected') {
+      const d = msg.data || {};
+      if (d.craftId) {
+        state.output = (state.output || []).filter((e) => e.craftId !== d.craftId);
+        renderQueue();
+      }
     } else if (msg.action === 'craftFinished') {
       const same = !msg.craftId || !state.craftId || msg.craftId === state.craftId;
       state.progressGen = (state.progressGen || 0) + 1;

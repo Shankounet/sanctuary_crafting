@@ -636,6 +636,8 @@
     const pins = d.pins || [];
     const prods = (d.productions && d.productions.queue) || [];
     const projects = (d.productions && d.productions.projects) || [];
+    const toCollect = (d.productions && (d.productions.toCollect || 0)) || 0;
+    const collectStations = (d.productions && d.productions.stations) || [];
     const almost = (d.suggestions && d.suggestions.almost) || [];
     const canCraft = d.canCraft || [];
     const title = (state.meta && state.meta.title) || 'Carnet de survie';
@@ -779,6 +781,7 @@
       </div>
 
       ${pins.length ? `<p class="hand-note" style="margin-top:10px">Épingles : ${pins.length}.</p>` : ''}
+      ${toCollect > 0 ? `<p class="hand-note">Productions à récupérer : ${toCollect}${collectStations.length ? ' — ' + collectStations.map((st) => esc(st.stationLabel || st.stationUid) + ' ×' + (st.count || 1)).join(', ') : ''}.</p>` : ''}
       ${prods.length ? `<p class="hand-note">File atelier : ${prods.slice(0, 2).map((q) => esc(q.label || displayItem(q))).join(', ')}</p>` : ''}
       ${folio('ii')}
       </div>`;
@@ -1767,8 +1770,10 @@
       </div>
       <div class="scrap-note rot-r" style="margin-top:16px">
         <span class="tape top-l"></span>
-        <div class="scrap-title">Prêt / à collecter</div>
-        <div class="scrap-body">La collecte se fait à l'atelier craft. Ce feuillet suit l'état sans cloner le banc.</div>
+        <div class="scrap-title">Productions à récupérer</div>
+        <div class="scrap-body">${(d.toCollect || 0) > 0
+          ? `${d.toCollect} pièce(s) en sortie.${(d.stations || []).length ? '<br/>' + (d.stations || []).map((st) => esc(st.stationLabel || st.stationUid)).join(', ') : ''}`
+          : 'La collecte se fait à l\'atelier. Rien en attente.'}</div>
       </div>
       ${folio('91')}`;
     setPages(left, right);

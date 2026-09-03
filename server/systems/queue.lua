@@ -33,7 +33,27 @@ local function ident(src)
 end
 
 function CraftQueue.List(src)
-    return queues[src] or {}
+    local list = queues[src] or {}
+    local out = {}
+    for i = 1, #list do
+        local st = list[i].state
+        if st ~= 'completed' and st ~= 'collected' then
+            out[#out + 1] = list[i]
+        end
+    end
+    return out
+end
+
+--- Remove a craft from player RAM (SQL owned by StationOutput).
+function CraftQueue.Detach(craftId)
+    if type(craftId) ~= 'string' then return end
+    for src, list in pairs(queues) do
+        for i = #list, 1, -1 do
+            if list[i].craftId == craftId then
+                table.remove(list, i)
+            end
+        end
+    end
 end
 
 function CraftQueue.CountForBench(src, benchKey)
@@ -124,13 +144,17 @@ function CraftQueue._startQueued(src, recipeId, benchKey, batch)
     if type(finishAt) ~= 'number' or finishAt <= os.time() then
         if CraftingAnomaly then CraftingAnomaly.Warn('bad_timestamp', src, { recipeId = recipe.id, finishAt = finishAt }) end
     end
+    local stationUid = (StationOutput and StationOutput.Uid and StationOutput.Uid(bench)) or bench.key
     local entry = {
         craftId = craftId, recipeId = recipe.id, benchKey = bench.key,
+        stationUid = stationUid,
         batch = ctx.batch, ingredients = ctx.ingredients, finishAt = finishAt,
         createdAt = os.time(), duration = duration,
         label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(recipe)) or recipe.label,
         reserved = CraftingMaterials.ReserveOnQueue() == true,
         snapshot = snap, recipeVersion = ver or 0,
+        state = 'processing',
+        source = 'queue',
     }
     queues[src][#queues[src] + 1] = entry
 
@@ -139,8 +163,8 @@ function CraftQueue._startQueued(src, recipeId, benchKey, batch)
         local snapJson = (RecipeSnapshot and RecipeSnapshot.Encode and RecipeSnapshot.Encode(snap)) or json.encode(snap)
         local insOk = pcall(function()
             MySQL.insert.await(
-                'INSERT INTO sanctuary_craft_queue (identifier, craft_id, recipe_id, bench_key, batch, ingredients, finish_at, created_at, recipe_snapshot, recipe_version) VALUES (?,?,?,?,?,?,?,?,?,?)',
-                { id, craftId, recipe.id, bench.key, ctx.batch, json.encode(ctx.ingredients), finishAt, os.time(), snapJson, ver or 0 }
+                'INSERT INTO sanctuary_craft_queue (identifier, craft_id, recipe_id, bench_key, batch, ingredients, finish_at, created_at, recipe_snapshot, recipe_version, station_uid, state) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                { id, craftId, recipe.id, bench.key, ctx.batch, json.encode(ctx.ingredients), finishAt, os.time(), snapJson, ver or 0, stationUid, 'processing' }
             )
         end)
         if not insOk then
@@ -180,6 +204,7 @@ function CraftQueue.TickPower()
                     e.pausedAt = os.time()
                     e.pausedRemaining = math.max(0, (tonumber(e.finishAt) or os.time()) - os.time())
                     e.state = 'paused'
+                    MySQL.update('UPDATE sanctuary_craft_queue SET state = ?, finish_at = ? WHERE craft_id = ?', { 'paused', e.finishAt, e.craftId })
                 end
             elseif e.paused then
                 local rem = tonumber(e.pausedRemaining) or 0
@@ -187,14 +212,22 @@ function CraftQueue.TickPower()
                 e.paused = false
                 e.pausedAt = nil
                 e.pausedRemaining = nil
-                e.state = nil
-                MySQL.update('UPDATE sanctuary_craft_queue SET finish_at = ? WHERE craft_id = ?', { e.finishAt, e.craftId })
+                e.state = 'processing'
+                MySQL.update('UPDATE sanctuary_craft_queue SET finish_at = ?, state = ? WHERE craft_id = ?', { e.finishAt, 'processing', e.craftId })
             end
         end
     end
 end
 
-function CraftQueue.TryCollect(src, craftId)
+function CraftQueue.TryCollect(src, craftId, benchKey)
+    if type(craftId) ~= 'string' then return false, 'craft_invalid' end
+    if StationOutput and StationOutput.Enabled and StationOutput.Enabled() then
+        return StationOutput.Collect(src, craftId, benchKey)
+    end
+    return CraftQueue.TryCollectLegacy(src, craftId)
+end
+
+function CraftQueue.TryCollectLegacy(src, craftId)
     if type(craftId) ~= 'string' then return false, 'craft_invalid' end
     if busy[craftId] then return false, 'craft_busy' end
     busy[craftId] = true
@@ -301,7 +334,17 @@ function CraftQueue.Cancel(src, craftId)
         for i = 1, #list do
             if list[i].craftId == craftId then
                 local e = list[i]
-                -- no refund after finishAt (race with collect)
+                local st = e.state
+                if st == 'completed' or st == 'collected' then
+                    return false, 'craft_must_collect'
+                end
+                if StationOutput and StationOutput.IsCancelable and not StationOutput.IsCancelable(st) then
+                    return false, 'craft_must_collect'
+                end
+                -- no refund after finishAt (race with collect / station output)
+                if e.finishAt and os.time() >= e.finishAt and StationOutput and StationOutput.Enabled and StationOutput.Enabled() then
+                    return false, 'craft_must_collect'
+                end
                 if CraftingMaterials.ShouldRefundQueue(e) then
                     CraftingMaterials.Give(src, e.ingredients or {})
                 end
@@ -344,13 +387,19 @@ function CraftQueue.LoadOffline(src)
             local live = Config.RecipeById and Config.RecipeById[r.recipe_id]
             local lab = (RecipeSnapshot and RecipeSnapshot.FacingLabel and RecipeSnapshot.FacingLabel(snap))
                 or (live and live.label) or r.recipe_id
+            local st = r.state or 'processing'
+            if st ~= 'completed' and st ~= 'collected' and st ~= 'cancelled' and st ~= 'failed' then
             queues[src][#queues[src] + 1] = {
                 craftId = cid, recipeId = r.recipe_id, benchKey = r.bench_key,
+                stationUid = r.station_uid or r.bench_key,
                 batch = r.batch, ingredients = json.decode(r.ingredients) or {},
                 finishAt = r.finish_at, createdAt = r.created_at,
                 snapshot = snap, recipeVersion = tonumber(r.recipe_version) or 0,
                 label = lab,
+                state = st,
+                paused = st == 'paused',
             }
+            end
         else
             -- drop duplicate row
             if cid then
@@ -384,8 +433,8 @@ lib.callback.register('sanctuary_crafting:queueList', function(src)
     return { ok = true, queue = CraftQueue.List(src) }
 end)
 
-lib.callback.register('sanctuary_crafting:queueCollect', function(src, craftId)
-    local ok, extra, extra2 = CraftQueue.TryCollect(src, craftId)
+lib.callback.register('sanctuary_crafting:queueCollect', function(src, craftId, benchKey)
+    local ok, extra, extra2 = CraftQueue.TryCollect(src, craftId, benchKey)
     if not ok then return { ok = false, reason = extra, wait = extra2 } end
     return { ok = true, label = extra.label }
 end)

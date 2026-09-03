@@ -127,4 +127,10 @@ Locales['en'] = {
     ['craft_now_craftable'] = '%s is now craftable',
     ['craft_paused_power'] = 'Craft paused — no power',
     ['craft_resumed_power'] = 'Power restored — craft resumed',
+    ['craft_output_ready'] = 'Production finished: %s ×%s — Available at the %s.',
+    ['craft_output_collected'] = 'Collected: %s ×%s',
+    ['craft_inventory_insufficient'] = 'Inventory full.',
+    ['craft_wrong_station'] = 'Collect this production at its station.',
+    ['craft_must_collect'] = 'Production finished — collect it at the station.',
+    ['craft_output_empty'] = 'Nothing to collect here.',
 }

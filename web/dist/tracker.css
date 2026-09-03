@@ -271,7 +271,9 @@
 
 #craft-tracker .ct-job.is-queued .ct-phase { color: var(--ct-warn); }
 
-#craft-tracker .ct-job.is-done .ct-phase { color: var(--ct-ok); }
+#craft-tracker .ct-job.is-done .ct-phase,
+#craft-tracker .ct-job.is-ready .ct-phase { color: var(--ct-ok); }
+#craft-tracker .ct-job.is-ready .ct-fill { background: linear-gradient(90deg, #4f7a4c, var(--ct-ok)); }
 #craft-tracker .ct-job.is-error .ct-phase { color: var(--ct-err); }
 
 #craft-tracker .ct-dismiss {
