@@ -144,13 +144,16 @@ RegisterNUICallback('complete', function(data, cb)
                 wallNow = wallMs(),
             })
         elseif result and (result.ok or result.already) then
+            local output = result.stationOutput or result.output
             CraftTracker.Upsert({
                 craftId = data.craftId,
-                status = 'done',
-                stepLabel = 'FABRICATION TERMINÉE',
+                status = output and 'ready' or 'done',
+                stepLabel = output and ('terminée — Disponible à : ' .. (result.stationLabel or 'Station')) or 'FABRICATION TERMINÉE',
                 label = result.label,
                 item = result.result and result.result.item,
                 count = result.result and result.result.count,
+                stationLabel = result.stationLabel,
+                stationOutput = output and true or false,
             })
         elseif result and (result.reason == 'craft_invalid' or result.reason == 'craft_too_far') then
             -- 100% complete is idempotent; craft_too_far must not stick the UI after time elapsed
@@ -203,11 +206,29 @@ RegisterNUICallback('queueList', function(_, cb)
 end)
 
 RegisterNUICallback('queueCollect', function(data, cb)
-    local r = lib.callback.await('sanctuary_crafting:queueCollect', false, data.craftId)
+    local r = lib.callback.await('sanctuary_crafting:queueCollect', false, data.craftId, data.benchKey or lastBenchKey)
     if trackerEnabled() and data.craftId and r and r.ok then
         CraftTracker.Remove(data.craftId)
     end
     cb(r or { ok = false })
+end)
+
+RegisterNUICallback('collectCraft', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:collectCraft', false, data and data.craftId, data and data.benchKey or lastBenchKey)
+    if trackerEnabled() and data and data.craftId and r and r.ok then
+        CraftTracker.Remove(data.craftId)
+    end
+    cb(r or { ok = false })
+end)
+
+RegisterNUICallback('collectAll', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:collectAll', false, data and data.benchKey or lastBenchKey)
+    cb(r or { ok = false })
+end)
+
+RegisterNUICallback('getStationOutput', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:getStationOutput', false, data and data.benchKey or lastBenchKey)
+    cb(r or { ok = true, output = {}, count = 0 })
 end)
 
 RegisterNUICallback('queueCancel', function(data, cb)
@@ -302,7 +323,9 @@ end)
 
 RegisterNUICallback('notify', function(data, cb)
     local desc = data.reason or 'craft_failed'
-    if data.reason == 'craft_success' and data.label then
+    if data.reason == 'craft_output_ready' then
+        desc = _('craft_output_ready', data.label or 'objet', data.count or 1, data.stationLabel or 'station')
+    elseif data.reason == 'craft_success' and data.label then
         desc = _('craft_success', 1, data.label)
     elseif type(data.args) == 'table' and #data.args > 0 then
         desc = _(desc, table.unpack(data.args))
@@ -338,15 +361,18 @@ RegisterNetEvent('sanctuary_crafting:client:craftFinished', function(payload)
         benchKey = payload.benchKey,
     })
     if trackerEnabled() and craftId then
+        local output = payload.stationOutput or payload.output
         CraftTracker.Upsert({
             craftId = craftId,
-            status = 'done',
-            stepLabel = 'FABRICATION TERMINÉE',
+            status = output and 'ready' or 'done',
+            stepLabel = output and ('terminée — Disponible à : ' .. (payload.stationLabel or 'Station')) or 'FABRICATION TERMINÉE',
             label = payload.label,
             item = payload.result and payload.result.item,
             count = payload.result and payload.result.count,
             batch = payload.batch,
             benchKey = payload.benchKey,
+            stationLabel = payload.stationLabel,
+            stationOutput = output and true or false,
         })
     end
 end)
@@ -409,6 +435,33 @@ end)
 -- Inventory delta → follow notify (server RAM). No extra getMenu from NUI.
 AddEventHandler('ox_inventory:updateInventory', function()
     TriggerServerEvent('sanctuary_crafting:server:invChanged')
+end)
+
+RegisterNetEvent('sanctuary_crafting:client:outputReady', function(payload)
+    payload = type(payload) == 'table' and payload or {}
+    SendNUIMessage({ action = 'outputReady', data = payload })
+    if trackerEnabled() and payload.craftId then
+        CraftTracker.Upsert({
+            craftId = payload.craftId,
+            status = 'ready',
+            stepLabel = 'terminée — Disponible à : ' .. (payload.stationLabel or 'Station'),
+            label = payload.label,
+            item = payload.result and payload.result.item,
+            count = payload.result and payload.result.count,
+            batch = payload.batch,
+            benchKey = payload.benchKey,
+            stationLabel = payload.stationLabel,
+            stationOutput = true,
+        })
+    end
+end)
+
+RegisterNetEvent('sanctuary_crafting:client:outputCollected', function(payload)
+    payload = type(payload) == 'table' and payload or {}
+    SendNUIMessage({ action = 'outputCollected', data = payload })
+    if trackerEnabled() and payload.craftId then
+        CraftTracker.Remove(payload.craftId)
+    end
 end)
 
 RegisterNetEvent('sanctuary_crafting:client:craftPaused', function(payload)

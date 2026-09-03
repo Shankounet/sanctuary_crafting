@@ -5,7 +5,7 @@ lua54 'yes'
 name 'sanctuary_crafting'
 author 'Shankounet / Sanctuary'
 description 'Plateforme de craft post-apo + Carnet de survie — ESX, ox_*, devhub_skillTree, NUI industrielle'
-version '2.22.0'
+version '2.23.0'
 
 ui_page 'web/dist/index.html'
 
@@ -84,6 +84,7 @@ server_scripts {
     'server/systems/quality.lua',
     'server/systems/mastery.lua',
     'server/systems/queue.lua',
+    'server/systems/station_output.lua',
     'server/systems/projects.lua',
     'server/systems/reverse.lua',
     'server/systems/favorites.lua',

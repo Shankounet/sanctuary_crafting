@@ -152,6 +152,13 @@ local function autoMigrate()
         end)
     end
 
+    -- v2.23 (223): station output columns on sanctuary_craft_queue (sparse)
+    if cur < 223 then
+        if StationOutput and StationOutput.EnsureColumns then
+            StationOutput.EnsureColumns()
+        end
+    end
+
     if cur < target then
         MySQL.query.await([[
             INSERT INTO sanctuary_schema_version (id, version) VALUES (1, ?)

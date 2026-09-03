@@ -189,7 +189,8 @@ function CraftingPipeline.Cancel(src, craftId, reason)
     local craft = activeById[craftId]
     if not craft or craft.src ~= src then return false, 'craft_invalid' end
     if craft.state == 'completed' or (craft.completed and craft.state ~= 'running') then
-        return true
+        -- completed output must be collected, never cancelled
+        return false, 'craft_must_collect'
     end
     if craft.state == 'completing' then
         return false, 'craft_busy'
@@ -200,6 +201,9 @@ function CraftingPipeline.Cancel(src, craftId, reason)
         return r and r.ok or false, r and r.reason
     end
     craft.state = 'cancelled'
+    if StationOutput and StationOutput.Delete then
+        StationOutput.Delete(craftId, GetPlayerIdentifierSafe(src))
+    end
     local doRefund = Config.Crafting and Config.Crafting.RefundOnCancel
     if doRefund and craft.removed and Config.Crafting.PartialRefund then
         local elapsed = GetGameTimer() - (craft.startedAt or 0)
@@ -500,7 +504,8 @@ local function validateStart(src, recipeId, benchKey, batch, opts)
     end
 
     local resultCount = (recipe.result.count or 1) * batch
-    if not Validation.CanCarry(src, recipe.result.item, resultCount) then
+    local outputOn = StationOutput and StationOutput.Enabled and StationOutput.Enabled()
+    if not outputOn and not Validation.CanCarry(src, recipe.result.item, resultCount) then
         return nil, 'craft_inventory_full'
     end
 
@@ -578,6 +583,28 @@ function CraftingPipeline._startInner(src, recipeId, benchKey, batch)
     registerActive(src, craft)
     emitNoise(src, recipe, bench)
     CraftingCore.Emit('craftStarted', src, craft)
+    if StationOutput and StationOutput.Enabled and StationOutput.Enabled() and StationOutput.Persist then
+        local id = GetPlayerIdentifierSafe(src)
+        if id then
+            craft.stationUid = StationOutput.Uid(bench) or bench.key
+            local finishAt = os.time() + math.ceil((duration or 0) / 1000)
+            StationOutput.Persist({
+                craftId = craftId,
+                identifier = id,
+                recipeId = recipe.id,
+                recipeVersion = craft.recipeVersion or 0,
+                snapshot = craft.snapshot,
+                benchKey = bench.key,
+                stationUid = craft.stationUid,
+                state = 'processing',
+                batch = ctx.batch,
+                ingredients = ctx.ingredients,
+                finishAt = finishAt,
+                createdAt = os.time(),
+                source = 'interactive',
+            })
+        end
+    end
 
     do
         local startedUnix = craft.startedUnix -- unix s
@@ -831,86 +858,127 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
     end
 
     local batch = craft.batch or 1
-    local resultItem = recipe.result.item
-    local resultCount = (recipe.result.count or 1) * batch
-
+    local resultItem = recipe.result and recipe.result.item
+    local resultCount = recipe.result and ((recipe.result.count or 1) * batch) or batch
+    local outputOn = StationOutput and StationOutput.Enabled and StationOutput.Enabled()
     local given = {}
-    if recipe.dismantle and Config.Dismantling and Config.Dismantling.Enabled and recipe.dismantleYields then
-        local bonus = 0
-        if Config.Dismantling.SkillYieldBonus then
-            bonus = (CraftingSkills.GetCategoryBonus(Config.Skills.defaultCategory or 'engineer', src) or 0) / 100
-        end
-        for _, y in ipairs(recipe.dismantleYields) do
-            local chance = math.min(1.0, (y.chance or 1.0) + bonus * 0.2)
-            if math.random() <= chance then
-                local c = y.count or 1
-                if Validation.CanCarry(src, y.item, c) then
-                    exports.ox_inventory:AddItem(src, y.item, c)
-                    given[#given + 1] = { item = y.item, count = c }
-                end
-            end
-        end
-    else
-        local quality = CraftingPipeline.RollQuality(src, recipe, bench)
 
-        if not Validation.CanCarry(src, resultItem, resultCount) then
-            if CraftingMaterials and CraftingMaterials.Give then
-                CraftingMaterials.Give(src, craft.ingredients)
-            else
-                for i = 1, #craft.ingredients do
-                    local ing = craft.ingredients[i]
-                    exports.ox_inventory:AddItem(src, ing.item, ing.count)
-                end
-            end
+    if outputOn then
+        -- Station output: snapshot once, store at station, NEVER AddItem here.
+        local okOut, outRow = StationOutput.Finalize({
+            craftId = craftId,
+            identifier = GetPlayerIdentifierSafe(src),
+            src = src,
+            recipe = recipe,
+            snapshot = craft.snapshot or recipe,
+            recipeId = recipe.id or craft.recipeId,
+            recipeVersion = craft.recipeVersion,
+            bench = bench,
+            benchKey = craft.benchKey,
+            stationUid = craft.stationUid or (StationOutput.Uid and StationOutput.Uid(bench)) or craft.benchKey,
+            batch = batch,
+            ingredients = craft.ingredients,
+            finishAt = os.time(),
+            createdAt = craft.startedUnix,
+            source = 'interactive',
+        })
+        if not okOut and outRow ~= 'already' then
             craft.state = 'failed'
-            clearActive(craftId, false)
-            return { ok = false, reason = 'craft_inventory_full' }
+            clearActive(craftId, craft.removed)
+            return { ok = false, reason = (type(outRow) == 'string' and outRow) or 'craft_failed' }
         end
-
-        local okGive = false
-        if CraftSignature and CraftSignature.GiveResult then
-            okGive = CraftSignature.GiveResult(src, recipe, bench, quality, craft.craftId, resultCount)
+        if type(outRow) == 'table' then
+            given[1] = {
+                item = outRow.resultItem or resultItem,
+                count = outRow.resultCount or resultCount,
+                quality = outRow.quality,
+            }
+            resultItem = given[1].item
+            resultCount = given[1].count
         else
-            local meta = { craftedBy = GetPlayerIdentifierSafe(src) }
-            if quality then meta.quality = quality end
-            okGive = exports.ox_inventory:AddItem(src, resultItem, resultCount, meta) and true or false
+            given[1] = { item = resultItem, count = resultCount }
         end
-        if not okGive then
-            if CraftingMaterials and CraftingMaterials.Give then
-                CraftingMaterials.Give(src, craft.ingredients)
-            else
-                for i = 1, #craft.ingredients do
-                    local ing = craft.ingredients[i]
-                    exports.ox_inventory:AddItem(src, ing.item, ing.count)
+        craftLog(('[CRAFT] output stored id=%s item=%s count=%s station=%s'):format(
+            craftId, tostring(given[1].item), tostring(given[1].count), tostring(craft.benchKey)
+        ))
+    else
+        if recipe.dismantle and Config.Dismantling and Config.Dismantling.Enabled and recipe.dismantleYields then
+            local bonus = 0
+            if Config.Dismantling.SkillYieldBonus then
+                bonus = (CraftingSkills.GetCategoryBonus(Config.Skills.defaultCategory or 'engineer', src) or 0) / 100
+            end
+            for _, y in ipairs(recipe.dismantleYields) do
+                local chance = math.min(1.0, (y.chance or 1.0) + bonus * 0.2)
+                if math.random() <= chance then
+                    local c = y.count or 1
+                    if Validation.CanCarry(src, y.item, c) then
+                        exports.ox_inventory:AddItem(src, y.item, c)
+                        given[#given + 1] = { item = y.item, count = c }
+                    end
                 end
             end
-            craft.state = 'failed'
-            clearActive(craftId, false)
-            return { ok = false, reason = 'craft_inventory_full' }
-        end
-        given[#given + 1] = { item = resultItem, count = resultCount, quality = quality }
-        giveByproducts(src, recipe)
-        if Tools and Tools.WearRecipe then
-            Tools.WearRecipe(src, recipe, batch)
-        end
-        if StationRuntime and StationRuntime.Degrade then
-            StationRuntime.Degrade(bench, recipe, batch)
-        end
-    end
+        else
+            local quality = CraftingPipeline.RollQuality(src, recipe, bench)
 
-    craftLog(('[CRAFT] reward granted id=%s item=%s count=%s'):format(
-        craftId, tostring(given[1] and given[1].item or resultItem), tostring(given[1] and given[1].count or resultCount)
-    ))
+            if not Validation.CanCarry(src, resultItem, resultCount) then
+                if CraftingMaterials and CraftingMaterials.Give then
+                    CraftingMaterials.Give(src, craft.ingredients)
+                else
+                    for i = 1, #craft.ingredients do
+                        local ing = craft.ingredients[i]
+                        exports.ox_inventory:AddItem(src, ing.item, ing.count)
+                    end
+                end
+                craft.state = 'failed'
+                clearActive(craftId, false)
+                return { ok = false, reason = 'craft_inventory_full' }
+            end
 
-    if recipe.xp and recipe.xp.category and recipe.xp.amount then
-        CraftingSkills.AddCraftXp(src, recipe.xp.category, recipe.xp.amount * batch)
-        if NewlyLearned and NewlyLearned.ScanLevelUnlocks then
-            NewlyLearned.ScanLevelUnlocks(src)
+            local okGive = false
+            if CraftSignature and CraftSignature.GiveResult then
+                okGive = CraftSignature.GiveResult(src, recipe, bench, quality, craft.craftId, resultCount)
+            else
+                local meta = { craftedBy = GetPlayerIdentifierSafe(src) }
+                if quality then meta.quality = quality end
+                okGive = exports.ox_inventory:AddItem(src, resultItem, resultCount, meta) and true or false
+            end
+            if not okGive then
+                if CraftingMaterials and CraftingMaterials.Give then
+                    CraftingMaterials.Give(src, craft.ingredients)
+                else
+                    for i = 1, #craft.ingredients do
+                        local ing = craft.ingredients[i]
+                        exports.ox_inventory:AddItem(src, ing.item, ing.count)
+                    end
+                end
+                craft.state = 'failed'
+                clearActive(craftId, false)
+                return { ok = false, reason = 'craft_inventory_full' }
+            end
+            given[#given + 1] = { item = resultItem, count = resultCount, quality = quality }
+            giveByproducts(src, recipe)
+            if Tools and Tools.WearRecipe then
+                Tools.WearRecipe(src, recipe, batch)
+            end
+            if StationRuntime and StationRuntime.Degrade then
+                StationRuntime.Degrade(bench, recipe, batch)
+            end
         end
-    end
 
-    if Config.Mastery and Config.Mastery.Enabled and Mastery then
-        Mastery.Add(src, recipe.id, (Config.Mastery.XpPerCraft or 1) * batch)
+        craftLog(('[CRAFT] reward granted id=%s item=%s count=%s'):format(
+            craftId, tostring(given[1] and given[1].item or resultItem), tostring(given[1] and given[1].count or resultCount)
+        ))
+
+        if recipe.xp and recipe.xp.category and recipe.xp.amount then
+            CraftingSkills.AddCraftXp(src, recipe.xp.category, recipe.xp.amount * batch)
+            if NewlyLearned and NewlyLearned.ScanLevelUnlocks then
+                NewlyLearned.ScanLevelUnlocks(src)
+            end
+        end
+
+        if Config.Mastery and Config.Mastery.Enabled and Mastery then
+            Mastery.Add(src, recipe.id, (Config.Mastery.XpPerCraft or 1) * batch)
+        end
     end
 
     craft.state = 'completed'
@@ -918,7 +986,9 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
     craftLog(('[CRAFT] state completed id=%s completedAt=%s'):format(craftId, tostring(craft.completedAt)))
 
     clearActive(craftId, false)
-    CraftingCore.Emit('craftCompleted', src, craft, given)
+    if not outputOn then
+        CraftingCore.Emit('craftCompleted', src, craft, given)
+    end
     DebugPrint('completeCraft ok', src, craftId)
 
     local chainNext = nil
@@ -926,6 +996,8 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
         chainNext = recipe.chain[1]
     end
 
+    local stationLabel = (StationOutput and StationOutput.StationLabel and StationOutput.StationLabel(craft.benchKey))
+        or (bench and bench.label) or craft.benchKey
     local resultPayload = {
         ok = true, craftId = craftId, craftUID = craft.craftUID,
         result = given[1] or recipe.result, results = given,
@@ -935,6 +1007,9 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
         advanced = false,
         batch = batch,
         benchKey = craft.benchKey,
+        stationOutput = outputOn and true or false,
+        stationLabel = stationLabel,
+        output = outputOn and true or false,
     }
     TriggerClientEvent('sanctuary_crafting:client:craftFinished', src, {
         craftId = craftId,
@@ -942,6 +1017,9 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
         result = resultPayload.result,
         batch = batch,
         benchKey = craft.benchKey,
+        stationOutput = outputOn and true or false,
+        stationLabel = stationLabel,
+        output = outputOn and true or false,
     })
 
     -- Queue-next: CraftQueue entries already have their own finishAt + collect path.
@@ -984,6 +1062,9 @@ local function pauseCraftPower(craft)
     craft.paused = true
     craft.state = 'paused'
     craft.pausedAt = os.time()
+    if StationOutput and StationOutput.Enabled and StationOutput.Enabled() then
+        MySQL.update('UPDATE sanctuary_craft_queue SET state = ? WHERE craft_id = ?', { 'paused', craft.craftId })
+    end
     TriggerClientEvent('sanctuary_crafting:client:craftPaused', craft.src, {
         craftId = craft.craftId,
         remainingMs = craft.pausedRemainingMs,
@@ -1002,6 +1083,10 @@ local function resumeCraftPower(craft)
     craft.pausedRemainingMs = nil
     craft.pausedAt = nil
     craft.state = 'running'
+    if StationOutput and StationOutput.Enabled and StationOutput.Enabled() then
+        local finishAt = os.time() + math.ceil(rem / 1000)
+        MySQL.update('UPDATE sanctuary_craft_queue SET state = ?, finish_at = ? WHERE craft_id = ?', { 'processing', finishAt, craft.craftId })
+    end
     TriggerClientEvent('sanctuary_crafting:client:craftResumed', craft.src, {
         craftId = craft.craftId,
         remainingMs = rem,
@@ -1062,6 +1147,7 @@ end)
 AddEventHandler('playerDropped', function()
     local src = source
     local set = activeBySrc[src]
+    local outputOn = StationOutput and StationOutput.Enabled and StationOutput.Enabled()
     if set then
         local ids = {}
         for id in pairs(set) do ids[#ids + 1] = id end
@@ -1069,19 +1155,47 @@ AddEventHandler('playerDropped', function()
             local craft = activeById[ids[i]]
             if craft and remainingMsOf(craft) <= 0 and (craft.state == 'running' or not craft.state) then
                 CraftingPipeline.FinalizeCraft(src, craft.craftId, { reason = 'session', requireNear = false })
+            elseif craft and outputOn and (craft.state == 'running' or craft.state == 'paused' or not craft.state) then
+                local id = GetPlayerIdentifierSafe(src)
+                if id and StationOutput.Persist then
+                    local rem = remainingMsOf(craft)
+                    local finishAt = os.time() + math.ceil(math.max(0, rem) / 1000)
+                    local st = (craft.paused or craft.state == 'paused') and 'paused' or 'processing'
+                    StationOutput.Persist({
+                        craftId = craft.craftId,
+                        identifier = id,
+                        recipeId = craft.recipeId,
+                        recipeVersion = craft.recipeVersion or 0,
+                        snapshot = craft.snapshot,
+                        benchKey = craft.benchKey,
+                        stationUid = craft.stationUid or craft.benchKey,
+                        state = st,
+                        batch = craft.batch or 1,
+                        ingredients = craft.ingredients,
+                        finishAt = finishAt,
+                        createdAt = craft.startedUnix or os.time(),
+                        source = 'interactive',
+                    })
+                end
+                clearActive(craft.craftId, false)
             end
         end
     end
-    local refund = Config.Crafting and Config.Crafting.RefundOnDisconnect
-    CraftingPipeline.CancelAll(src, refund)
+    if not outputOn then
+        local refund = Config.Crafting and Config.Crafting.RefundOnDisconnect
+        CraftingPipeline.CancelAll(src, refund)
+    else
+        -- leftover RAM (completing/failed): drop without refund — SQL owns the job
+        CraftingPipeline.CancelAll(src, false)
+    end
     Validation.ClearPlayer(src)
 end)
 
 
 
--- Interactive crafts live in RAM (GetGameTimer). Close/reopen NUI rehydrates via GetSession.
--- Disconnect still cancels interactive crafts (playerDropped). Queue SQL covers queued/offline.
--- Persisting interactive crafts across reconnect is deferred (not in this version).
+-- Interactive crafts live in RAM (GetGameTimer) while the player is online.
+-- With StationOutput, they are also persisted to sanctuary_craft_queue (processing)
+-- so disconnect / restart / reboot keep the job; finish_at catch-up -> completed output.
 
 local function craftSessionDebug()
     return Config.Debug or (Config.CraftTracker and Config.CraftTracker.Debug)
@@ -1179,6 +1293,9 @@ function CraftingPipeline.GetSession(src, benchKey)
             end
         end
     end
+    if StationOutput and StationOutput.Enabled and StationOutput.Enabled() and StationOutput.CatchUpOverdue then
+        StationOutput.CatchUpOverdue()
+    end
     local active, other = CraftingPipeline.SerializeActive(src, benchKey)
     local queued = {}
     if CraftQueue and CraftQueue.List then
@@ -1190,14 +1307,17 @@ function CraftingPipeline.GetSession(src, benchKey)
                 local createdAt = tonumber(e.createdAt) or finishAt
                 local durationMs = tonumber(e.duration) or math.max(0, (finishAt - createdAt) * 1000)
                 local remainingMs = math.max(0, (finishAt - os.time()) * 1000)
-                local qState = e.paused and 'paused' or 'queued'
+                local qState = e.state or (e.paused and 'paused' or 'processing')
+                if e.paused then qState = 'paused' end
                 if e.paused and e.pausedRemaining then
                     remainingMs = math.max(0, tonumber(e.pausedRemaining) or 0) * 1000
                 end
+                if qState ~= 'completed' and qState ~= 'collected' then
                 queued[#queued + 1] = {
                     craftId = e.craftId,
                     recipeId = e.recipeId,
                     benchKey = e.benchKey,
+                    stationUid = e.stationUid or e.benchKey,
                     batch = e.batch or 1,
                     quantity = e.batch or 1,
                     ingredients = e.ingredients,
@@ -1210,15 +1330,26 @@ function CraftingPipeline.GetSession(src, benchKey)
                     remainingMs = remainingMs,
                     label = e.label,
                     state = qState,
-                    paused = e.paused == true,
+                    paused = e.paused == true or qState == 'paused',
                 }
+                end
             end
         end
+    end
+    local output, outputCount = {}, 0
+    if StationOutput and StationOutput.Enabled and StationOutput.Enabled() and StationOutput.ListForStation then
+        local list = StationOutput.ListForStation(src, benchKey) or {}
+        for i = 1, #list do
+            output[#output + 1] = StationOutput.SerializeOutput(list[i])
+        end
+        outputCount = #output
     end
     local session = {
         stationId = benchKey,
         active = active,
         queued = queued,
+        output = output,
+        outputCount = outputCount,
         other = other,
     }
     if craftSessionDebug() then
@@ -2292,6 +2423,7 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
             followNotify = (Config.Follow and Config.Follow.NotifyWhenCraftable) ~= false,
             knowledge = Config.Knowledge and Config.Knowledge.Enabled ~= false,
             compare = compareCfg.Enabled == true,
+            stationOutput = not (StationOutput and StationOutput.Enabled) or StationOutput.Enabled() ~= false,
         },
         knowledge = Config.Knowledge,
         masteryCfg = Config.Mastery and {

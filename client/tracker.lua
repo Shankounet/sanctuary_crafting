@@ -157,6 +157,13 @@ function CraftTracker.ApplySession(benchKey, session)
             keep[e.craftId] = true
         end
     end
+    for _, o in ipairs(session.output or {}) do
+        local e = CraftTracker.FromOutputEntry and CraftTracker.FromOutputEntry(o)
+        if e then
+            CraftTracker.Upsert(e)
+            keep[e.craftId] = true
+        end
+    end
     for _, o in ipairs(session.other or {}) do
         local e = CraftTracker.FromSessionActive(o)
         if e then CraftTracker.Upsert(e) end
@@ -167,16 +174,17 @@ function CraftTracker.ApplySession(benchKey, session)
         for id, job in pairs(jobs) do
             if job.benchKey == key and not keep[id] then
                 local st = job.status
-                if st == 'done' or st == 'completing' or st == 'completed' then
-                    -- keep linger card
+                if st == 'done' or st == 'ready' or st == 'completing' or st == 'completed' then
+                    -- keep linger / à récupérer card
                 elseif st == 'active' then
                     local remaining = (job.endsAt or 0) - nowMs()
                     if remaining <= 0 then
-                        -- Session no longer has this job: server just finalized. Show TERMINÉ, don't yank.
+                        -- Session no longer has this job: server just finalized. Show SORTIE, don't yank.
                         CraftTracker.Upsert({
                             craftId = id,
-                            status = 'done',
-                            stepLabel = 'FABRICATION TERMINÉE',
+                            status = 'ready',
+                            stepLabel = 'terminée — Disponible à : Station',
+                            stationOutput = true,
                         })
                     else
                         drop[#drop + 1] = id
@@ -268,7 +276,7 @@ end
 function CraftTracker.HasActive()
     for _, e in pairs(jobs) do
         local st = e.status
-        if st == 'active' or st == 'queued' or st == 'paused' then
+        if st == 'active' or st == 'queued' or st == 'paused' or st == 'ready' then
             return true
         end
     end
@@ -354,7 +362,8 @@ function CraftTracker.FromQueueEntry(entry, meta)
         batch = entry.batch or 1,
         benchKey = entry.benchKey or meta.benchKey,
         benchLabel = meta.benchLabel or entry.benchLabel,
-        status = 'queued',
+        stationLabel = entry.stationLabel or meta.benchLabel,
+        status = (entry.paused or entry.state == 'paused') and 'paused' or 'queued',
         startedAt = createdAt * 1000,
         endsAt = finishAt * 1000,
         duration = duration,
@@ -365,6 +374,30 @@ function CraftTracker.FromQueueEntry(entry, meta)
         phaseFamily = phaseFamilyFor(category),
         category = category,
         queueWaiting = 0,
+        wallNow = wallMs(),
+        clientTimer = nowMs(),
+    }
+end
+
+function CraftTracker.FromOutputEntry(entry)
+    if not entry or not entry.craftId then return nil end
+    local stationLabel = entry.stationLabel or entry.benchLabel or 'Station'
+    return {
+        craftId = entry.craftId,
+        recipeId = entry.recipeId,
+        label = entry.label or entry.recipeId,
+        item = entry.resultItem or entry.item,
+        count = entry.resultCount or entry.count or entry.batch or 1,
+        batch = entry.batch or 1,
+        benchKey = entry.benchKey or entry.stationUid,
+        stationLabel = stationLabel,
+        status = 'ready',
+        stepLabel = 'terminée — Disponible à : ' .. stationLabel,
+        stationOutput = true,
+        duration = 1,
+        startedAt = nowMs(),
+        endsAt = nowMs(),
+        useWallClock = true,
         wallNow = wallMs(),
         clientTimer = nowMs(),
     }

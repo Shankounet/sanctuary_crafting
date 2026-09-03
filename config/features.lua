@@ -201,6 +201,32 @@ Config.Filters = {
     HaveWhatIHaveIncludeAlmost = true,
 }
 
+
+--------------------------------------------------------------------------------
+-- Station output (v2.23.0) — results stay at the bench until collected.
+-- On timer end / offline catch-up: snapshot once, state=completed, NO AddItem.
+-- Collect at the SAME station (default). Shared stations do not allow steal.
+--------------------------------------------------------------------------------
+Config.StationOutput = {
+    Enabled = true,
+    -- Collect only at the producing station (world:id / placed:id).
+    SameStationOnly = true,
+    -- XP + mastery: 'complete' (default, offline still gets XP on next login)
+    --             | 'collect' (only when the player picks up the item)
+    XpOn = 'complete',
+}
+
+-- Who may collect station output.
+--   owner  = crafter identifier only (DEFAULT — shared stations cannot steal)
+--   job    = same ESX job.name as stored at complete (owner_job)
+--   crew   = stub of job (no crew framework; uses ESX job/group)
+--   public = anyone at the station (still SameStationOnly unless disabled)
+Config.OutputAccess = 'owner'
+
+-- nil / false = never auto-purge completed output.
+-- number = DELETE completed rows older than N days (maintenance timer).
+Config.CompletedRetentionDays = false
+
 -- Full craft history in sanctuary_book_history. Default OFF (sparse).
 -- sanctuary_player_recent (≤10 catalogue « récemment ») stays regardless.
 -- If Enabled=true, optional RetentionDays prunes craft_completed rows (book MaxHistory still caps).

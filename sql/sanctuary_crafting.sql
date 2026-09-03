@@ -40,12 +40,25 @@ CREATE TABLE IF NOT EXISTS `sanctuary_craft_queue` (
     `craft_id` VARCHAR(64) NOT NULL,
     `recipe_id` VARCHAR(64) NOT NULL,
     `bench_key` VARCHAR(64) NOT NULL,
+    `station_uid` VARCHAR(64) NULL,
+    `state` VARCHAR(16) NOT NULL DEFAULT 'queued',
     `batch` INT NOT NULL DEFAULT 1,
     `ingredients` LONGTEXT NOT NULL,
+    `result_item` VARCHAR(64) NULL,
+    `result_count` INT NULL,
+    `result_metadata` LONGTEXT NULL,
+    `quality` VARCHAR(24) NULL,
     `finish_at` INT NOT NULL,
+    `finished_at` INT NULL,
     `created_at` INT NOT NULL,
+    `recipe_snapshot` LONGTEXT NULL,
+    `recipe_version` INT NULL,
+    `owner_job` VARCHAR(32) NULL,
+    `xp_granted` TINYINT(1) NOT NULL DEFAULT 0,
     PRIMARY KEY (`id`),
     KEY `idx_ident` (`identifier`),
+    KEY `idx_ident_state` (`identifier`, `state`),
+    KEY `idx_station_state` (`station_uid`, `state`),
     UNIQUE KEY `uniq_craft` (`craft_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -230,4 +243,8 @@ CREATE TABLE IF NOT EXISTS `sanctuary_schema_version` (
 --   DELETE craft_completed history; purge admin_logs older than RetentionDays.
 -- v2.18 (218): ADD discovered_resources.note TEXT NULL (personal note only).
 --   Do NOT store labels/images. Do NOT seed ox items. New player = 0 rows.
+-- v2.23 (223): sanctuary_craft_queue station output columns (state, station_uid,
+--   result_item/count/metadata, quality, finished_at, owner_job, xp_granted).
+--   completed = ready to collect at the station. collected = DELETE row.
+--   NO label/description/image in SQL — ox_inventory at read time.
 -- Live ALTER — tables are NOT renamed sanctuary_* → craft_*.

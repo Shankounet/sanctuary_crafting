@@ -429,7 +429,14 @@
     const p = Math.max(0, Math.min(1, progress || 0));
     const st = entry.status || 'active';
     if (st === 'error') return 'Erreur';
+    if (st === 'ready') {
+      const where = entry.stationLabel || entry.benchLabel || 'Station';
+      return 'terminée — Disponible à : ' + where;
+    }
     if (st === 'done' || st === 'completed' || st === 'completing' || p >= 1) {
+      if (entry.stationOutput || entry.stationLabel) {
+        return 'terminée — Disponible à : ' + (entry.stationLabel || 'Station');
+      }
       return 'FABRICATION TERMINÉE';
     }
     if (st === 'queued') return 'EN ATTENTE';
@@ -452,7 +459,7 @@
   }
 
   function computeProgress(entry) {
-    if (entry.status === 'done') return { pct: 1, remain: 0 };
+    if (entry.status === 'done' || entry.status === 'ready') return { pct: 1, remain: 0 };
     if (entry.status === 'error' || entry.status === 'cancelled') return { pct: 1, remain: 0 };
 
     const duration = Math.max(1, Number(entry.duration) || 1);
@@ -524,9 +531,9 @@
     if (isNew && (entry.status === 'active' || entry.status === 'queued')) {
       beep('start');
     }
-    if (entry.status === 'done' && prev.status !== 'done') {
+    if ((entry.status === 'done' || entry.status === 'ready') && prev.status !== 'done' && prev.status !== 'ready') {
       beep('complete');
-      scheduleAutoRemove(entry.craftId);
+      if (entry.status !== 'ready') scheduleAutoRemove(entry.craftId);
     }
     if (entry.status === 'error' && prev.status !== 'error') {
       beep('error');
@@ -589,9 +596,10 @@
     el.querySelector('.ct-batch').textContent = `×${entry.count || entry.batch || 1}`;
     el.querySelector('.ct-phase').textContent = phase;
     el.querySelector('.ct-fill').style.width = `${Math.round(pct * 100)}%`;
-    const visualDone = entry.status === 'done' || entry.status === 'completed' || entry.status === 'completing' || pct >= 1;
+    const visualDone = entry.status === 'done' || entry.status === 'ready' || entry.status === 'completed' || entry.status === 'completing' || pct >= 1;
     el.querySelector('.ct-time').textContent =
       entry.status === 'error' ? 'Échec'
+        : entry.status === 'ready' ? ('Disponible à : ' + (entry.stationLabel || 'Station'))
         : visualDone ? 'Terminé'
           : entry.status === 'queued' ? `EN ATTENTE · ${formatRemain(remain)}`
             : formatRemain(remain);
@@ -618,7 +626,7 @@
   }
 
   function liveJobCount(arr) {
-    const n = arr.filter((j) => j.status !== 'done' && j.status !== 'error').length;
+    const n = arr.filter((j) => j.status !== 'done' && j.status !== 'error' && j.status !== 'ready').length;
     return n || arr.length;
   }
 
@@ -646,8 +654,10 @@
       if (live && live.status === 'paused') els.reducedPct.textContent = 'EN PAUSE';
       else els.reducedPct.textContent = `${pct}%`;
     }
+    const readyN = arr.filter((j) => j.status === 'ready').length;
     if (els.reducedWait) {
-      els.reducedWait.textContent = waiting > 0 ? `+${waiting} en attente` : '';
+      if (readyN > 0) els.reducedWait.textContent = 'À récupérer : ' + readyN;
+      else els.reducedWait.textContent = waiting > 0 ? `+${waiting} en attente` : '';
     }
   }
 
@@ -966,17 +976,49 @@
     if (action === 'craftFinished') {
       if (!msg.craftId) return;
       const prev = jobs.get(msg.craftId) || { craftId: msg.craftId };
+      const output = msg.stationOutput || msg.output;
       upsertJob({
         ...prev,
         craftId: msg.craftId,
-        status: 'done',
-        stepLabel: 'FABRICATION TERMINÉE',
+        status: output ? 'ready' : 'done',
+        stepLabel: output
+          ? ('terminée — Disponible à : ' + (msg.stationLabel || prev.stationLabel || 'Station'))
+          : 'FABRICATION TERMINÉE',
         label: msg.label || prev.label,
         item: (msg.result && msg.result.item) || prev.item,
         count: (msg.result && msg.result.count) || prev.count,
         batch: msg.batch || prev.batch,
         benchKey: msg.benchKey || prev.benchKey,
+        stationLabel: msg.stationLabel || prev.stationLabel,
+        stationOutput: !!output,
       });
+      return;
+    }
+    if (action === 'outputReady') {
+      const d = msg.data || msg;
+      if (!d.craftId) return;
+      const prev = jobs.get(d.craftId) || { craftId: d.craftId };
+      const stationLabel = d.stationLabel || prev.stationLabel || 'Station';
+      upsertJob({
+        ...prev,
+        craftId: d.craftId,
+        status: 'ready',
+        stepLabel: 'terminée — Disponible à : ' + stationLabel,
+        label: d.label || prev.label,
+        item: (d.result && d.result.item) || prev.item,
+        count: (d.result && d.result.count) || prev.count,
+        batch: d.batch || prev.batch,
+        benchKey: d.benchKey || prev.benchKey,
+        stationLabel,
+        stationOutput: true,
+      });
+      return;
+    }
+    if (action === 'outputCollected') {
+      const d = msg.data || msg;
+      if (d.craftId) jobs.delete(d.craftId);
+      render();
+      updateVisibility();
       return;
     }
     if (action === 'craftAdvanced') {

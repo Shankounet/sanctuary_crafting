@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.22.0
+# sanctuary_crafting v2.23.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,18 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.23.0 — Stations: sortie à récupérer (plus de giveItem auto)
+Les résultats de craft restent à la **sortie de station** jusqu’à collecte. Plus d’`ox_inventory:AddItem` à la fin du timer (interactif + file + catch-up offline).
+
+- **Finalize** : snapshot définitif (item, count, metadata/qualité/lot) → `state=completed`, lié à `stationUid` + identifier. Notify : « Production terminée : X ×n — Disponible à la [Station]. » Jamais « ajouté à l’inventaire ».
+- **Collect** (`collectCraft` / `collectAll` / `getStationOutput`) : lock, `completed` only, `Config.OutputAccess`, `CanCarry`, AddItem avec metadata stockée, DELETE. Inventaire plein → reste `completed` (« Inventaire insuffisant. »). Double collect idempotent.
+- **Cancel** : queued / processing / paused seulement — jamais un `completed` (il faut collecter).
+- **SQL sparse** : colonnes sur `sanctuary_craft_queue` (schema **223**). Pas de labels/images en SQL. `collected` = DELETE. `Config.CraftHistory` reste false. `Config.CompletedRetentionDays = false` (pas de purge auto).
+- **Config** : `StationOutput.Enabled=true`, `SameStationOnly=true`, `XpOn='complete'` (offline : XP au login si pending). `OutputAccess='owner'` (`owner|job|crew|public` — crew = stub ESX job).
+- **XP** : DevHub always on finalize (complete), pas sur collect (sauf `XpOn='collect'`).
+- **UI** : FILE = queued/processing/paused ; SORTIE = completed + RÉCUPÉRER / RÉCUPÉRER TOUT. Badge RÉCUP. N. Tracker : « terminée — Disponible à : [Station] ». Carnet Accueil/Productions : count + lignes station.
+- Interactif **et** file passent par la même sortie si `StationOutput.Enabled`. Survive disconnect / restart / reboot.
 
 ### v2.22.0 — Craft: causes, recherche, batch, courses, DevHub
 Intelligence / UX (pas de refonte visuelle). `getMenu` snapshot unique + RAM.
