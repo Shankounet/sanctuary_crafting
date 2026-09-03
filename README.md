@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.26.0
+# sanctuary_crafting v2.26.1
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,9 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.26.1 — Craft: header sans plaque métal (séparateur subtil)
+Retrait de la plaque industrielle rivetée (`.ctrl-plate-mark` / `.ctrl-screw`) à gauche de l’identité station. Remplacée par un filet gauche fin `rgba(154,136,102,0.35)` sur `.ctrl-identity`. Reste du header inchangé.
 
 ### v2.26.0 — HUD: drag libre du bandeau Carnet — Épingles
 Le widget `#book-pins-hud` se déplace comme le tracker : drag du bandeau `.ph-header`, sans bouton Déplacer.

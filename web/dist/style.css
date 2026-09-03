@@ -6742,3 +6742,23 @@ button, input { font: inherit; color: inherit; }
   font-size: 0.74rem;
   color: rgba(198,194,184,0.82);
 }
+
+/* ============================================================
+   v2.26.1 — Header: remove industrial plate, subtle left separator
+   ============================================================ */
+#app .ctrl-plate-mark,
+#app .ctrl-screw {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+#app .ctrl-identity {
+  border-left: 1px solid rgba(154, 136, 102, 0.35);
+}
