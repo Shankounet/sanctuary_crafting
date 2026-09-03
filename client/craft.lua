@@ -42,9 +42,11 @@ function OpenCraftMenu(benchKey)
             _('ingredients') .. ': ' .. formatIngredients(r.ingredients),
             _('duration', math.floor((r.duration or 0) / 1000)),
         }
-        if r.xp then descParts[#descParts + 1] = _('xp_reward', r.xp.amount, r.xp.category) end
-        if r.requireLevel then descParts[#descParts + 1] = _('req_level', r.requireLevel) end
-        if r.requireSkill then descParts[#descParts + 1] = _('req_skill', r.requireSkill) end
+        if r.xp then descParts[#descParts + 1] = _('xp_reward', r.xp.amount, r.skillCategoryLabel or r.xp.category) end
+        local reqLvl = (r.skillTree and r.skillTree.requiredLevel) or r.requireLevel
+        if reqLvl then descParts[#descParts + 1] = _('req_level', reqLvl) end
+        local talent = r.requiredSkillLabel
+        if talent then descParts[#descParts + 1] = _('req_skill', talent) end
         if r.locked and r.lockReason then descParts[#descParts + 1] = _(r.lockReason, table.unpack(r.lockArgs or {})) end
 
         options[#options + 1] = {

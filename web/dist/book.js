@@ -86,7 +86,9 @@
     const map = {
       crafting: 'Artisanat', survival: 'Survie', survie: 'Survie',
       ingenieur: 'Ingénieur', engineer: 'Ingénieur', engineering: 'Ingénierie',
-      medical: 'Médical', mechanic: 'Mécanique', cooking: 'Cuisine',
+      medic: 'Médecin', medecin: 'Médecin', medical: 'Médical',
+      gunsmith: 'Armurier', armurier: 'Armurier',
+      mechanic: 'Mécanique', cooking: 'Cuisine',
       scavenging: 'Récupération', farming: 'Culture',
       general: 'Général',
     };
@@ -203,7 +205,8 @@
 
   function unlockNeed(x) {
     if (!x) return '';
-    if (x.requireSkill) return 'Compétence : ' + prettySkill(x.requireSkill);
+    if (x.requiredSkillLabel) return 'Talent requis ' + x.requiredSkillLabel;
+    if (x.requireSkill) return 'Talent requis ' + prettySkill(x.requireSkill);
     if (x.requireLevel != null && x.requireLevel !== '') return 'Niv. ' + String(x.requireLevel);
     return '';
   }
@@ -265,21 +268,21 @@
     return `<div class="ms-lines">${keys.map((k) => {
       const lv = levels[k] || {};
       const level = Math.max(0, Number(lv.level) || 0);
-      const filled = Math.max(0, Math.min(10, Math.round(level)));
-      const ticks = Array.from({ length: 10 }).map((_, i) =>
-        `<span class="tick ${i < filled ? 'on' : ''}"></span>`
-      ).join('');
-      const stampCls = level >= 8 ? 'stamp-maitrise' : (level >= 4 ? 'stamp-valide' : '');
-      const stampLab = level >= 8 ? 'MAÎTRISÉ' : (level >= 4 ? 'VALIDÉ' : (level > 0 ? 'OUVERT' : ''));
-      const bonus = Number(lv.bonus) || 0;
-      const bonusNote = bonus > 0
-        ? `<p class="ms-bonus hand-note">Bonus de competence : ${esc(bonus)}%</p>`
+      const xp = Number(lv.xp);
+      const totalXp = Number(lv.totalXp);
+      const name = lv.label || prettySkill(k);
+      const talents = Array.isArray(lv.talents) ? lv.talents.filter(Boolean) : [];
+      const xpNote = Number.isFinite(xp)
+        ? `<p class="ms-bonus hand-note">XP actuel : ${esc(xp)}${Number.isFinite(totalXp) && totalXp > 0 ? ` · total ${esc(totalXp)}` : ''}</p>`
+        : '';
+      const talentNote = talents.length
+        ? `<p class="ms-bonus hand-note">Talents : ${esc(talents.join(', '))}</p>`
         : '';
       return `<div class="ms-line">
-        <span class="ms-name">${esc(prettySkill(k))}</span>
-        <span class="ms-lvl hand-note">Niv. ${esc(level)}${stampLab ? `<span class="lvl-stamp ${stampCls}">${stampLab}</span>` : ''}</span>
-        <div class="ms-ticks" aria-hidden="true">${ticks}</div>
-        ${bonusNote}
+        <span class="ms-name">${esc(name)}</span>
+        <span class="ms-lvl hand-note">Niveau ${esc(level)}</span>
+        ${xpNote}
+        ${talentNote}
       </div>`;
     }).join('')}</div>`;
   }

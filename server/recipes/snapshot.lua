@@ -127,8 +127,16 @@ function RecipeSnapshot.Capture(recipe)
     if recipe.requiresLearn then snap.requiresLearn = true end
     if recipe.requireSpec then snap.requireSpec = recipe.requireSpec end
     -- finalize re-checks skill gates FROM the snapshot (not live Config)
+    if recipe.skillTree then snap.skillTree = {
+        category = recipe.skillTree.category,
+        requiredLevel = recipe.skillTree.requiredLevel,
+        requiredSkill = recipe.skillTree.requiredSkill,
+    } end
     if recipe.requireLevel then snap.requireLevel = recipe.requireLevel end
     if recipe.requireSkill then snap.requireSkill = recipe.requireSkill end
+    if recipe.requireSkillCategory then
+        -- ignored at runtime; KEY lives in skillTree.category
+    end
     -- collect/finalize grant
     if recipe.quality then snap.quality = recipe.quality end
     if recipe.signatureMode then snap.signatureMode = recipe.signatureMode end

@@ -5,8 +5,8 @@ Config = {}
   sanctuary_crafting — configuration (v2.0.0-phase1)
   Thème : post-apo (ferraille, médical de fortune, pièces d'armes, survie)
 
-  ml_skills est la SEULE source de skill / XP / niveaux.
-  Ne créez JAMAIS de XP/niveaux craft parallèles.
+  devhub_skillTree est la SEULE source de skill / XP / niveaux.
+  Ne créez JAMAIS de XP/niveaux craft parallèles. UIDs uniquement dans Config.SkillCategories.
 
 --------------------------------------------------------------------------------
   Schéma d'une recette (Config.Recipes) — Phase 1
@@ -20,9 +20,10 @@ Config = {}
       },
       result      = { item = 'metal_plate', count = 1 },  -- requis
       duration    = 8000,                    -- ms (requis)
-      xp          = { category = 'crafting', amount = 15 }, -- optionnel ml_skills
-      requireLevel = 1,                      -- optionnel ; si ml_skills down → refuse
-      requireSkill = 'crafting_basic',       -- optionnel UID ml_skills ; idem
+      xp          = { category = 'engineer', amount = 15 }, -- KEY Config.SkillCategories
+      skillTree   = { category = 'medic', requiredLevel = 10, requiredSkill = nil },
+      -- category = KEY (medic/survival/engineer/gunsmith) ; jamais l'UID brut
+      -- legacy requireLevel / requireSkill / skill migrés au load
 
       -- Multi-étapes (v2 polish) — steps[] OU chain (même craftId / craftUID) :
       -- steps = {
@@ -45,7 +46,7 @@ Config = {}
 
 Config.Locale = 'fr'
 Config.Debug = false
-Config.Version = '2.20.1'
+Config.Version = '2.21.0'
 
 --------------------------------------------------------------------------------
 -- Feature flags (Phase 2–7) — stubs uniquement, aucun comportement Phase 1
@@ -114,40 +115,67 @@ Config.EnableWorldBenchCommand = true
 Config.WorldBenchCommand = 'placeworldbench'
 
 --------------------------------------------------------------------------------
--- ml_skills (Micio Mods) — soft-fail via CraftingSkills
--- Si une recette a requireLevel / requireSkill et ml_skills est down → refuse
--- (PAS de bypass silencieux en prod). BypassRequirements = false par défaut.
+-- devhub_skillTree — soft-fail via CraftingSkills
+-- UIDs DevHub UNIQUEMENT ici (SkillCategories.categoryUid). Recettes / stations
+-- utilisent les KEYS (survival/medic/engineer/gunsmith).
+-- Si skillTree.requiredLevel / requiredSkill et ressource down → refuse
+-- (sauf BypassRequirements / ACE). Crafts sans gate skillTree restent OK.
 --------------------------------------------------------------------------------
+Config.SkillSystem = 'devhub'
+
+Config.SkillCategories = {
+    survival = { categoryUid = 'survie', label = 'Survie' },
+    medic    = { categoryUid = 'medecin', label = 'Médecin' },
+    engineer = { categoryUid = 'ingenieur', label = 'Ingénieur' },
+    gunsmith = { categoryUid = 'armurier', label = 'Armurier' },
+}
+
+-- station id → SkillCategories KEY (jamais d'UID brut)
+Config.StationSkillCategory = {
+    survie = 'survival', survival = 'survival', cuisine = 'survival',
+    agriculture = 'survival', scrap = 'survival', tailleur = 'survival',
+    boucherie = 'survival', decoration = 'survival',
+    medical = 'medic',
+    ingenieur = 'engineer', schema = 'engineer', construction = 'engineer',
+    mecano = 'engineer', mechanic = 'engineer',
+    forgeron = 'engineer', reparation_forgeron = 'engineer',
+    fonderie_forgeron = 'engineer', manche_forgeron = 'engineer',
+    armurier = 'gunsmith', munition = 'gunsmith', weapons = 'gunsmith',
+    accessoires = 'gunsmith',
+}
+
+-- one-time load mapping: old recipe skill / requireSkillCategory / xp.category → KEY
+Config.SkillLegacyMap = {
+    survie = 'survival', survival = 'survival',
+    medecin = 'medic', medic = 'medic', medical = 'medic',
+    ingenieur = 'engineer', ingenieurs = 'engineer', engineer = 'engineer',
+    engineering = 'engineer', crafting = 'engineer',
+    armurier = 'gunsmith', gunsmith = 'gunsmith', weapons = 'gunsmith',
+    agriculture = 'survival',
+    forgeron = 'engineer',
+    mechanic = 'engineer', mecano = 'engineer',
+}
+
 Config.Skills = {
     enabled = true,
-    resource = 'ml_skills',
-    -- Catégories ml_skills du pack Alex (requiredLevelCategory exactes)
-    -- ingenieurs→ingenieur, survie, agriculture, medecin, forgeron, mechanic, armurier
-    craftingCategory = 'ingenieur', -- défaut bonus durée (fallback)
-    survivalCategory = 'survie',
-    categories = {
-        'ingenieur',
-        'survie',
-        'agriculture',
-        'medecin',
-        'forgeron',
-        'mechanic',
-        'armurier',
-    },
-    craftTimeBonus = true,
+    resource = 'devhub_skillTree',
+    defaultCategory = 'engineer',
+    craftingCategory = 'engineer', -- KEY (ex-UID ingenieur)
+    survivalCategory = 'survival',
+    AwardPoints = false, -- addPoints depuis un craft : non par défaut
+    craftTimeBonus = true, -- no-op : DevHub n'expose pas GetTotalCategoryBonus
     maxCraftTimeReduction = 0.40,
 
-    --[[ Mode test sans skills (DEV ONLY)
-         BypassRequirements = true  → TOUS les joueurs sautent requireLevel / requireSkill
-         BypassAce (optionnel)      → si défini, les joueurs avec cet ACE (ou Config.AdminGroups
-                                       / Config.AdminAce via Validation.IsAdmin) bypassent même
-                                       si BypassRequirements = false
+    --[[ Bypass (LIVE : actuellement true — ne PAS désactiver silencieusement)
+         BypassRequirements = true  → TOUS les joueurs sautent requiredLevel / requiredSkill
+         BypassAce                  → ACE (ou AdminGroups via Validation.IsAdmin)
          NE JAMAIS activer BypassRequirements sur un serveur public / production.
+         Valeur actuelle true conservée (économie live / labs). Documenté, pas un changement.
     ]]
     BypassRequirements = true,
     BypassAce = 'sanctuary.crafting.bypassskills',
-    BypassAlsoSkipXP = false, -- false = toujours tenter AddXp si ml_skills est up
-    BypassNotify = true,     -- true = notify ox_lib une fois (aussi si Config.Debug)
+    BypassAlsoSkipXP = false, -- false = toujours tenter addXp si skill tree up
+    BypassNotify = true,
 }
 
 --------------------------------------------------------------------------------

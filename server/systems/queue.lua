@@ -226,7 +226,7 @@ function CraftQueue.TryCollect(src, craftId)
                     Tools.WearRecipe(src, recipe, e.batch or 1)
                 end
                 if recipe.xp and recipe.xp.category then
-                    CraftingSkills.AddXP(recipe.xp.category, (recipe.xp.amount or 0) * (e.batch or 1), src)
+                    CraftingSkills.AddCraftXp(src, recipe.xp.category, (recipe.xp.amount or 0) * (e.batch or 1))
                     if NewlyLearned and NewlyLearned.ScanLevelUnlocks then
                         NewlyLearned.ScanLevelUnlocks(src)
                     end

@@ -92,6 +92,9 @@ function RecipeRegistry.Rebuild()
     local okCount, bad, skipped = 0, 0, 0
     for i = 1, #working do
         local r = working[i]
+        if r and SkillTree and SkillTree.NormalizeRecipe then
+            SkillTree.NormalizeRecipe(r)
+        end
         if r and r._disabled then
             skipped = skipped + 1
         elseif RecipeRegistry.Validate(r) then

@@ -17,12 +17,11 @@ local function ident(src)
 end
 
 local function currentLevels(src)
-    local cats = (Config.Skills and Config.Skills.categories) or {}
     local out = {}
-    if not CraftingSkills or not CraftingSkills.GetLevel then return out end
-    for i = 1, #cats do
-        local cat = cats[i]
-        out[cat] = CraftingSkills.GetLevel(cat, src) or 0
+    if not CraftingSkills or not CraftingSkills.Snapshot then return out end
+    local snap = CraftingSkills.Snapshot(src)
+    for key, cat in pairs((snap and snap.categories) or {}) do
+        out[key] = (cat and cat.level) or 0
     end
     return out
 end
@@ -50,7 +49,7 @@ function NewlyLearned.Load(src)
     for i = 1, #rows do
         cache[id][rows[i].recipe_id] = rows[i].source
     end
-    -- last-seen levels: RAM only (ml_skills is the sole XP source).
+    -- last-seen levels: RAM only (devhub_skillTree is the sole XP source).
     -- Restart may miss unread level-unlock badges until the first post-restart craft.
     levelSnap[id] = currentLevels(src)
 end
@@ -114,7 +113,7 @@ local function saveSnap(id, levels)
     levelSnap[id] = levels
 end
 
---- Compare getMenu / AddXP snapshot → mark recipes whose requireLevel is newly met
+--- Compare Snapshot levels → mark recipes whose requiredLevel is newly met
 function NewlyLearned.ScanLevelUnlocks(src)
     if cfg().Enabled == false then return end
     local id = ident(src)
@@ -125,15 +124,14 @@ function NewlyLearned.ScanLevelUnlocks(src)
     local hadPrev = prev and next(prev) ~= nil
     if hadPrev then
         for _, recipe in pairs(Config.RecipeById or {}) do
-            local need = recipe.requireLevel
-            if need then
-                local cat = CraftingSkills and CraftingSkills.LevelCategoryForRecipe and CraftingSkills.LevelCategoryForRecipe(recipe)
-                if cat then
-                    local before = tonumber(prev[cat]) or 0
-                    local now = tonumber(curr[cat]) or 0
-                    if before < need and now >= need then
-                        NewlyLearned.Mark(src, recipe.id, "level")
-                    end
+            local g = SkillTree and SkillTree.RecipeGate and SkillTree.RecipeGate(recipe) or {}
+            local need = g.requiredLevel
+            local cat = g.category
+            if need and cat then
+                local before = tonumber(prev[cat]) or 0
+                local now = tonumber(curr[cat]) or 0
+                if before < need and now >= need then
+                    NewlyLearned.Mark(src, recipe.id, "level")
                 end
             end
         end

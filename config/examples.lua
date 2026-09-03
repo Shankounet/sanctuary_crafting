@@ -27,7 +27,7 @@ local Examples = {
         },
         result = { item = 'metal_plate', count = 1 },
         duration = 6000,
-        xp = { category = 'crafting', amount = 10 },
+        xp = { category = 'engineer', amount = 10 },
     },
     -- 2. Skill-gated
     {
@@ -41,9 +41,8 @@ local Examples = {
         },
         result = { item = 'reinforced_plate', count = 1 },
         duration = 10000,
-        xp = { category = 'crafting', amount = 25 },
-        requireLevel = 3,
-        requireSkill = 'crafting_basic',
+        xp = { category = 'engineer', amount = 25 },
+        skillTree = { category = 'engineer', requiredLevel = 3, requiredSkill = nil },
     },
     -- 3. Blueprint-gated
     {
@@ -74,7 +73,7 @@ local Examples = {
         },
         result = { item = 'cut_pipe', count = 1 },
         duration = 8000,
-        xp = { category = 'crafting', amount = 12 },
+        xp = { category = 'engineer', amount = 12 },
         requireTool = { item = 'hand_saw', durabilityCost = 5 },
         -- chain = { 'ex_reinforced_plate' }, -- décommenter pour enchaîner (réponse chainNext)
     },
@@ -90,7 +89,7 @@ local Examples = {
         },
         result = { item = 'medkit_basic', count = 1 },
         duration = 9000,
-        xp = { category = 'crafting', amount = 15 },
+        xp = { category = 'engineer', amount = 15 },
         quality = true,
     },
     -- 6. Mechanic station
@@ -105,8 +104,8 @@ local Examples = {
         },
         result = { item = 'repair_kit', count = 1 },
         duration = 15000,
-        xp = { category = 'crafting', amount = 30 },
-        requireLevel = 2,
+        xp = { category = 'engineer', amount = 30 },
+        skillTree = { category = 'engineer', requiredLevel = 2 },
         stationLevel = 1,
     },
     -- 7. Byproducts
@@ -120,7 +119,7 @@ local Examples = {
         },
         result = { item = 'metal_ingot', count = 1 },
         duration = 14000,
-        xp = { category = 'crafting', amount = 18 },
+        xp = { category = 'engineer', amount = 18 },
         byproducts = {
             { item = 'slag', count = 1, chance = 0.6 },
             { item = 'coal_dust', count = 1, chance = 0.25 },
@@ -139,8 +138,8 @@ local Examples = {
         },
         result = { item = 'ammo_9mm', count = 12 },
         duration = 45000,
-        xp = { category = 'crafting', amount = 40 },
-        requireLevel = 4,
+        xp = { category = 'engineer', amount = 40 },
+        skillTree = { category = 'gunsmith', requiredLevel = 4 },
         powerCost = 1,
         queueable = true,
         batchMax = 5,
@@ -157,13 +156,13 @@ local Examples = {
         },
         result = { item = 'weapon_parts', count = 3 },
         duration = 20000,
-        xp = { category = 'crafting', amount = 22 },
+        xp = { category = 'gunsmith', amount = 22 },
         dismantleYields = {
             { item = 'weapon_parts', count = 2, chance = 1.0 },
             { item = 'spring', count = 1, chance = 0.5 },
             { item = 'scrap_metal', count = 2, chance = 0.8 },
         },
-        requireSkill = 'weapons_basic',
+        skillTree = { category = 'gunsmith', requiredSkill = nil },
     },
 }
 

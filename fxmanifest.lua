@@ -4,8 +4,8 @@ lua54 'yes'
 
 name 'sanctuary_crafting'
 author 'Shankounet / Sanctuary'
-description 'Plateforme de craft post-apo + Carnet de survie — ESX, ox_*, ml_skills, NUI industrielle'
-version '2.20.1'
+description 'Plateforme de craft post-apo + Carnet de survie — ESX, ox_*, devhub_skillTree, NUI industrielle'
+version '2.21.0'
 
 ui_page 'web/dist/index.html'
 
@@ -58,7 +58,7 @@ client_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     -- integrations
-    'server/integrations/ml_skills.lua',
+    'server/integrations/devhub_skillTree.lua',
     'server/integrations/permissions.lua',
     'server/integrations/ox_items.lua',
     'server/integrations/power.lua',
@@ -114,6 +114,8 @@ dependencies {
     'ox_inventory',
     'ox_target',
     'oxmysql',
+    'devhub_skillTree',
 }
 
--- ml_skills optionnel (soft-fail ; gates requises → refuse si down)
+-- devhub_lib typically pulled in by the skill tree itself (not a hard dep here)
+-- skill tree down: print [CRAFT] devhub_skillTree is not started. Gates fail closed; ungated crafts still work.

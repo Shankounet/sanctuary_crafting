@@ -98,10 +98,21 @@ local function checkSpec(src, recipe)
 end
 
 local function checkLevel(src, recipe)
-    if not recipe.requireLevel then return true end
-    if not CraftingSkills or not CraftingSkills.HasRequiredLevel then return false end
-    local cat = CraftingSkills.LevelCategoryForRecipe and CraftingSkills.LevelCategoryForRecipe(recipe)
-    return CraftingSkills.HasRequiredLevel(cat, recipe.requireLevel, src)
+    local g = SkillTree and SkillTree.RecipeGate and SkillTree.RecipeGate(recipe) or {}
+    if not g.requiredLevel and not g.requiredSkill then return true end
+    if not CraftingSkills then return false end
+    local cat = g.category or (CraftingSkills.LevelCategoryForRecipe and CraftingSkills.LevelCategoryForRecipe(recipe))
+    if g.requiredLevel then
+        if not CraftingSkills.HasRequiredLevel or not CraftingSkills.HasRequiredLevel(src, cat, g.requiredLevel) then
+            return false
+        end
+    end
+    if g.requiredSkill then
+        if not CraftingSkills.HasSkill or not CraftingSkills.HasSkill(src, cat, g.requiredSkill) then
+            return false
+        end
+    end
+    return true
 end
 
 local function checkMastery(src, recipe)

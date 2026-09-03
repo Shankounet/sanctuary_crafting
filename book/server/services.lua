@@ -141,36 +141,46 @@ function SurvivalBook.CraftTreeMasked(src, recipeId, depth)
     return nodeFor(recipeId, depth)
 end
 
---- Progression READ-ONLY from CraftingSkills (ml_skills)
+--- Progression READ-ONLY from CraftingSkills.Snapshot (devhub_skillTree)
 function SurvivalBook.GetProgression(src)
     if not BookDB.Mod('Progression') then return { available = false } end
-    local cats = {}
+    local keys = {}
     local seen = {}
     local function addCat(c)
-        if c and not seen[c] then seen[c] = true; cats[#cats + 1] = c end
+        local key = (SkillTree and SkillTree.ResolveKey and SkillTree.ResolveKey(c)) or c
+        if key and not seen[key] then seen[key] = true; keys[#keys + 1] = key end
     end
-    if Config.Skills and Config.Skills.categories then
-        for _, c in ipairs(Config.Skills.categories) do addCat(c) end
-    end
-    addCat(Config.Skills and Config.Skills.craftingCategory)
+    addCat('survival')
     addCat(Config.Skills and Config.Skills.survivalCategory)
     if Specializations and Specializations.Resolve then
         local spec = Specializations.Resolve(src)
         for _, s in ipairs((spec and spec.skills) or {}) do addCat(s.id) end
     end
+    local snap = (CraftingSkills and CraftingSkills.Snapshot and CraftingSkills.Snapshot(src)) or { available = false, categories = {}, unlocked = {} }
+    local available = snap.available == true
     local levels = {}
-    local available = CraftingSkills and CraftingSkills.IsAvailable and CraftingSkills.IsAvailable()
-    for i = 1, #cats do
-        local cat = cats[i]
+    for i = 1, #keys do
+        local cat = keys[i]
+        local row = (snap.categories and snap.categories[cat]) or {}
+        local talents = {}
+        for _, u in ipairs(snap.unlocked or {}) do
+            if u.categoryKey == cat and u.label then
+                talents[#talents + 1] = u.label
+            end
+        end
         levels[cat] = {
-            level = available and CraftingSkills.GetLevel(cat, src) or 0,
-            bonus = available and CraftingSkills.GetCategoryBonus(cat, src) or 0,
+            key = cat,
+            label = row.label or (SkillTree and SkillTree.CategoryLabel and SkillTree.CategoryLabel(cat)) or cat,
+            level = available and (row.level or 0) or 0,
+            xp = available and (row.xp or 0) or 0,
+            totalXp = available and (row.totalXp or 0) or 0,
+            talents = talents,
         }
     end
     return {
         available = available and true or false,
         levels = levels,
-        note = 'ml_skills_readonly',
+        note = 'devhub_readonly',
     }
 end
 
@@ -181,24 +191,28 @@ function SurvivalBook.NextUnlocks(src, limit)
     local progression = SurvivalBook.GetProgression(src)
     local out = {}
     for id, r in pairs(Config.RecipeById or {}) do
-        local req = r.requireLevel
+        local g = SkillTree and SkillTree.RecipeGate and SkillTree.RecipeGate(r) or {}
+        local req = g.requiredLevel
         if req then
-            local cat = CraftingSkills and CraftingSkills.LevelCategoryForRecipe and CraftingSkills.LevelCategoryForRecipe(r) or 'crafting'
+            local cat = g.category or 'survival'
             local lvl = progression.levels[cat] and progression.levels[cat].level or 0
             if lvl < req and (req - lvl) <= 3 then
                 out[#out + 1] = {
                     recipeId = id, label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or r.label, requireLevel = req,
                     currentLevel = lvl, category = r.category,
+                    categoryLabel = SkillTree and SkillTree.CategoryLabel and SkillTree.CategoryLabel(cat) or cat,
                     delta = req - lvl,
                 }
             end
         end
-        if r.requireSkill and CraftingSkills and CraftingSkills.IsAvailable and CraftingSkills.IsAvailable() then
-            local cat = CraftingSkills.LevelCategoryForRecipe(r)
-            if not CraftingSkills.HasSkill(cat, r.requireSkill, src) then
-                -- show as locked skill (no other players)
+        if g.requiredSkill and CraftingSkills and CraftingSkills.IsAvailable and CraftingSkills.IsAvailable() then
+            local cat = g.category
+            if not CraftingSkills.HasSkill(src, cat, g.requiredSkill) then
+                local lab = CraftingSkills.SkillLabel and CraftingSkills.SkillLabel(g.requiredSkill, cat) or nil
                 out[#out + 1] = {
-                    recipeId = id, label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or r.label, requireSkill = r.requireSkill,
+                    recipeId = id, label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or r.label,
+                    requireSkill = lab or nil,
+                    requiredSkillLabel = lab,
                     category = r.category, kind = 'skill',
                 }
             end

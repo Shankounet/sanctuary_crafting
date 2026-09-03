@@ -1,8 +1,8 @@
-# sanctuary_crafting v2.20.1
+# sanctuary_crafting v2.21.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
-**ml_skills** (Micio Mods) est la **seule** source de compétences / XP / niveaux. Aucun XP craft parallèle.
+**devhub_skillTree** est la **seule** source de compétences / XP / niveaux. Aucun XP craft parallèle.
 
 UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton terni `#9a8866`, pas Fallout / pas cyberpunk). **Craft** = banc de production 3 colonnes (polish densité PC). **Carnet** = journal / dossier de terrain (identité séparée). Micro-interactions 100–180 ms. **Callbacks NUI inchangés.**
 
@@ -10,6 +10,9 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.21.0 — Skills: removed ml_skills → devhub_skillTree
+Couche skill/XP/level/unlock uniquement. Exports officiels (`getPlayerLevel`, `getPlayerXp`, `getPlayerTotalXp`, `getPlayerGlobalStats`, `getUnlockedSkills`, `hasUnlockedSkill`, `addXp` serveur, `getConfig`). Config `SkillCategories` KEY→UID (`survie`/`medecin`/`ingenieur`/`armurier`). Recette `skillTree = { category, requiredLevel, requiredSkill }` (alias `requiredSkillTree`) ; migration one-time des anciens `requireLevel`/`requireSkill`/`skill`. Snapshot + cache par source (join / 1er craft / carnet, TTL 8s, invalidate addXp / skillUnlocked / skillReset / drop). Ressource down : `[CRAFT] devhub_skillTree is not started.` — gates fail-closed, crafts sans skillTree OK. Pas de barre % inventée. BypassRequirements **conservé à true** (live). `unlockSkill` unused. Maîtrise recette SQL inchangée (pas d'XP DevHub).
 
 ### v2.20.1 — Carnet: papiers fournis (page, tan, worn, ligné)
 Pages et inserts du carnet utilisent les 5 papiers fournis: `paper_page` (vignette, Accueil L/R), `paper_page_alt` (fond noir → alpha), `paper_sheet_tan` (rides, projet/déblocage), `paper_sheet_worn` (taches, découverte/polaroid), `paper_sheet_lined` (notes). Cuir `ref_cover` uniquement sur couverture/tranche. Encre `#2a2218`. Onglets colorés v2.20.0 inchangés. Callbacks NUI / craft / tracker / SQL inchangés.
@@ -49,9 +52,9 @@ Accueil / Situation content blocks (identity polaroid, Projet principal, Dernier
 ### v2.17.0 — SQL sparse (no derived rows, slim snapshots, history off)
 Persistence pass. **New player first connect / getMenu / carnet = 0 INSERTs** (already true; unchanged). No dense player×recipe seed. Table names stay `sanctuary_*`.
 
-Cut: fat queue `recipe_snapshot` (label/description/image/category/rarity/steps UI/heat); derived objective SQL (`gather`/`skill`/`blueprint` — reconstruct live from recipe + ox_inventory + ml_skills); `sanctuary_player_skill_watch` (RAM last-seen vs ml_skills); `discovered_resources.label` (ox label at read); projects `required` JSON copy + accumulating `status=done`; CoolTick heat SQL every 15s (heat is RAM, ambient on restart); `craft_completed` book history + unbounded admin_logs every craft; 8 COUNT roundtrips on dashboard; artisans/orders SELECT every getMenu.
+Cut: fat queue `recipe_snapshot` (label/description/image/category/rarity/steps UI/heat); derived objective SQL (`gather`/`skill`/`blueprint` — reconstruct live from recipe + ox_inventory + skill tree snapshot); `sanctuary_player_skill_watch` (RAM last-seen vs skill tree); `discovered_resources.label` (ox label at read); projects `required` JSON copy + accumulating `status=done`; CoolTick heat SQL every 15s (heat is RAM, ambient on restart); `craft_completed` book history + unbounded admin_logs every craft; 8 COUNT roundtrips on dashboard; artisans/orders SELECT every getMenu.
 
-Kept: knowledge/mastery/favorites/queue/placed_benches/pins/notes; player-placed bench row even at 100% wear; world benches 0 SQL; `sanctuary_player_recent` ≤10; ml_skills sole XP source.
+Kept: knowledge/mastery/favorites/queue/placed_benches/pins/notes; player-placed bench row even at 100% wear; world benches 0 SQL; `sanctuary_player_recent` ≤10; devhub_skillTree sole XP source.
 
 Config: `CraftHistory.Enabled=false`, `AdminLogs.RetentionDays=14` (purge 6h), `Follow.AutoObjectives` = parent recipe objective only. Schema **217** auto-migrates at boot.
 
@@ -103,11 +106,11 @@ Signature `none|batch|individual` (défaut batch). LOT partagé, plus de `craftU
 File : `validateStart`, clamp, LoadOffline clear/dedup, pas de refund après `finishAt`, mutex collect/cancel, `bench.queueSize`, NUI Annuler.
 
 ### v2.14.0 — Vague gameplay (spec, enseignement, suivi, courses, favoris, récents, nouveaux)
-Identité de métier (`Config.Specializations`, SQL `sanctuary_player_spec`) : SQL > job ESX > survie. Stations exclusives (médical / ingénieur / mécano / armurier). Survie et stations non mappées = tout le monde. **BypassRequirements saute level/skill ml_skills, jamais spec / connaissance / enseignement.** File d'attente recopie les mêmes gates au start **et** au collect.
+Identité de métier (`Config.Specializations`, SQL `sanctuary_player_spec`) : SQL > job ESX > survie. Stations exclusives (médical / ingénieur / mécano / armurier). Survie et stations non mappées = tout le monde. **BypassRequirements saute level/skill tree, jamais spec / connaissance / enseignement.** File d'attente recopie les mêmes gates au start **et** au collect.
 
 Enseignement (`Config.Teaching`, `server/systems/teaching.lua`) : ENSEIGNER sur la fiche, overlay compact, ox_lib progress, succès serveur uniquement.
 
-Suivi Carnet : pin = follow → objectifs live (ingrédients ox_inventory, skill ml_skills, plan). Courses fusionnées depuis les pins (5+8+2=15, owned soustrait une fois). Catalogue : sections FAVORIS / RÉCEMMENT FABRIQUÉS / NOUVEAUX (serveur). `ml_skills` reste la seule source XP/niveaux.
+Suivi Carnet : pin = follow → objectifs live (ingrédients ox_inventory, skill tree, plan). Courses fusionnées depuis les pins (5+8+2=15, owned soustrait une fois). Catalogue : sections FAVORIS / RÉCEMMENT FABRIQUÉS / NOUVEAUX (serveur). skill tree reste la seule source XP/niveaux.
 
 ### v2.13.0 — Carnet mapping textures strict
 Couverture / cadre / reliure = `tex/leather_cover.png`. Pages gauche et droite = `tex/paper_aged_new.png` (fond PNG direct, pas de voile beige). Fiches collées (projet / découverte / documents) = `tex/paper_dark.png`. Un texture par élément ; CSS = position, ombre, tilt.
@@ -128,7 +131,7 @@ Enrichissement **additif** du catalogue craft (serveur autoritaire) :
 - Menu recipe fields : `mastered`, `knowledge`, `knowledgeSource`, `blueprintId`, `blueprintMeta`, `pathHints`, `pathHintsMore`, `artisanHints` (+ labels ingredients)
 - NUI : pastille MAITRISE, marques knowledge, recherche indexee client, modules CHEMIN RECOMMANDE / ARTISANS CONNUS (fiche droite)
 - Callback `pathHints` (NUI -> `sanctuary_crafting:pathHints`) ; objectifs carnet peuvent creer des sous-objectifs manquants
-- **ml_skills** reste la seule source XP globale ; maitrise = par recette uniquement
+- **devhub_skillTree** reste la seule source XP globale ; maitrise = par recette uniquement
 - Carnet shell (`book.css` / `book.js`) non redesigné
 
 ### v2.1.3 — Craft UI polish
@@ -136,7 +139,7 @@ Polish UX / art direction de l’**atelier craft** (`web/dist/style.css`, `app.j
 
 - Colonne gauche un peu plus étroite, catégories compactes, File/Arbre/Courses mieux présentés (file industrielle / plan technique / checklist récup).
 - Cartes recettes : image un peu plus grande, hiérarchie nom, tags techniques (OPÉRATIONNEL / MANQUANT / VERROUILLÉ), favori discret, hover premium.
-- Panneau droit : identité (image, nom, catégorie, rareté, description) puis blocs techniques ; lignes « — » masquées ; spécialisation ✓/✕ ; skill ml_skills (nom, niveau actuel/requis, barre) ; matériaux image + owned/required.
+- Panneau droit : identité (image, nom, catégorie, rareté, description) puis blocs techniques ; lignes « — » masquées ; spécialisation ✓/✕ ; skill tree (label, niveau requis, talent — pas de barre %) ; matériaux image + owned/required.
 - FABRIQUER désactivé mais lisible + une raison primaire ; tooltips obligatoires sur icônes latérales.
 - Direction artistique atelier survivant (grain métal, rivets, stencils STATION/RECIPE INDEX, codes recette) — **Book inchangé** (reste dossier / journal via `book.css` / `book.js`).
 - Enrichissement NUI additif dans `buildRecipeEntry` (`owned`, `playerSkillLevel`, `hasSpecialization`, `description`) — **aucun rename** de callbacks (`close`, `refresh`, `craft`, `complete`, `cancel`, `favorite`, `queue`, `queueList`, `queueCollect`, `shopping`, `shoppingClear`, `tree`, `notify`, book*).
@@ -167,7 +170,7 @@ ensure ox_lib
 ensure ox_inventory
 ensure ox_target
 ensure es_extended
-ensure ml_skills          # optionnel mais recommandé
+ensure devhub_skillTree   # skill / XP / unlock (soft-fail if down)
 ensure sanctuary_crafting
 ```
 
@@ -187,7 +190,7 @@ sanctuary_crafting/
 ├── config/examples.lua        # 9 recettes d’exemple (OFF si import)
 ├── shared/                    # utils, UUID craftId, types de bancs
 ├── integrations/
-│   ├── ml_skills.lua          # CraftingSkills.* → API ml_skills
+│   ├── devhub_skillTree.lua   # CraftingSkills.* → exports officiels
 │   ├── permissions.lua        # CraftingPermissions.CanUseStation
 │   └── power.lua              # CraftingPower.HasPower / CanRunRecipe
 ├── core/                      # boot, hooks registry
@@ -216,7 +219,7 @@ Ordre de chargement serveur (fxmanifest) : **shared → integrations → core �
 ## Sécurité craft (`craftId`)
 
 1. Client envoie **intent** uniquement (`recipeId`, `benchKey`, `batch`).
-2. Serveur valide : station, distance, permissions, power, niveau station, **gates ml_skills**, blueprint, outils, ingrédients, `CanCarry`.
+2. Serveur valide : station, distance, permissions, power, niveau station, **gates skill tree**, blueprint, outils, ingrédients, `CanCarry`.
 3. Ingrédients retirés au **start** (configurable) → génération **UUID `craftId`** + `craftUID`.
 4. Client termine **uniquement** avec `craftId` (one-shot). Anti-speedhack (floor durée).
 5. Cancel / disconnect : refund selon `Config.Crafting` (dont refund partiel).
@@ -224,23 +227,23 @@ Ordre de chargement serveur (fxmanifest) : **shared → integrations → core �
 
 ---
 
-## CraftingSkills / ml_skills
+## CraftingSkills / devhub_skillTree
 
-Fichier : `server/integrations/ml_skills.lua`.
+Fichier : `server/integrations/devhub_skillTree.lua`.
 
 | Wrapper | API réelle |
 |---------|------------|
-| `CraftingSkills.AddXP` | `AddXp(categoryUid, amount, source)` |
-| `CraftingSkills.GetLevel` | `GetPlayerLevel(categoryUid?, source)` |
+| `CraftingSkills.AddCraftXp(src, catKey, amount)` | `addXp(categoryUid, amount, source)` — SERVER, amount recette |
+| `CraftingSkills.GetLevel(src, catKey)` | `getPlayerLevel(categoryUid, source)` |
 | `CraftingSkills.HasRequiredLevel` | level ≥ requis (ou bypass test) |
-| `CraftingSkills.HasSkill` | `HasUnlockedSkill(...)` (ou bypass test) |
-| `CraftingSkills.GetCategoryBonus` | `GetTotalCategoryBonus(categoryUid, source)` |
+| `CraftingSkills.HasSkill(src, catKey, skillUid)` | `hasUnlockedSkill(categoryUid, skillUid, source)` |
+| `CraftingSkills.Snapshot(src)` | cache levels/xp/totalXp/unlocked — 0 spam export par carte |
 | `CraftingSkills.ShouldBypassRequirements` | mode test (voir ci-dessous) |
 
 Soft-fail : `pcall` + `GetResourceState`.  
-**Si la recette a `requireLevel` / `requireSkill` et ml_skills est down → craft refusé** (`craft_skills_unavailable`), **sauf** mode test (bypass).
+**Si la recette a `skillTree.requiredLevel` / `requiredSkill` et `devhub_skillTree` est down → craft refusé** (`craft_skills_unavailable`), **sauf** mode test (bypass). Crafts sans gate skillTree restent possibles.
 
-La **maîtrise de recette** (`Config.Mastery`) est locale (SQL) et **n’est pas** un XP global : ml_skills reste la seule source d’XP de compétences.
+La **maîtrise de recette** (`Config.Mastery`) est locale (SQL) et **n’est pas** un XP global : le skill tree reste la seule source d’XP de compétences.
 
 ### Mode test sans skills
 
@@ -252,7 +255,7 @@ Config.Skills = {
   -- ...
   BypassRequirements = false,                          -- OFF par défaut (prod)
   BypassAce = 'sanctuary.crafting.bypassskills',       -- optionnel
-  BypassAlsoSkipXP = false,                            -- false = tenter AddXp si ml_skills up
+  BypassAlsoSkipXP = false,                            -- false = tenter addXp si skill tree up
   BypassNotify = false,                                -- ou Config.Debug → notify ox_lib 1×
 }
 ```
@@ -263,8 +266,8 @@ Comportement :
 |-----------|--------|
 | `BypassRequirements = true` | **Tous** les joueurs sautent `requireLevel` / `requireSkill` (pipeline + book « can craft ») |
 | `BypassRequirements = false` + ACE `BypassAce` (ou `Config.AdminGroups` / `AdminAce` via `Validation.IsAdmin`) | Ces joueurs seulement sautent les gates |
-| Bonus durée craft | Soft-fail inchangé (pas de bonus si ml_skills down) |
-| XP | Toujours via `CraftingSkills.AddXP` → ml_skills ; pas d’XP parallèle. Si `BypassAlsoSkipXP = true`, n’appelle pas AddXp sous bypass |
+| Bonus durée craft | no-op (DevHub n'expose pas de bonus catégorie) |
+| XP | Toujours via `CraftingSkills.AddCraftXp` → addXp serveur ; pas d'XP parallèle. Si `BypassAlsoSkipXP = true`, n'appelle pas addXp sous bypass |
 | Sécurité | Ingrédients, station, distance, rate-limit, `craftId` : **inchangés** |
 
 Notify (une fois / session) au **démarrage d’un craft** (pipeline ou file) si `Config.Debug` ou `Config.Skills.BypassNotify`.
@@ -290,7 +293,7 @@ Tous les modules sont **implémentés**. Les flags activent/désactivent le comp
 | `Config.Batch.Enabled` | lots |
 | `Config.Queue.Enabled` | file + offline timestamps |
 | `Config.Projects.Enabled` | projets multi-contributeurs |
-| `Config.Dismantling.Enabled` | démontage + yield ml_skills |
+| `Config.Dismantling.Enabled` | démontage (bonus yield skill = 0, pas d'API bonus DevHub) |
 | `Config.Mastery.Enabled` | maîtrise par recette |
 | `Config.Mastery.MasteredThreshold` | seuil « maîtrisé » (défaut = MaxMastery) |
 | `Config.Knowledge.Enabled` / `States` | états unknown/partial/blueprint/learned/mastered |
@@ -322,7 +325,7 @@ Tous les modules sont **implémentés**. Les flags activent/désactivent le comp
   },
   result = { item = 'metal_plate', count = 1 },
   duration = 6000,
-  xp = { category = 'crafting', amount = 10 }, -- ml_skills only
+  xp = { category = 'engineer', amount = 10 }, -- KEY SkillCategories
   requireLevel = 1,
   requireSkill = 'crafting_basic',
   requireBlueprint = 'bp_xxx',
@@ -375,11 +378,11 @@ Conversion **non 1:1** depuis `Shared.Categories` / `Shared.Crafts` / `Shared.Cr
 
 Une recette a `category` (filtre UI) **et** `station` (banc). Le pipeline matche `recipe.station` (ou `category` pour les exemples) avec `bench.category`.
 
-### Skills ml_skills (catégories exactes du pack)
+### Skills devhub_skillTree (KEYS, UIDs uniquement dans Config.SkillCategories)
 
-`ingenieur`, `survie`, `agriculture`, `medecin`, `forgeron`, `mechanic`, `armurier`.
+KEYS : `survival`, `medic`, `engineer`, `gunsmith` → UIDs `survie`, `medecin`, `ingenieur`, `armurier`.
 
-Listées dans `Config.Skills.categories`. XP = `requiredLevelCategory` + `craftXP`. Skill = premier `skillTreeRequirements`.
+Recette : `skillTree = { category = 'medic', requiredLevel = 10, requiredSkill = nil }`. XP = `xp.category` (KEY) + `xp.amount`. Mapping one-time des anciens champs au load.
 
 ### BypassRequirements (rappel)
 
@@ -391,7 +394,7 @@ Réservé aux labs / tests de recettes. Voir section « Mode test sans skills »
 
 - `customRequirements.handler` (remplacé par `tools` / `requireTool` pour `WEAPON_WRENCHKNIFE`)
 - `cameraOffset` / `PropDefaults` / tables `camera` (commentées éventuellement)
-- Invented ml_skills exports — uniquement les wrappers `CraftingSkills.*` existants
+- Invented skill-tree exports — uniquement les wrappers `CraftingSkills.*` officiels
 
 ### Bancs `type = "coords"`
 
@@ -515,7 +518,7 @@ Config.Power = {
 - [x] README items exemples + gaps documentés
 - [x] Nil-guards pipeline + `fxmanifest` fichiers `web/sounds/*.ogg`
 
-**ml_skills** reste la seule source XP via `CraftingSkills` (pas d'XP craft parallèle).
+**devhub_skillTree** reste la seule source XP via `CraftingSkills` (pas d'XP craft parallèle).
 
 
 ---
@@ -526,7 +529,7 @@ Manuel de terrain **personnel** (dossier technique sombre, accent `#9a8866`) —
 
 ### Principes
 
-- **ml_skills** = seule vérité XP/niveaux via `CraftingSkills` (**lecture seule** dans le carnet). Aucune table XP parallèle.
+- **devhub_skillTree** = seule vérité XP/niveaux via `CraftingSkills` (**lecture seule** dans le carnet). Aucune table XP parallèle. Carnet : Niveau + XP actuel (pas de barre %).
 - Réutilise recettes / stations / blueprints / file / projets du craft — **pas** de duplication `Config.Recipes`.
 - Connaissance **par découverte** : ressources inconnues → `???`. **Pas de GPS**. Pas de niveaux/licences/inventaires exacts des autres joueurs (tiers artisans qualitatifs seulement).
 - Serveur valide : découvertes, contacts, objectifs, pins, notes, commandes.
@@ -574,7 +577,7 @@ config/book.lua              # Config.Book.*
 
 ### SQL (minimal)
 
-`sanctuary_book_player`, `_objectives`, `_pins`, `_notes`, `_discovered_resources`, `_artisans`, `_history`, `_orders` — **aucun** stockage XP ml_skills.
+`sanctuary_book_player`, `_objectives`, `_pins`, `_notes`, `_discovered_resources`, `_artisans`, `_history`, `_orders` — **aucun** stockage XP skill tree.
 
 ### Exports / events book
 

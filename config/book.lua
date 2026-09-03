@@ -1,6 +1,6 @@
 --[[
     Config.Book — Carnet de survie (Survival Book)
-    Manuel de terrain personnel. ml_skills = lecture seule via CraftingSkills.
+    Manuel de terrain personnel. Progression = lecture seule via CraftingSkills / devhub_skillTree.
 ]]
 
 Config = Config or {}
@@ -23,7 +23,7 @@ Config.Book = {
     },
 
     Dashboard     = { Enabled = true },
-    Progression   = { Enabled = true }, -- READ-ONLY ml_skills
+    Progression   = { Enabled = true }, -- READ-ONLY devhub_skillTree (pas de barre % inventée)
     NextUnlocks   = { Enabled = true },
     Objectives    = { Enabled = true },
     Pins          = { Enabled = true, MiniHud = true, HudMax = 4 },

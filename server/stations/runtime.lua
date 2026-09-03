@@ -358,9 +358,9 @@ function StationRuntime.MaintainOrRepair(src, key, kind)
             if not okS then return false, reasonS, argsS end
         end
         if spec.requireLevel and CraftingSkills and CraftingSkills.HasRequiredLevel then
-            local cat = spec.skillCategory or (Config.Skills and Config.Skills.craftingCategory) or 'ingenieur'
+            local cat = spec.skillCategory or (SkillTree and SkillTree.StationCategory and SkillTree.StationCategory(bench.category)) or (Config.Skills and Config.Skills.defaultCategory) or 'engineer'
             -- skill check BEFORE consume
-            if not CraftingSkills.HasRequiredLevel(cat, spec.requireLevel, src) then
+            if not CraftingSkills.HasRequiredLevel(src, cat, spec.requireLevel) then
                 return false, 'craft_level_required', { spec.requireLevel }
             end
         end
