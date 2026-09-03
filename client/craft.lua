@@ -13,7 +13,7 @@ local function formatIngredients(ingredients)
     return table.concat(lines, ', ')
 end
 
-function OpenCraftMenu(benchKey)
+function OpenCraftMenu(benchKey, opts)
     if crafting then
         lib.notify({ type = 'error', description = _('craft_busy') })
         return
@@ -23,6 +23,10 @@ function OpenCraftMenu(benchKey)
     if not data or not data.ok then
         lib.notify({ type = 'error', description = _(data and data.reason or 'craft_failed') })
         return
+    end
+
+    if type(opts) == 'table' and opts.focusOutput then
+        data.focusOutput = true
     end
 
     if OpenCraftNui and Config.UI and Config.UI.UseNui ~= false then

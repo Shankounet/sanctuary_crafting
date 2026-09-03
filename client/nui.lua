@@ -148,7 +148,7 @@ RegisterNUICallback('complete', function(data, cb)
             CraftTracker.Upsert({
                 craftId = data.craftId,
                 status = output and 'ready' or 'done',
-                stepLabel = output and ('terminée — Disponible à : ' .. (result.stationLabel or 'Station')) or 'FABRICATION TERMINÉE',
+                stepLabel = output and 'TERMINÉ' or 'FABRICATION TERMINÉE',
                 label = result.label,
                 item = result.result and result.result.item,
                 count = result.result and result.result.count,
@@ -365,7 +365,7 @@ RegisterNetEvent('sanctuary_crafting:client:craftFinished', function(payload)
         CraftTracker.Upsert({
             craftId = craftId,
             status = output and 'ready' or 'done',
-            stepLabel = output and ('terminée — Disponible à : ' .. (payload.stationLabel or 'Station')) or 'FABRICATION TERMINÉE',
+            stepLabel = output and 'TERMINÉ' or 'FABRICATION TERMINÉE',
             label = payload.label,
             item = payload.result and payload.result.item,
             count = payload.result and payload.result.count,
@@ -444,7 +444,7 @@ RegisterNetEvent('sanctuary_crafting:client:outputReady', function(payload)
         CraftTracker.Upsert({
             craftId = payload.craftId,
             status = 'ready',
-            stepLabel = 'terminée — Disponible à : ' .. (payload.stationLabel or 'Station'),
+            stepLabel = 'TERMINÉ',
             label = payload.label,
             item = payload.result and payload.result.item,
             count = payload.result and payload.result.count,

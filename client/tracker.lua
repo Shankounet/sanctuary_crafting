@@ -183,7 +183,7 @@ function CraftTracker.ApplySession(benchKey, session)
                         CraftTracker.Upsert({
                             craftId = id,
                             status = 'ready',
-                            stepLabel = 'terminée — Disponible à : Station',
+                            stepLabel = 'TERMINÉ',
                             stationOutput = true,
                         })
                     else
@@ -392,7 +392,7 @@ function CraftTracker.FromOutputEntry(entry)
         benchKey = entry.benchKey or entry.stationUid,
         stationLabel = stationLabel,
         status = 'ready',
-        stepLabel = 'terminée — Disponible à : ' .. stationLabel,
+        stepLabel = 'TERMINÉ',
         stationOutput = true,
         duration = 1,
         startedAt = nowMs(),
@@ -473,8 +473,42 @@ end)
 RegisterNUICallback('trackerClick', function(data, cb)
     local id = data and data.craftId
     local entry = id and jobs[id]
-    local benchKey = (data and data.benchKey) or (entry and entry.benchKey)
-    if benchKey and OpenCraftMenu then
+    local benchKey = (data and data.benchKey) or (entry and entry.benchKey) or (entry and entry.stationUid)
+    local stationLabel = (data and data.stationLabel)
+        or (entry and (entry.stationLabel or entry.benchLabel))
+        or 'Station'
+    local status = (data and data.status) or (entry and entry.status)
+    local isReady = (status == 'ready')
+        or (entry and entry.stationOutput == true)
+
+    if not benchKey then
+        cb({ ok = true })
+        return
+    end
+
+    -- Completed / SORTIE: near → open craft on RÉCUP panel; far → station name only (no GPS).
+    if isReady then
+        local near = false
+        local coords = GetClientBenchCoords and GetClientBenchCoords(benchKey)
+        if coords and Dist3 then
+            local ped = cache and cache.ped or PlayerPedId()
+            local pcoords = GetEntityCoords(ped)
+            local maxDist = (Config.InteractDistance or 2.5) + 0.5
+            near = Dist3(pcoords, coords) <= maxDist
+        end
+        if near and OpenCraftMenu then
+            OpenCraftMenu(benchKey, { focusOutput = true })
+        else
+            lib.notify({
+                type = 'inform',
+                description = ('Disponible à %s'):format(stationLabel),
+            })
+        end
+        cb({ ok = true })
+        return
+    end
+
+    if OpenCraftMenu then
         OpenCraftMenu(benchKey)
     end
     cb({ ok = true })

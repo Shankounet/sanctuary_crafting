@@ -430,12 +430,11 @@
     const st = entry.status || 'active';
     if (st === 'error') return 'Erreur';
     if (st === 'ready') {
-      const where = entry.stationLabel || entry.benchLabel || 'Station';
-      return 'terminée — Disponible à : ' + where;
+      return 'TERMINÉ';
     }
     if (st === 'done' || st === 'completed' || st === 'completing' || p >= 1) {
       if (entry.stationOutput || entry.stationLabel) {
-        return 'terminée — Disponible à : ' + (entry.stationLabel || 'Station');
+        return 'TERMINÉ';
       }
       return 'FABRICATION TERMINÉE';
     }
@@ -597,9 +596,11 @@
     el.querySelector('.ct-phase').textContent = phase;
     el.querySelector('.ct-fill').style.width = `${Math.round(pct * 100)}%`;
     const visualDone = entry.status === 'done' || entry.status === 'ready' || entry.status === 'completed' || entry.status === 'completing' || pct >= 1;
+    const readyWhere = entry.stationLabel || entry.benchLabel || 'Station';
     el.querySelector('.ct-time').textContent =
       entry.status === 'error' ? 'Échec'
-        : entry.status === 'ready' ? ('Disponible à : ' + (entry.stationLabel || 'Station'))
+        : entry.status === 'ready' ? ('Disponible à ' + readyWhere)
+        : (visualDone && (entry.stationOutput || entry.stationLabel)) ? ('Disponible à ' + readyWhere)
         : visualDone ? 'Terminé'
           : entry.status === 'queued' ? `EN ATTENTE · ${formatRemain(remain)}`
             : formatRemain(remain);
@@ -613,7 +614,7 @@
 
     el.addEventListener('click', (ev) => {
       if (ev.target.closest('.ct-dismiss')) return;
-      post('trackerClick', { craftId: entry.craftId, benchKey: entry.benchKey });
+      post('trackerClick', { craftId: entry.craftId, benchKey: entry.benchKey || entry.stationUid, stationUid: entry.stationUid, status: entry.status, stationLabel: entry.stationLabel });
     });
     el.querySelector('.ct-dismiss').addEventListener('click', (ev) => {
       ev.stopPropagation();
@@ -982,7 +983,7 @@
         craftId: msg.craftId,
         status: output ? 'ready' : 'done',
         stepLabel: output
-          ? ('terminée — Disponible à : ' + (msg.stationLabel || prev.stationLabel || 'Station'))
+          ? 'TERMINÉ'
           : 'FABRICATION TERMINÉE',
         label: msg.label || prev.label,
         item: (msg.result && msg.result.item) || prev.item,
@@ -1003,7 +1004,7 @@
         ...prev,
         craftId: d.craftId,
         status: 'ready',
-        stepLabel: 'terminée — Disponible à : ' + stationLabel,
+        stepLabel: 'TERMINÉ',
         label: d.label || prev.label,
         item: (d.result && d.result.item) || prev.item,
         count: (d.result && d.result.count) || prev.count,

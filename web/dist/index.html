@@ -223,17 +223,25 @@
         </div>
         <div id="tab-queue" class="tab-body">
           <p class="side-caption"><i class="fa-solid fa-industry" aria-hidden="true"></i> Console de production</p>
-          <div class="prod-split-label" id="file-label">FILE</div>
-          <div id="queue-list" class="queue-track"></div>
-          <div class="empty-state empty-prod" id="queue-empty">
-            <span class="empty-kicker">STATION READY</span>
-            <p>File vide</p>
-            <span class="empty-sys"><i class="led-dot ok" aria-hidden="true"></i> Système en veille</span>
+          <div class="prod-split file-split" id="file-split">
+            <div class="prod-split-label" id="file-label"><span class="split-title">FILE</span><span class="split-hint">en cours</span></div>
+            <div id="queue-list" class="queue-track"></div>
+            <div class="empty-state empty-prod" id="queue-empty">
+              <span class="empty-kicker">STATION READY</span>
+              <p>File vide</p>
+              <span class="empty-sys"><i class="led-dot ok" aria-hidden="true"></i> Système en veille</span>
+            </div>
           </div>
-          <div class="prod-split-label sortie-label" id="sortie-label">SORTIE</div>
-          <div id="output-list" class="output-track"></div>
-          <div class="output-actions hidden" id="output-actions">
-            <button type="button" id="btn-collect-all" class="ghost compact">RÉCUPÉRER TOUT</button>
+          <div class="prod-split-divider" aria-hidden="true"></div>
+          <div class="prod-split sortie-split" id="sortie-split">
+            <div class="prod-split-label sortie-label" id="sortie-label">
+              <span class="split-title">SORTIE</span>
+              <span class="split-count" id="sortie-count"></span>
+            </div>
+            <div id="output-list" class="output-track"></div>
+            <div class="output-actions hidden" id="output-actions">
+              <button type="button" id="btn-collect-all" class="recup-plate recup-all">RÉCUPÉRER TOUT</button>
+            </div>
           </div>
         </div>
         <div id="tab-tree" class="tab-body hidden">
