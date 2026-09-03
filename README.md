@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.25.0
+# sanctuary_crafting v2.26.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,14 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.26.0 — HUD: drag libre du bandeau Carnet — Épingles
+Le widget `#book-pins-hud` se déplace comme le tracker : drag du bandeau `.ph-header`, sans bouton Déplacer.
+
+- Position persistée dans `localStorage.pinnedTrackerPosition = {x,y}` (viewport left/top), indépendante de `craftTrackerPosition`.
+- PIN / réduire / masquer restent cliquables ; PIN n’empêche jamais le drag. Seuil 6 px : un drag ne déplie pas le widget réduit.
+- Clamp + reclamp au resize (EDGE 8) : le bandeau reste à l’écran. Défaut CSS `top:22px; right:22px`.
+- Paramètres HUD : **RÉINITIALISER LA POSITION DES WIDGETS** vide les deux clés et rétablit les deux widgets.
 
 ### v2.25.0 — Craft: cohérence lecture file de production
 Lecture immédiate de la station : **1 en cours / N en attente / M prêts**. Plus de contradiction FILE « en cours » + « File vide » pendant qu’un craft tourne.

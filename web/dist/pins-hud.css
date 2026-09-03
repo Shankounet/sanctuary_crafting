@@ -94,10 +94,17 @@
   gap: 10px;
   padding: 10px 12px 9px;
   border-bottom: 1px solid var(--ph-line);
+  cursor: grab;
+}
+#book-pins-hud .ph-header:active { cursor: grabbing; }
+#book-pins-hud .ph-header .ph-btn { cursor: pointer; }
+#book-pins-hud.is-dragging .ph-header { cursor: grabbing; }
+#book-pins-hud.is-dragging {
+  user-select: none;
 }
 #book-pins-hud.is-collapsed .ph-header {
   border-bottom: 0;
-  cursor: pointer;
+  cursor: grab;
 }
 #book-pins-hud .ph-title {
   flex: 1;
