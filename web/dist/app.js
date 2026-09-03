@@ -2550,7 +2550,6 @@
       syncPinButton(state.selected);
       showToast(was ? 'Suivi retiré' : 'Suivi dans le Carnet', r && r.ok !== false ? 'ok' : 'err');
       post('notify', { type: r && r.ok !== false ? 'success' : 'error', reason: was ? (r && r.ok !== false ? 'book_pinned' : (r && r.reason) || 'craft_failed') : (r && r.ok ? 'book_pinned' : (r && r.reason) || 'craft_failed') });
-      beep(r && r.ok !== false ? 'click' : 'error');
     });
   });
 
@@ -2571,7 +2570,6 @@
     if (!state.selected) return;
     post('bookObjectiveRecipe', { recipeId: state.selected.id }).then((r) => {
       post('notify', { type: r && r.ok ? 'success' : 'error', reason: r && r.ok ? 'book_objective_added' : (r && r.reason) || 'craft_failed' });
-      beep(r && r.ok ? 'click' : 'error');
       if (r && r.ok) showToast('Objectif ajouté au Carnet', 'ok');
     });
   });
@@ -2583,7 +2581,6 @@
     if (!state.selected) return;
     post('bookObjectiveRecipe', { recipeId: state.selected.id, withMissing: true }).then((r) => {
       post('notify', { type: r && r.ok ? 'success' : 'error', reason: r && r.ok ? 'book_objective_added' : (r && r.reason) || 'craft_failed' });
-      beep(r && r.ok ? 'click' : 'error');
       if (r && r.ok) showToast('Objectifs (recette + manquants) ajoutés', 'ok');
     });
   });

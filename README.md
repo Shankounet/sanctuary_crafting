@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.21.1
+# sanctuary_crafting v2.21.2
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,9 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.21.2 — Carnet: plus de scintillement, plus de sons
+Carnet NUI: plus de FOUC à l'ouverture (textures / polices / reflow). `#book-app` reste invisible (`opacity`/`visibility`/`pointer-events`, jamais `display:none`) jusqu'à `journalReady`. Preload `Image()` + `document.fonts.ready` (timeout 400 ms). Fade 150 ms. Overlay « Ouverture du carnet... » au premier open. DOM conservé à la fermeture (plus de wipe « Chargement… »). Tous les sons Carnet coupés (`Config.Book.Sounds.Enabled = false`). Callbacks NUI / bookDashboard non-bloquant / craft / tracker / SQL / DevHub inchangés.
 
 ### v2.21.1 — Craft: PROFIL REQUIS DevHub, panneau droit compact
 Atelier `#app` only. Compétence + Spécialisation fusionnés en **PROFIL REQUIS** (Branche, Niveau actuel/requis ✓✕, Talent label DevHub ✓✕). Snapshot `getMenu` (level/xp/unlocked labels) — pas de `ml_skills` / GetSkill dans le panneau. Atelier compact (Station / Niveau / État). Production : rangée LOT·RÉSULTAT·DURÉE·XP, Matériaux n/n, rail 1|5|10|MAX, plaque FABRIQUER. Récents = bandeau mini. Filtres avancés repliés. STATION READY court. Carte sélectionnée liseré `#9a8866`. Callbacks NUI / carnet / tracker / SQL inchangés.

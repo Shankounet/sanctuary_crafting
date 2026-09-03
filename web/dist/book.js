@@ -23,6 +23,120 @@
 
   const OX_IMG_BASE = 'nui://ox_inventory/web/images/';
 
+  /* v2.21.2 — never paint a partial book; mute all Carnet audio */
+  let journalReady = false;
+  let assetsReady = false;
+  let firstPaintDone = false;
+  let preloadPromise = null;
+  const JOURNAL_PRELOAD = [
+    'tex/paper_page.png',
+    'tex/paper_sheet_tan.png',
+    'tex/paper_sheet_worn.png',
+    'tex/paper_sheet_lined.png',
+    'tex/paper_page_alt.png',
+    'tex/ref_cover.png',
+    'tex/postit_yellow.png',
+    'tex/postit_blue.png',
+    'tex/postit_green.png',
+    'tex/postit_pink.png',
+  ];
+
+  function playBookSound() { /* muted: no Howler / Audio / PlaySound */ }
+
+  function preloadImage(src) {
+    return new Promise((resolve) => {
+      try {
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = src;
+      } catch (_) {
+        resolve(false);
+      }
+    });
+  }
+
+  function waitFonts(ms) {
+    try {
+      if (document.fonts && document.fonts.ready) {
+        return Promise.race([
+          document.fonts.ready.then(() => true).catch(() => false),
+          new Promise((r) => setTimeout(() => r(false), ms || 400)),
+        ]);
+      }
+    } catch (_) { /* CEF without FontFaceSet */ }
+    return new Promise((r) => setTimeout(() => r(false), 0));
+  }
+
+  function ensurePreload() {
+    if (preloadPromise) return preloadPromise;
+    preloadPromise = Promise.all([
+      Promise.all(JOURNAL_PRELOAD.map(preloadImage)),
+      waitFonts(400),
+    ]).then(() => {
+      assetsReady = true;
+    }).catch(() => {
+      assetsReady = true;
+    });
+    return preloadPromise;
+  }
+
+  function openingOverlay() { return document.getElementById('book-opening-overlay'); }
+
+  function showOpeningOverlay() {
+    const ov = openingOverlay();
+    if (!ov) return;
+    ov.classList.remove('hidden');
+    ov.setAttribute('aria-hidden', 'false');
+  }
+
+  function hideOpeningOverlay() {
+    const ov = openingOverlay();
+    if (!ov) return;
+    ov.classList.add('hidden');
+    ov.setAttribute('aria-hidden', 'true');
+  }
+
+  function hasPageContent() {
+    const L = document.getElementById('book-left');
+    return !!(L && String(L.innerHTML || '').trim());
+  }
+
+  function hideBookShell() {
+    hideOpeningOverlay();
+    book.classList.add('hidden');
+    book.classList.remove('is-open', 'is-opening');
+    /* keep .is-ready after first success so reopen does not remount */
+    book.setAttribute('aria-hidden', 'true');
+    book.style.pointerEvents = 'none';
+    /* do not display:none, do not wipe innerHTML, do not force opacity via cssText */
+  }
+
+  function revealBookShell() {
+    hideOpeningOverlay();
+    book.classList.remove('hidden', 'is-opening');
+    book.classList.add('is-open', 'is-ready');
+    book.setAttribute('aria-hidden', 'false');
+    book.removeAttribute('hidden');
+    book.style.pointerEvents = '';
+    book.style.display = '';
+    book.style.visibility = '';
+    book.style.opacity = '';
+  }
+
+  function tryReveal() {
+    if (!state.open) return;
+    if (journalReady) {
+      revealBookShell();
+      return;
+    }
+    if (!assetsReady) return;
+    if (!firstPaintDone && !hasPageContent()) return;
+    journalReady = true;
+    revealBookShell();
+  }
+
+
   /* Primary edge tabs — short labels so they do not clip */
   const PRIMARY_TABS = [
     { id: 'dashboard', label: 'Accueil', mod: 'Dashboard', icon: 'fa-house' },
@@ -361,18 +475,16 @@
     if (L) {
       L.innerHTML = leftHtml || '';
       L.classList.remove('page-turn');
-      void L.offsetWidth;
-      L.classList.add('page-turn');
     }
     if (R) {
       R.innerHTML = rightHtml || '';
       R.classList.remove('page-turn');
-      void R.offsetWidth;
-      R.classList.add('page-turn');
     }
     /* Compat: keep #book-main in sync for any external peek */
     const main = $('#book-main');
     if (main) main.innerHTML = (leftHtml || '') + (rightHtml || '');
+    firstPaintDone = true;
+    tryReveal();
   }
 
   function setContext() { /* no sidebar context in physical book */ }
@@ -1492,8 +1604,6 @@
     if (!R) return;
     R.innerHTML = notesRightHtml();
     R.classList.remove('page-turn');
-    void R.offsetWidth;
-    R.classList.add('page-turn');
     bindNotesRight();
   }
 
@@ -1980,79 +2090,93 @@
     );
   }
 
-  function paintShellVisible() {
-    book.classList.remove('hidden');
-    book.classList.add('is-open');
-    book.removeAttribute('hidden');
-    book.setAttribute('aria-hidden', 'false');
-    book.style.cssText = 'display:block!important;visibility:visible!important;opacity:1!important;position:fixed!important;inset:0!important;z-index:2147483000!important;pointer-events:auto!important;';
-    const spread = $('#book-spread');
-    if (spread) {
-      spread.style.opacity = '1';
-      spread.style.visibility = 'visible';
-      spread.style.transform = 'none';
-      spread.style.animation = 'none';
+  function applyBookMeta(msg) {
+    if (msg && msg.meta) state.meta = msg.meta;
+    state.modules = (state.meta && state.meta.modules) || state.modules || {};
+    if (state.meta && state.meta.accent) {
+      try {
+        document.documentElement.style.setProperty('--book-accent', state.meta.accent);
+      } catch (_) { /* ignore */ }
     }
+    const title = (state.meta && state.meta.title) || 'CARNET DE SURVIE';
+    const subtitle = (state.meta && state.meta.subtitle) || 'Journal technique de terrain';
+    const titleEl = $('#book-title');
+    const subEl = $('#book-sub');
+    if (titleEl) titleEl.textContent = String(title).toUpperCase();
+    if (subEl) subEl.textContent = subtitle;
   }
 
   function paintBootPages(title, subtitle) {
+    /* Kept as last-resort hidden paint; never shown as incomplete book. */
+    if (hasPageContent()) return;
     const left = `
       <div class="accueil-hero">
         <p class="book-stamp">Carnet de terrain</p>
         <h2 class="accueil-title">${esc(String(title || 'Carnet de survie'))}</h2>
         <p class="accueil-sub">${esc(subtitle || 'Journal de terrain')}</p>
         <hr class="ink-rule" />
-        <p class="hand-note">Ouverture du carnet…</p>
         <span class="stamp">Terrain</span>
       </div>
-      <h3 class="section-title">Compétences</h3>
-      <p class="hand-note">Ouverture des lignes de competences…</p>
       ${folio('i')}`;
     const right = `
       <p class="book-stamp">Feuillet du jour</p>
       <h2 class="book-page-title">Situation</h2>
       <hr class="ink-rule" />
-      <div class="scrap-note">
-        <span class="tape top-l"></span>
-        <div class="scrap-title">Synthèse</div>
-        <div class="scrap-body empty">Le contenu se remplit dès que le serveur répond.</div>
-      </div>
       ${folio('ii')}`;
     setPages(left, right);
   }
 
   function openBook(msg) {
-    state.open = true;
-    state.meta = (msg && msg.meta) || {};
-    state.modules = (state.meta.modules) || {};
-    if (state.meta.accent) {
-      try {
-        document.documentElement.style.setProperty('--book-accent', state.meta.accent);
-      } catch (_) { /* ignore */ }
-    }
-    const title = state.meta.title || 'CARNET DE SURVIE';
-    const subtitle = state.meta.subtitle || 'Journal technique de terrain';
-    const titleEl = $('#book-title');
-    const subEl = $('#book-sub');
-    if (titleEl) titleEl.textContent = String(title).toUpperCase();
-    if (subEl) subEl.textContent = subtitle;
-    /* 1) Force shell visible BEFORE any await */
-    paintShellVisible();
-    book.classList.remove('is-opening');
+    playBookSound(); /* no-op */
+    const wasOpen = state.open;
+    applyBookMeta(msg);
     closeIndex();
     renderTabs();
-    /* 2) Sync Accueil skeleton so ivory pages are never empty */
-    paintBootPages(title, subtitle);
-    const page = (msg && msg.page) || 'dashboard';
+    const page = (msg && msg.page) || state.page || 'dashboard';
+
+    if (wasOpen && journalReady) {
+      revealBookShell();
+      return;
+    }
+
+    if (wasOpen && !journalReady) {
+      /* duplicate bookOpen while preloading (CEF retries) — keep last paint */
+      return;
+    }
+
+    state.open = true;
+    book.classList.remove('is-opening');
+
+    if (journalReady) {
+      /* subsequent open: DOM + assets live — fade in, keep last pages */
+      if (page !== state.page || !hasPageContent()) {
+        Promise.resolve()
+          .then(() => navigate(page))
+          .catch((err) => {
+            console.error('[sanctuary_crafting book navigate]', err);
+          });
+      }
+      revealBookShell();
+      return;
+    }
+
+    /* First open after resource restart: overlay only, book stays opacity 0 */
+    if (!assetsReady) showOpeningOverlay();
+    ensurePreload().then(() => {
+      assetsReady = true;
+      tryReveal();
+    });
+    window.setTimeout(() => {
+      if (!state.open || journalReady) return;
+      tryReveal();
+    }, 800);
     Promise.resolve()
       .then(() => navigate(page))
       .catch((err) => {
         console.error('[sanctuary_crafting book navigate]', err);
-        paintShellVisible();
-        setPages(
-          pageHead('Carnet de survie', 'Ouverture partielle') +
-            emptyBox('fa-book-open', 'Contenu indisponible', 'Réessaie ou rouvre le carnet.'),
-          folio('—')
+        paintBootPages(
+          (state.meta && state.meta.title) || 'Carnet de survie',
+          (state.meta && state.meta.subtitle) || 'Journal de terrain'
         );
       });
   }
@@ -2060,12 +2184,7 @@
   function closeBook() {
     state.open = false;
     closeIndex();
-    book.classList.add('hidden');
-    book.classList.remove('is-open', 'is-opening');
-    book.setAttribute('aria-hidden', 'true');
-    book.style.display = '';
-    book.style.visibility = '';
-    book.style.opacity = '';
+    hideBookShell();
     post('bookClose', {});
   }
 
@@ -2078,12 +2197,7 @@
     if (data.action === 'bookClose') {
       state.open = false;
       closeIndex();
-      book.classList.add('hidden');
-      book.classList.remove('is-open', 'is-opening');
-      book.setAttribute('aria-hidden', 'true');
-      book.style.display = '';
-      book.style.visibility = '';
-      book.style.opacity = '';
+      hideBookShell();
     }
     if (data.action === 'bookPins') {
       /* HUD is #book-pins-hud via pinsHud */
@@ -2133,4 +2247,6 @@
   if (searchEl) searchEl.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') doSearch(ev.target.value.trim());
   });
+
+  ensurePreload();
 })();

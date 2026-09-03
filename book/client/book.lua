@@ -1,5 +1,6 @@
 --[[
     book/client/book.lua — ouverture NUI Carnet + mini HUD pins + artisans meet
+    v2.21.2: no Carnet SFX (do not PlaySound / SendNUIMessage sound / Audio).
 ]]
 
 local bookOpen = false

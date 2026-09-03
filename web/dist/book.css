@@ -1,5 +1,5 @@
 /* =============================================================================
-   Survival Book v2.20.1 — papiers fournis (page, tan, worn, ligné)
+   Survival Book v2.21.2 — no flicker, no sounds; papers page/tan/worn/lined
    Leather cover/spine only. Real paper PNGs on pages + distinct insert sheets.
    CEF-safe: system fonts, no @import, no feTurbulence, no mix-blend.
    ============================================================================= */
@@ -46,24 +46,28 @@
   color: var(--book-ink);
   background: transparent;
   overflow: hidden;
-  opacity: 1;
-  visibility: visible;
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 150ms ease;
 }
 
-#book-app.hidden {
-  display: none !important;
+#book-app.hidden,
+#book-app:not(.is-ready) {
+  /* Keep layout alive — never display:none (remount/FOUC) */
+  display: block !important;
   opacity: 0 !important;
   visibility: hidden !important;
   animation: none !important;
   pointer-events: none !important;
 }
 
-#book-app:not(.hidden),
-#book-app.is-open {
+#book-app.is-open.is-ready {
   display: block !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  pointer-events: auto !important;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 #book-app.is-opening .book-spread {
@@ -71,7 +75,7 @@
 }
 
 @keyframes book-spread-in {
-  from { opacity: 0; transform: scale(0.96) translateY(10px); }
+  from { opacity: 1; transform: none; }
   to { opacity: 1; transform: none; }
 }
 
@@ -109,6 +113,7 @@
   z-index: 2;
   width: min(1080px, 88vw);
   height: min(680px, 82vh);
+  aspect-ratio: 1080 / 680;
   display: grid;
   grid-template-columns: 1fr 28px 1fr;
   grid-template-rows: 1fr;
@@ -1678,37 +1683,49 @@
 }
 
 /* ============================================================
-   CEF visibility hard fix
+   CEF visibility — layout always computed; fade only on #book-app.is-ready
    ============================================================ */
 #book-app.is-open,
-#book-app:not(.hidden) {
+#book-app:not(.hidden),
+#book-app.hidden {
   display: block !important;
   position: fixed !important;
   inset: 0 !important;
   z-index: 2147483000 !important;
+  background: transparent !important;
+}
+#book-app.is-open.is-ready {
   opacity: 1 !important;
   visibility: visible !important;
   pointer-events: auto !important;
-  background: transparent !important;
 }
+#book-app.hidden,
+#book-app:not(.is-ready) {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+#book-app .book-stage,
 #book-app.is-open .book-stage,
 #book-app:not(.hidden) .book-stage {
   opacity: 1 !important;
   visibility: visible !important;
 }
+#book-app .book-world-dim,
 #book-app.is-open .book-world-dim,
 #book-app:not(.hidden) .book-world-dim {
   opacity: 1 !important;
   background: rgba(8, 6, 4, 0.78) !important;
 }
+#book-app .book-spread,
 #book-app.is-open .book-spread,
 #book-app:not(.hidden) .book-spread {
-  opacity: 1 !important;
   visibility: visible !important;
   transform: none !important;
   animation: none !important;
   width: min(1080px, 88vw) !important;
   height: min(680px, 82vh) !important;
+  aspect-ratio: 1080 / 680;
 }
 #book-app.is-open .book-page,
 #book-app:not(.hidden) .book-page {
@@ -2807,12 +2824,12 @@
 }
 
 #book-app .book-page-inner.page-turn {
-  animation: book-page-settle 160ms ease !important;
+  animation: none !important;
   opacity: 1 !important;
   transform: none !important;
 }
 @keyframes book-page-settle {
-  from { transform: translateY(4px); }
+  from { transform: none; }
   to { transform: none; }
 }
 
@@ -3704,4 +3721,58 @@
 }
 #book-app .book-index-tab.active {
   background: #7a6548 !important;
+}
+
+
+/* ============================================================
+   v2.21.2 — hide/show without remount; no beige FOUC; 150ms fade
+   ============================================================ */
+#book-opening-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483100;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  background: rgba(10, 8, 6, 0.42);
+  color: #e8dcc8;
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+#book-opening-overlay.hidden {
+  display: grid !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+#book-app {
+  transition: opacity 150ms ease;
+}
+#book-app.hidden,
+#book-app:not(.is-ready) {
+  display: block !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+#book-app.is-open.is-ready {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+#book-app .book-page,
+#book-app .book-page-left,
+#book-app .book-page-right {
+  height: 100%;
+  min-height: 0;
+  /* never #f3ead6 over PNGs */
+  background-color: transparent;
+}
+#book-app .book-edge-tabs {
+  width: 40px;
+}
+#book-app .book-page-inner.page-turn {
+  animation: none !important;
+  transform: none !important;
 }
