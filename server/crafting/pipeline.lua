@@ -1550,12 +1550,22 @@ local function buildRecipeEntry(src, r, ctx)
     end
 
     local requireSpec = nil
+    local requireSpecLabel = nil
     if Specializations and Specializations.InferRequireSpec then
         requireSpec = Specializations.InferRequireSpec(r)
+        if requireSpec then
+            local c = Config.Specializations or {}
+            if requireSpec == (c.SurvivalId or 'survie') then
+                requireSpecLabel = c.SurvivalLabel or 'Survie'
+            else
+                local def = (c.Main or {})[requireSpec]
+                requireSpecLabel = def and def.label or nil
+            end
+        end
         local okSpec = Specializations.CanCraftRecipe and select(1, Specializations.CanCraftRecipe(src, r))
         hasSpecialization = okSpec and true or false
         if not okSpec then
-            canCraft, lockReason, lockArgs = false, 'craft_spec_required', { requireSpec }
+            canCraft, lockReason, lockArgs = false, 'craft_spec_required', { requireSpecLabel or requireSpec }
         end
     end
 
@@ -1689,6 +1699,8 @@ local function buildRecipeEntry(src, r, ctx)
         skillTree = r.skillTree,
         skillCategoryLabel = facing and facing.categoryLabel or (SkillTree and SkillTree.CategoryLabel and SkillTree.CategoryLabel(skillCategory)) or nil,
         requiredSkillLabel = facing and facing.requiredSkillLabel or nil,
+        hasRequiredSkill = facing and facing.hasRequiredSkill,
+        requireSpecLabel = requireSpecLabel,
         playerSkillXp = facing and facing.playerSkillXp or nil,
         playerTotalXp = facing and facing.playerTotalXp or nil,
         requireBlueprint = bpId,
@@ -1890,6 +1902,16 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
                     o[k] = { key = k, label = c.label, level = c.level, xp = c.xp, totalXp = c.totalXp }
                 end
                 return o
+            end)(),
+            talents = (function()
+                local talents = {}
+                for i = 1, #(skillSnap.unlocked or {}) do
+                    local u = skillSnap.unlocked[i]
+                    if u and type(u.label) == 'string' and u.label ~= '' then
+                        talents[#talents + 1] = { label = u.label, category = u.categoryKey }
+                    end
+                end
+                return talents
             end)(),
         } or nil,
         recentlyCrafted = (RecentlyCrafted and RecentlyCrafted.List and RecentlyCrafted.List(src)) or {},

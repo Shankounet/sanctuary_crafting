@@ -147,7 +147,7 @@
             <button type="button" class="chip" data-filter="new"><i class="fa-solid fa-certificate"></i><span>Nouveaux</span></button>
           </div>
           <details class="filters-more" id="filters-more">
-            <summary class="filters-more-toggle" title="Filtres secondaires">Plus</summary>
+            <summary class="filters-more-toggle" title="Filtres avancés">Filtres avancés</summary>
             <div class="filters-secondary">
               <button type="button" class="chip" data-filter="locked"><i class="fa-solid fa-lock"></i><span>Verrouillés</span></button>
               <button type="button" class="chip" data-filter="plans"><i class="fa-solid fa-scroll"></i><span>Plans</span></button>
@@ -185,11 +185,9 @@
           <p class="side-caption"><i class="fa-solid fa-industry" aria-hidden="true"></i> Console de production</p>
           <div id="queue-list" class="queue-track"></div>
           <div class="empty-state empty-prod" id="queue-empty">
-            <span class="empty-ico" aria-hidden="true"><i class="fa-solid fa-microchip"></i></span>
             <span class="empty-kicker">STATION READY</span>
-            <p>File de production vide</p>
+            <p>File vide</p>
             <span class="empty-sys"><i class="led-dot ok" aria-hidden="true"></i> Système en veille</span>
-            <span class="empty-hint">Ajoutez une recette depuis le catalogue via « File »</span>
           </div>
         </div>
         <div id="tab-tree" class="tab-body hidden">
@@ -314,32 +312,16 @@
         <section class="fiche-sec fiche-sec-req" aria-label="Exigences">
         <p class="fiche-section-label">Exigences</p>
         <div class="fiche-req-body">
-        <div class="block block-skill" id="block-skill">
-          <h3 class="t-l3"><i class="fa-solid fa-brain"></i> Compétence</h3>
-          <div class="skill-head">
-            <span class="skill-name" id="d-skill">—</span>
-            <span class="skill-levels" id="d-skill-level">—</span>
-          </div>
-          <div class="skill-bar-wrap" id="d-skill-bar-wrap">
-            <div class="skill-bar" aria-hidden="true"><i class="skill-fill" id="d-skill-fill"></i></div>
-            <span class="skill-bar-label t-l6" id="d-skill-bar-label"></span>
-          </div>
-        </div>
-
-        <div class="block block-spec" id="block-spec">
-          <h3 class="t-l3"><i class="fa-solid fa-certificate"></i> Spécialisation</h3>
-          <div class="spec-row" id="d-spec-row">
-            <span class="spec-need" id="d-spec-need">—</span>
-            <span class="spec-yours" id="d-spec-yours"></span>
-          </div>
+        <div class="block block-profil" id="block-profil">
+          <h3 class="t-l3"><i class="fa-solid fa-id-card"></i> Profil requis</h3>
+          <div class="profil-lines" id="d-profil"></div>
         </div>
 
         <div class="block block-station" id="block-station">
           <h3 class="t-l3"><i class="fa-solid fa-warehouse"></i> Atelier</h3>
           <div class="kv-row" id="row-station"><span>Station</span><span id="d-station">—</span></div>
-          <div class="kv-row" id="row-station-lvl"><span>Niveau requis</span><span id="d-station-lvl">—</span></div>
-          <div class="kv-row" id="row-station-vent"><span>Ventilation</span><span id="d-station-vent">—</span></div>
-          <div class="kv-row" id="row-station-queue"><span>File</span><span id="d-station-queue">—</span></div>
+          <div class="kv-row" id="row-station-lvl"><span>Niveau</span><span id="d-station-lvl">—</span></div>
+          <div class="kv-row" id="row-station-etat"><span>État</span><span id="d-station-etat">—</span></div>
           <div id="station-ops" class="station-ops hidden">
             <div class="station-ops-row">
               <button type="button" id="btn-maintain" class="ghost compact" title="Entretenir la station">MAINTENIR</button>
@@ -421,20 +403,13 @@
         <!-- SECTION 4 PRODUCTION -->
         <section class="fiche-sec fiche-sec-prod" aria-label="Production">
         <p class="fiche-section-label">Production</p>
-        <div class="block block-xp" id="block-xp">
+        <div class="block block-xp hidden" id="block-xp">
           <div class="kv-row" id="row-xp"><span>XP</span><span id="d-xp">—</span></div>
           <div class="kv-row" id="row-mastery"><span>Maîtrise</span><span id="d-mastery">—</span></div>
         </div>
         <div class="panel-action actions" id="fab-module" data-fab-state="ready">
           <div id="fab-ready" class="fab-panel fab-ready">
-            <div id="fab-idle-console" class="fab-idle-console" aria-label="Console atelier">
-              <div class="fab-idle-line fab-idle-ready"><span class="led-dot ok" id="fab-idle-led" aria-hidden="true"></span><span class="fab-idle-k">STATION READY</span></div>
-              <div class="fab-idle-line"><span class="fab-idle-k">File</span> <span class="fab-idle-v" id="fab-idle-queue">0/5</span></div>
-              <div class="fab-idle-line"><span class="fab-idle-k">Dernier craft</span> <span class="fab-idle-v" id="fab-idle-last">—</span></div>
-              <div class="fab-idle-line fab-idle-sleep" id="fab-idle-sleep"><span class="fab-idle-k">État veille</span></div>
-              <div class="fab-idle-line fab-idle-sensor hidden" id="fab-idle-temp-line"><span class="fab-idle-k">Temp.</span> <span class="fab-idle-v" id="fab-idle-temp">—</span></div>
-              <div class="fab-idle-line fab-idle-sensor hidden" id="fab-idle-energy-line"><span class="fab-idle-k">Énergie</span> <span class="fab-idle-v" id="fab-idle-energy">—</span></div>
-            </div>
+            <div id="fab-idle-console" class="fab-idle-console hidden" aria-hidden="true"></div>
             <div class="fab-readouts" aria-label="Résumé fabrication">
               <div class="fab-chip" id="fab-chip-lot">
                 <span class="fab-chip-k">Lot</span>
@@ -452,18 +427,10 @@
                 <span class="fab-chip-k">XP</span>
                 <span class="fab-chip-v" id="fab-ready-xp">—</span>
               </div>
-              <div class="fab-chip hidden" id="fab-chip-noise">
-                <span class="fab-chip-k">Bruit</span>
-                <span class="fab-chip-v" id="fab-ready-noise">—</span>
-              </div>
-              <div class="fab-chip hidden" id="fab-chip-energy">
-                <span class="fab-chip-k">Énergie</span>
-                <span class="fab-chip-v" id="fab-ready-energy">—</span>
-              </div>
-              <div class="fab-chip" id="fab-chip-mats">
-                <span class="fab-chip-k">Matériaux</span>
-                <span class="fab-chip-v" id="fab-ready-mats">—</span>
-              </div>
+            </div>
+            <div class="fab-mats-line" id="fab-mats-line">
+              <span class="fab-chip-k">Matériaux</span>
+              <span class="fab-chip-v" id="fab-ready-mats">—</span>
             </div>
             <div class="action-primary-row">
               <label class="batch lot-rail-wrap" id="batch-wrap">
@@ -562,6 +529,11 @@
           </div>
         </div>
         <p id="craft-why" class="craft-why panel-alert hidden"></p>
+        </section>
+
+        <section class="fiche-sec fiche-sec-recent hidden" id="fiche-recent" aria-label="Récemment fabriqués">
+          <p class="fiche-section-label">Récemment fabriqués</p>
+          <div class="recent-row" id="d-recent-row"></div>
         </section>
       </div>
     </section>

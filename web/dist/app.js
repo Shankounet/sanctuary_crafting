@@ -36,6 +36,7 @@
     sort: 'name',
     rarityFilter: 'all',
     playerSpec: null,
+    skillSnapshot: null,
     recentlyCrafted: [],
     newlyLearned: [],
     teaching: {},
@@ -447,7 +448,8 @@
     },
     craft_skill_required: (r) => {
       const sk = (r.lockArgs && r.lockArgs[0]) || r.requiredSkillLabel;
-      return sk ? `Talent requis ${sk}` : 'Talent requis';
+      if (sk && !looksLikeUid(sk)) return `Talent requis ${sk}`;
+      return 'Talent requis';
     },
     craft_blueprint_required: (r) => {
       const bp = (r.lockArgs && r.lockArgs[0]) || r.requireBlueprint;
@@ -461,8 +463,8 @@
     craft_no_power: () => 'Atelier hors tension',
     craft_tool_required: () => 'Outil requis manquant ou usé',
     craft_spec_required: (r) => {
-      const sp = (r.lockArgs && r.lockArgs[0]) || r.requireSpec;
-      return sp ? `Spécialisation requise : ${humanize(sp)}` : 'Spécialisation requise';
+      const sp = (r.lockArgs && r.lockArgs[0]) || r.requireSpecLabel || frLabel(r.requireSpec, null);
+      return sp ? `Spécialisation requise : ${sp}` : 'Spécialisation requise';
     },
     craft_knowledge_required: () => 'Recette non connue',
   };
@@ -802,30 +804,7 @@
       wrap.appendChild(h);
       const row = document.createElement('div');
       row.className = 'recent-row';
-      recipes.slice(0, 5).forEach((r) => {
-        const qty = (r.result && r.result.count) || r.qty || 1;
-        const resultItem = (r.result && r.result.item) || r.id;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'recent-mini';
-        if (state.selected && state.selected.id === r.id) btn.classList.add('selected');
-        btn.title = r.label || '';
-        btn.innerHTML = `
-          <span class="recent-img">
-            <span class="ph" aria-hidden="true"><i class="fa-solid fa-cube"></i></span>
-            <img alt="" />
-          </span>
-          <span class="recent-meta">
-            <span class="recent-name">${escapeHtml(r.label || '')}</span>
-            <span class="recent-qty">×${escapeHtml(qty)}</span>
-          </span>
-        `;
-        const img = btn.querySelector('img');
-        const ph = btn.querySelector('.ph');
-        bindItemImg(img, resultItem, ph);
-        btn.addEventListener('click', () => selectRecipe(r));
-        row.appendChild(btn);
-      });
+      recipes.slice(0, 5).forEach((r) => row.appendChild(makeRecentMini(r)));
       wrap.appendChild(row);
       grid.appendChild(wrap);
     };
@@ -839,10 +818,11 @@
       appendGroup('FAVORIS', favs);
       favs.forEach((r) => used.add(r.id));
       const recents = [];
-      (state.recentlyCrafted || []).forEach((id) => {
-        if (byId[id] && !used.has(id)) recents.push(byId[id]);
+      (state.recentlyCrafted || []).forEach((entry) => {
+        const id = typeof entry === 'string' ? entry : (entry && (entry.recipeId || entry.id));
+        if (id && byId[id] && !used.has(id)) recents.push(byId[id]);
       });
-      appendRecentStrip(recents);
+      appendRecentStrip(recents.slice(0, 5));
       recents.forEach((r) => used.add(r.id));
       const news = list.filter((r) => isNewRecipe(r) && !used.has(r.id));
       appendGroup('NOUVEAUX', news);
@@ -868,6 +848,212 @@
       });
     }
     return out;
+  }
+
+  const SPEC_FR = {
+    survie: 'Survie', survival: 'Survie',
+    medecin: 'Médecin', medic: 'Médecin', medical: 'Médecin',
+    ingenieur: 'Ingénieur', engineer: 'Ingénieur',
+    mecano: 'Mécanicien', mechanic: 'Mécanicien',
+    armurier: 'Armurier', gunsmith: 'Armurier',
+  };
+
+  function looksLikeUid(s) {
+    if (!s || typeof s !== 'string') return true;
+    if (/^[0-9a-f]{8}-/i.test(s)) return true;
+    if (/^(cat_|sk_|skill_|uid_)/i.test(s)) return true;
+    if (/^[a-z0-9_]{24,}$/i.test(s)) return true;
+    return false;
+  }
+
+  function frLabel(raw, fallback) {
+    if (raw == null || raw === '') return fallback || null;
+    const s = String(raw);
+    if (SPEC_FR[s]) return SPEC_FR[s];
+    if (SPEC_FR[s.toLowerCase()]) return SPEC_FR[s.toLowerCase()];
+    if (looksLikeUid(s)) return fallback || null;
+    return s;
+  }
+
+  function snapshotCat(key) {
+    const snap = state.skillSnapshot;
+    if (!snap || !snap.categories || !key) return null;
+    return snap.categories[key] || null;
+  }
+
+  function branchLabelOf(r) {
+    if (!r) return null;
+    if (r.skillCategoryLabel && !looksLikeUid(r.skillCategoryLabel)) return String(r.skillCategoryLabel);
+    const key = r.skillCategory || (r.skillTree && r.skillTree.category) || (r.xp && r.xp.category) || null;
+    const row = snapshotCat(key);
+    if (row && row.label && !looksLikeUid(row.label)) return String(row.label);
+    return frLabel(key, null);
+  }
+
+  function specLabelOf(r) {
+    if (!r) return null;
+    if (r.requireSpecLabel && !looksLikeUid(r.requireSpecLabel)) return String(r.requireSpecLabel);
+    return frLabel(r.requireSpec, null);
+  }
+
+  function talentLabelOf(r) {
+    if (!r) return null;
+    const lab = r.requiredSkillLabel;
+    if (lab && !looksLikeUid(lab)) return String(lab);
+    return null;
+  }
+
+  function playerLevelOf(r) {
+    if (!r) return null;
+    if (typeof r.playerSkillLevel === 'number') return r.playerSkillLevel;
+    if (r.lockReason === 'craft_level_required' && r.lockArgs && r.lockArgs[1] != null) {
+      return Number(r.lockArgs[1]);
+    }
+    const key = r.skillCategory || (r.skillTree && r.skillTree.category);
+    const row = snapshotCat(key);
+    if (row && typeof row.level === 'number') return row.level;
+    return null;
+  }
+
+  function talentUnlockedOf(r, label) {
+    if (typeof r.hasRequiredSkill === 'boolean') return r.hasRequiredSkill;
+    if (r.lockReason === 'craft_skill_required') return false;
+    const snap = state.skillSnapshot;
+    if (label && snap && Array.isArray(snap.talents)) {
+      const hit = snap.talents.some((t) => t && t.label === label);
+      if (hit) return true;
+    }
+    return r.lockReason !== 'craft_skill_required';
+  }
+
+  function markOk(ok) {
+    return ok ? '✓' : '✕';
+  }
+
+  function stationEtatLabel() {
+    const meta = state.menuMeta || {};
+    if (meta.powered === false) return { text: 'Hors service', cls: 'bad' };
+    const raw = meta.condition;
+    if (raw != null) {
+      const n = Number(raw);
+      if (!Number.isNaN(n)) {
+        const pct = n > 1 ? n : n * 100;
+        if (pct >= 60) return { text: 'Opérationnelle', cls: 'ok' };
+        if (pct >= 30) return { text: 'Dégradée', cls: 'warn' };
+        return { text: 'Hors service', cls: 'bad' };
+      }
+      const s = String(raw).toLowerCase();
+      if (/hors|off|down|critique|fail/.test(s)) return { text: 'Hors service', cls: 'bad' };
+      if (/dégrad|degrad|warn|moyen/.test(s)) return { text: 'Dégradée', cls: 'warn' };
+    }
+    return { text: 'Opérationnelle', cls: 'ok' };
+  }
+
+  function renderProfilRequis(r) {
+    const block = $('#block-profil');
+    const body = $('#d-profil');
+    if (!block || !body) return;
+    const st = r.skillTree || {};
+    const reqLvl = st.requiredLevel != null ? st.requiredLevel : r.requireLevel;
+    const curLvl = playerLevelOf(r);
+    const talent = talentLabelOf(r);
+    const branch = branchLabelOf(r);
+    const specLab = specLabelOf(r);
+    const specNeed = r.requireSpec;
+    const survival = !specNeed || specNeed === 'survie' || specNeed === 'survival';
+    const lacksSpec = !survival && r.hasSpecialization === false;
+    const hasLevel = reqLvl != null;
+    const hasTalent = !!talent;
+    const extra = hasLevel || hasTalent || lacksSpec;
+
+    body.innerHTML = '';
+    const addLine = (k, v, cls) => {
+      const row = document.createElement('div');
+      row.className = `profil-line${cls ? ' ' + cls : ''}`;
+      if (k) {
+        row.innerHTML = `<span class="profil-k">${escapeHtml(k)}</span><span class="profil-v">${v}</span>`;
+      } else {
+        row.innerHTML = `<span class="profil-bare">${v}</span>`;
+      }
+      body.appendChild(row);
+    };
+
+    if (!extra) {
+      addLine(null, escapeHtml(branch || specLab || 'Survie'), 'profil-branch');
+      addLine(null, 'Aucun prérequis supplémentaire', 'profil-none');
+      block.classList.remove('hidden');
+      return;
+    }
+
+    const branchTxt = branch || specLab || 'Survie';
+    const branchCls = lacksSpec ? 'bad' : 'ok';
+    addLine('Branche', `${escapeHtml(branchTxt)} <span class="profil-mark ${branchCls}">${markOk(!lacksSpec)}</span>`, branchCls);
+
+    if (hasLevel) {
+      const ok = curLvl != null ? Number(curLvl) >= Number(reqLvl) : r.lockReason !== 'craft_level_required';
+      const curTxt = curLvl != null ? String(curLvl) : '—';
+      addLine('Niveau', `${escapeHtml(curTxt)} / ${escapeHtml(String(reqLvl))} <span class="profil-mark ${ok ? 'ok' : 'bad'}">${markOk(ok)}</span>`, ok ? 'ok' : 'bad');
+    }
+
+    if (hasTalent) {
+      const ok = talentUnlockedOf(r, talent);
+      addLine('Talent', `${escapeHtml(talent)} <span class="profil-mark ${ok ? 'ok' : 'bad'}">${ok ? '✓ débloqué' : '✕ manquant'}</span>`, ok ? 'ok' : 'bad');
+    }
+
+    block.classList.remove('hidden');
+  }
+
+  function recentRecipeList() {
+    const byId = {};
+    (state.recipes || []).forEach((r) => { byId[r.id] = r; });
+    const out = [];
+    const seen = new Set();
+    (state.recentlyCrafted || []).forEach((entry) => {
+      const id = typeof entry === 'string' ? entry : (entry && (entry.recipeId || entry.id));
+      if (!id || seen.has(id) || !byId[id]) return;
+      seen.add(id);
+      out.push(byId[id]);
+    });
+    return out.slice(0, 5);
+  }
+
+  function makeRecentMini(r) {
+    const qty = (r.result && r.result.count) || r.qty || 1;
+    const resultItem = (r.result && r.result.item) || r.id;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'recent-mini';
+    if (state.selected && state.selected.id === r.id) btn.classList.add('selected');
+    btn.title = r.label || '';
+    btn.innerHTML = `
+      <span class="recent-img">
+        <span class="ph" aria-hidden="true"><i class="fa-solid fa-cube"></i></span>
+        <img alt="" />
+      </span>
+      <span class="recent-meta">
+        <span class="recent-name">${escapeHtml(r.label || '')}</span>
+        <span class="recent-qty">×${escapeHtml(qty)}</span>
+      </span>
+    `;
+    const img = btn.querySelector('img');
+    const ph = btn.querySelector('.ph');
+    bindItemImg(img, resultItem, ph);
+    btn.addEventListener('click', () => selectRecipe(r));
+    return btn;
+  }
+
+  function renderRightRecent() {
+    const sec = $('#fiche-recent');
+    const row = $('#d-recent-row');
+    if (!sec || !row) return;
+    const recents = recentRecipeList();
+    row.innerHTML = '';
+    if (!recents.length) {
+      sec.classList.add('hidden');
+      return;
+    }
+    recents.forEach((r) => row.appendChild(makeRecentMini(r)));
+    sec.classList.remove('hidden');
   }
 
   function toggleRow(el, show) {
@@ -953,80 +1139,20 @@
     $('#d-duration').textContent = durationLabel(r.duration);
     $('#d-qty').textContent = `×${resCount}`;
 
-    // —— Skill (devhub_skillTree snapshot) ——
-    const skillBlock = $('#block-skill');
-    const st = r.skillTree || {};
-    const skillName = r.skillCategoryLabel || r.skillCategory || (r.xp && r.xp.category) || null;
-    const reqLvl = st.requiredLevel != null ? st.requiredLevel : r.requireLevel;
-    let curLvl = typeof r.playerSkillLevel === 'number' ? r.playerSkillLevel : null;
-    if (curLvl == null && r.lockReason === 'craft_level_required' && r.lockArgs && r.lockArgs[1] != null) {
-      curLvl = r.lockArgs[1];
-    }
-    const talentLabel = r.requiredSkillLabel || null;
-    const hasSkillInfo = !!(skillName || reqLvl != null || curLvl != null || talentLabel);
-    toggleRow(skillBlock, hasSkillInfo);
-    if (hasSkillInfo) {
-      $('#d-skill').textContent = skillName ? String(skillName) : 'Compétence';
-      if (reqLvl != null && curLvl != null) {
-        $('#d-skill-level').textContent = `Niveau requis ${reqLvl} · actuel ${curLvl}`;
-      } else if (reqLvl != null) {
-        $('#d-skill-level').textContent = `Niveau requis ${reqLvl}`;
-      } else if (curLvl != null) {
-        $('#d-skill-level').textContent = `Niveau ${curLvl}`;
-      } else {
-        $('#d-skill-level').textContent = 'Aucun niveau requis';
-      }
-      const barWrap = $('#d-skill-bar-wrap');
-      const fill = $('#d-skill-fill');
-      const barLabel = $('#d-skill-bar-label');
-      // No invented XP % bar. Talent label only.
-      if (talentLabel) {
-        barWrap.classList.remove('hidden');
-        fill.style.width = '0%';
-        barLabel.textContent = `Talent requis ${talentLabel}`;
-      } else {
-        barWrap.classList.add('hidden');
-        barLabel.textContent = '';
-      }
-    }
+    // —— PROFIL REQUIS (DevHub snapshot + spec, one block) ——
+    renderProfilRequis(r);
 
-    // —— Specialization ——
-    const specBlock = $('#block-spec');
-    const specNeed = r.requireSpec;
-    if (specNeed) {
-      specBlock.classList.remove('hidden');
-      $('#d-spec-need').textContent = humanize(specNeed);
-      const yours = $('#d-spec-yours');
-      const has = r.hasSpecialization;
-      if (has === true) {
-        yours.textContent = '✓ Vôtre';
-        yours.className = 'spec-yours ok';
-      } else if (has === false) {
-        yours.textContent = '✕ Manquante';
-        yours.className = 'spec-yours bad';
-      } else if (r.lockReason === 'craft_skill_required') {
-        yours.textContent = '✕ Manquante';
-        yours.className = 'spec-yours bad';
-      } else if (!r.locked) {
-        yours.textContent = '✓ Vôtre';
-        yours.className = 'spec-yours ok';
-      } else {
-        yours.textContent = '—';
-        yours.className = 'spec-yours';
-      }
-    } else {
-      specBlock.classList.add('hidden');
-    }
-
-    // —— Station ——
+    // —— Station compact: Station / Niveau / État ——
     const stationBlock = $('#block-station');
-    const stationName = r.station ? humanize(r.station) : (state.menuMeta.label || null);
-    const stationLvl = r.stationLevel;
+    const meta = state.menuMeta || {};
+    const stationName = meta.label || (r.station ? frLabel(r.station, humanize(r.station)) : null);
+    const stationLvl = meta.stationLevel != null ? meta.stationLevel : r.stationLevel;
     const showStation = !!(stationName || stationLvl != null);
     toggleRow(stationBlock, showStation);
     if (showStation) {
       const rowS = $('#row-station');
       const rowL = $('#row-station-lvl');
+      const rowE = $('#row-station-etat');
       if (stationName) {
         rowS.classList.remove('hidden');
         $('#d-station').textContent = stationName;
@@ -1039,23 +1165,15 @@
       } else {
         rowL.classList.add('hidden');
       }
-    }
-    const ventRow = $('#row-station-vent');
-    const ventEl = $('#d-station-vent');
-    const qRow = $('#row-station-queue');
-    const qEl2 = $('#d-station-queue');
-    const meta = state.menuMeta || {};
-    if (ventRow && ventEl) {
-      if (meta.ventilation != null) {
-        ventRow.classList.remove('hidden');
-        ventEl.textContent = String(meta.ventilation);
-      } else ventRow.classList.add('hidden');
-    }
-    if (qRow && qEl2) {
-      const used = meta.queue != null ? meta.queue : ((state.queue && state.queue.length) || 0);
-      const cap = meta.queueSize || state.queueMax || 5;
-      qEl2.textContent = `${used}/${cap}`;
-      qRow.classList.remove('hidden');
+      if (rowE) {
+        rowE.classList.remove('hidden');
+        const etat = stationEtatLabel();
+        const etatEl = $('#d-station-etat');
+        if (etatEl) {
+          etatEl.textContent = etat.text;
+          etatEl.className = etat.cls;
+        }
+      }
     }
 
     // —— Materials ——
@@ -1138,27 +1256,17 @@
       bpBlock.classList.add('hidden');
     }
 
-    // —— XP / mastery ——
+    // —— XP lives in the production glance row; hide duplicate block ——
     const xpBlock = $('#block-xp');
-    const hasXp = !!r.xp;
-    const hasMastery = !!state.flags.mastery;
-    toggleRow(xpBlock, hasXp || hasMastery);
-    if (hasXp || hasMastery) {
-      const rowXp = $('#row-xp');
-      const rowMa = $('#row-mastery');
-      if (hasXp) {
-        rowXp.classList.remove('hidden');
-        $('#d-xp').textContent = `+${r.xp.amount} (${humanize(r.xp.category)})`;
-      } else {
-        rowXp.classList.add('hidden');
-      }
-      if (hasMastery) {
-        rowMa.classList.remove('hidden');
-        $('#d-mastery').textContent = String(r.mastery || 0);
-      } else {
-        rowMa.classList.add('hidden');
-      }
+    if (xpBlock) xpBlock.classList.add('hidden');
+    const rowXp = $('#row-xp');
+    const rowMa = $('#row-mastery');
+    if (r.xp && $('#d-xp')) {
+      const catLab = frLabel(r.xp.category, null);
+      $('#d-xp').textContent = catLab ? `+${r.xp.amount} (${catLab})` : `+${r.xp.amount}`;
     }
+    if (rowXp) rowXp.classList.add('hidden');
+    if (rowMa) rowMa.classList.add('hidden');
 
     // —— Knowledge source / blueprint identity ——
     renderKnowledgeSource(r);
@@ -1179,6 +1287,7 @@
     syncCompareButton(r);
     syncTeachButton(r);
 
+    renderRightRecent();
     renderList();
   }
 
@@ -1493,9 +1602,9 @@
     if (recipe) {
       const resCount = ((recipe.result && recipe.result.count) || 1) * batch;
       const resItem = (recipe.result && recipe.result.item) || recipe.id || '—';
-      const resLabel = recipe.label || humanize(resItem);
+      const resLabel = (recipe.result && recipe.result.label) || recipe.label || humanize(resItem);
       const resultEl = $('#fab-ready-result');
-      if (resultEl) resultEl.textContent = `${resCount}× ${resLabel}`;
+      if (resultEl) resultEl.textContent = resLabel;
       const durEl = $('#fab-ready-dur');
       if (durEl) {
         const base = recipe.duration || 0;
@@ -1582,51 +1691,7 @@
 
   function updateFabIdleConsole() {
     const cons = $('#fab-idle-console');
-    if (!cons) return;
-    const show = uxOn('fabReadyConsole', true);
-    cons.classList.toggle('hidden', !show);
-    if (!show) return;
-    const qEl = $('#fab-idle-queue');
-    const maxQ = state.queueMax || 5;
-    const n = (state.queue && state.queue.length) || 0;
-    if (qEl) qEl.textContent = `${n}/${maxQ}`;
-    const lastEl = $('#fab-idle-last');
-    if (lastEl) {
-      const last = state.lastCraft || (function () {
-        try { return localStorage.getItem(LAST_CRAFT_KEY); } catch (_) { return null; }
-      })();
-      lastEl.textContent = last || '—';
-    }
-    const meta = state.menuMeta || {};
-    const sleep = $('#fab-idle-sleep');
-    const led = $('#fab-idle-led');
-    const busy = n > 0 || !!state.crafting;
-    if (sleep) sleep.classList.toggle('hidden', busy);
-    if (led) {
-      led.classList.toggle('ok', !busy && meta.powered !== false);
-      led.classList.toggle('warn', busy);
-      led.classList.toggle('off', meta.powered === false);
-    }
-    const tempLine = $('#fab-idle-temp-line');
-    const tempVal = $('#fab-idle-temp');
-    if (tempLine && tempVal) {
-      const hasTemp = meta.heatEnabled && meta.temp != null;
-      tempLine.classList.toggle('hidden', !hasTemp);
-      if (hasTemp) {
-        const temp = Number(meta.temp);
-        tempVal.textContent = Number.isNaN(temp) ? String(meta.temp) : `${Math.round(temp)}°`;
-      }
-    }
-    const energyLine = $('#fab-idle-energy-line');
-    const energyVal = $('#fab-idle-energy');
-    if (energyLine && energyVal) {
-      const hasEnergy = meta.energy != null || meta.powered != null;
-      energyLine.classList.toggle('hidden', !hasEnergy);
-      if (hasEnergy) {
-        if (meta.energy != null) energyVal.textContent = String(meta.energy);
-        else energyVal.textContent = meta.powered === false ? 'Off' : 'OK';
-      }
-    }
+    if (cons) cons.classList.add('hidden');
   }
 
   function syncFabQueueMini() {
@@ -1908,7 +1973,7 @@
   function fillStationOps(data) {
     const wrap = $('#station-ops');
     if (!wrap) return;
-    const show = !!(data && (data.canUpgrade || data.canModule || data.conditionEnabled));
+    const show = false; // compact atelier: Station / Niveau / État only
     wrap.classList.toggle('hidden', !show);
     if (!show) return;
     const btnM = $('#btn-maintain');
@@ -2105,6 +2170,7 @@
     state.favorites = data.favorites || [];
     state.pinned = data.pinned || [];
     state.playerSpec = data.playerSpec || null;
+    if (data.skillSnapshot) state.skillSnapshot = data.skillSnapshot;
     state.recentlyCrafted = data.recentlyCrafted || [];
     state.newlyLearned = data.newlyLearned || [];
     state.teaching = data.teaching || {};
@@ -2128,6 +2194,7 @@
     rebuildSearchIndex(state.recipes);
     updateStationHeader(data);
     renderCategories();
+    renderRightRecent();
     renderList();
     updateFabIdleConsole();
     const session = data.session;
@@ -2635,6 +2702,7 @@
           state.selected.playerSkillLevel = row.level;
           state.selected.playerSkillXp = row.xp;
           state.selected.playerTotalXp = row.totalXp;
+          if (row.label) state.selected.skillCategoryLabel = row.label;
         }
         if (typeof selectRecipe === 'function') selectRecipe(state.selected);
       }
