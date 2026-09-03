@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.23.2
+# sanctuary_crafting v2.23.3
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,15 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.23.3 — Craft: bloc PRODUCTION compact et hiérarchisé
+Panneau droit PRODUCTION uniquement : hiérarchie compacte sans changement de logique.
+
+- **Résultat** dominant (nom + xN lot-aware) ; **durée totale • XP total** sur une ligne ; lot replié dans FABRIQUER xN.
+- **MATÉRIAUX n/n** + cause primaire `Manque : Alcool x1` — plus de dalle « Matériaux insuffisants pour fabriquer » en doublon (`Il manque …` une fois).
+- **LOT** 1/5/10/MAX : sélection `#9a8866` en relief, sans glow. MAX (N) si N>0 ; sinon MAX + tooltip « Impossible actuellement / Matériau limitant : … ».
+- **FABRIQUER** reste la commande dominante (acier mat, laiton, press/hover). Désactivé lisible, pas une plaque noire ; hint optionnel « Matériau manquant ». FILE/COURSES/ARBRE/SUIVRE plus discrets.
+- **Récents** : section droite masquée (bandeau catalogue v2.23.2 déjà présent). Popover matériaux / rail lot / callbacks / SQL / DevHub / Carnet : inchangés.
 
 ### v2.23.2 — Craft: favoris et récents en bandeaux compact
 FAVORIS et RÉCEMMENT FABRIQUÉS passent en **bandeaux horizontaux mini** (plus de cartes catalogue pleine hauteur pour les favoris).

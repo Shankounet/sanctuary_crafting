@@ -6238,3 +6238,232 @@ button, input { font: inherit; color: inherit; }
   height: auto;
   padding-bottom: 2px;
 }
+
+/* —— v2.23.3 PRODUCTION: compact hierarchy, no glow —— */
+#app .fiche-sec-prod {
+  padding: 6px 9px 8px;
+}
+#app #fab-module.panel-action,
+#app #fab-module.actions {
+  padding: 7px 8px 8px !important;
+}
+#app .fab-ready {
+  gap: 6px;
+}
+#app .fab-readouts {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 2px !important;
+  margin: 0 0 2px !important;
+  padding: 2px 2px 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#app .fab-glance {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+#app .fab-result-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
+#app .fab-result-name,
+#app #fab-ready-result {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem !important;
+  font-weight: 750 !important;
+  letter-spacing: 0.01em;
+  color: #eee8dc !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#app .fab-result-qty,
+#app #fab-ready-lot {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: #9a8866;
+}
+#app .fab-glance-meta {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(154,148,138,0.88);
+  font-variant-numeric: tabular-nums;
+}
+#app .fab-meta-sep {
+  margin: 0 6px;
+  opacity: 0.5;
+  color: rgba(154,148,138,0.7);
+}
+#app #fab-ready-dur,
+#app #fab-ready-xp {
+  color: inherit;
+}
+
+#app .fab-mats-line {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  margin: 0 0 4px;
+  padding: 4px 8px 5px;
+  background: #1c1c1c;
+  border: 1px solid #3a332b;
+}
+#app .fab-mats-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+#app .fab-mats-line .fab-chip-k {
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(154,148,138,0.62);
+  font-weight: 700;
+}
+#app .fab-mats-line .fab-chip-v {
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  color: #e4e0d6;
+  font-size: 0.72rem;
+}
+#app .fab-mats-miss {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: #c4a07a;
+  line-height: 1.3;
+}
+#app .fab-mats-miss.hidden { display: none !important; }
+#app .fab-mats-line.is-short .fab-chip-v { color: #c4a07a; }
+
+/* LOT selected: brass #9a8866, slight relief, no glow */
+#app .lot-seg-btn {
+  color: #8e8a82;
+  text-shadow: none;
+}
+#app .lot-seg-btn.active {
+  color: #f2eadc !important;
+  background:
+    linear-gradient(180deg, #3e382e 0%, #2c2822 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(232,220,190,0.22),
+    inset 0 -2px 0 #9a8866,
+    0 1px 1px rgba(0,0,0,0.38) !important;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.45);
+  filter: none !important;
+}
+
+/* FABRIQUER — dominant plate; disabled visible, not a black slab */
+#app #btn-craft.primary,
+#app #btn-craft.craft-engage {
+  min-height: 56px !important;
+}
+#app .craft-engage-copy {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1.05;
+}
+#app .craft-engage-hint {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8a7a66;
+  text-shadow: none;
+}
+#app #btn-craft:not(:disabled) .craft-engage-hint,
+#app .craft-engage-hint.hidden { display: none !important; }
+#app #btn-craft.craft-engage:disabled {
+  color: #8a8680 !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 28%),
+    linear-gradient(180deg, #3a3a38 0%, #2e2e2c 55%, #242422 100%) !important;
+  border-color: #4a4640 !important;
+  border-top-color: #5a564e !important;
+  box-shadow:
+    0 2px 0 #161614,
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 0 -2px 6px rgba(0,0,0,0.4) !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+#app #btn-craft.craft-engage:disabled .craft-engage-ico,
+#app #btn-craft.craft-engage:disabled i.craft-engage-ico {
+  color: #6a645c !important;
+}
+#app #btn-craft.craft-engage:disabled .craft-engage-label {
+  color: #8a8680 !important;
+}
+
+/* FILE / COURSES / ARBRE / SUIVRE — quieter so FABRIQUER dominates */
+#app .action-secondary-row {
+  height: 30px;
+  border-color: rgba(58,51,43,0.75);
+  background: #1a1a1a;
+}
+#app .ghost.action-tool {
+  height: 30px !important;
+  min-height: 30px !important;
+  font-size: 0.52rem !important;
+  letter-spacing: 0.08em;
+  color: rgba(154,148,138,0.52) !important;
+  border-right-color: rgba(58,51,43,0.7) !important;
+}
+#app .ghost.action-tool i {
+  font-size: 0.62rem !important;
+  color: inherit !important;
+  opacity: 0.85;
+}
+#app .ghost.action-tool:hover {
+  color: rgba(154,136,102,0.88) !important;
+  background: #222220 !important;
+}
+#app .action-more,
+#app .action-more > summary {
+  height: 30px !important;
+}
+#app .action-more > summary {
+  width: 30px !important;
+  color: rgba(154,148,138,0.52);
+}
+
+/* no duplicate recents in right panel (catalogue strip v2.23.2) */
+#app .fiche-sec-recent {
+  display: none !important;
+}
+
+/* lock/other why: one compact line, not a dark slab */
+#app .fiche-sec-prod #craft-why,
+#app .fiche-sec-prod .craft-why.panel-alert {
+  margin: 4px 0 0;
+  padding: 2px 2px 0;
+  border: none !important;
+  border-left: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 0.66rem;
+  color: #b8a888;
+  line-height: 1.3;
+}

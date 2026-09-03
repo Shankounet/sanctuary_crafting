@@ -467,26 +467,24 @@
           <div id="fab-ready" class="fab-panel fab-ready">
             <div id="fab-idle-console" class="fab-idle-console hidden" aria-hidden="true"></div>
             <div class="fab-readouts" aria-label="Résumé fabrication">
-              <div class="fab-chip" id="fab-chip-lot">
-                <span class="fab-chip-k">Lot</span>
-                <span class="fab-chip-v" id="fab-ready-lot">×1</span>
-              </div>
-              <div class="fab-chip" id="fab-chip-result">
-                <span class="fab-chip-k">Résultat</span>
-                <span class="fab-chip-v" id="fab-ready-result">—</span>
-              </div>
-              <div class="fab-chip" id="fab-chip-dur">
-                <span class="fab-chip-k">Durée totale</span>
-                <span class="fab-chip-v" id="fab-ready-dur">—</span>
-              </div>
-              <div class="fab-chip" id="fab-chip-xp">
-                <span class="fab-chip-k">XP total</span>
-                <span class="fab-chip-v" id="fab-ready-xp">—</span>
+              <div class="fab-glance" id="fab-chip-result">
+                <p class="fab-result-line">
+                  <span class="fab-result-name" id="fab-ready-result">—</span>
+                  <span class="fab-result-qty" id="fab-ready-lot">x1</span>
+                </p>
+                <p class="fab-glance-meta">
+                  <span id="fab-ready-dur">—</span>
+                  <span class="fab-meta-sep" aria-hidden="true">•</span>
+                  <span id="fab-ready-xp">—</span>
+                </p>
               </div>
             </div>
             <div class="fab-mats-line" id="fab-mats-line">
-              <span class="fab-chip-k">Matériaux</span>
-              <span class="fab-chip-v" id="fab-ready-mats">—</span>
+              <div class="fab-mats-head">
+                <span class="fab-chip-k">Matériaux</span>
+                <span class="fab-chip-v" id="fab-ready-mats">—</span>
+              </div>
+              <p class="fab-mats-miss hidden" id="fab-mats-miss"></p>
             </div>
             <div class="action-primary-row">
               <label class="batch lot-rail-wrap" id="batch-wrap">
@@ -502,7 +500,10 @@
               <button type="button" id="btn-craft" class="primary craft-engage" title="Lancer la fabrication">
                 <span class="craft-engage-face">
                   <i class="fa-solid fa-hammer craft-engage-ico" aria-hidden="true"></i>
-                  <span class="craft-engage-label">FABRIQUER</span>
+                  <span class="craft-engage-copy">
+                    <span class="craft-engage-label">FABRIQUER</span>
+                    <span class="craft-engage-hint hidden" id="craft-engage-hint">Matériau manquant</span>
+                  </span>
                 </span>
                 <span class="craft-engage-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
               </button>
