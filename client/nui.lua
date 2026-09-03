@@ -105,9 +105,10 @@ RegisterNUICallback('getCraftSession', function(data, cb)
 end)
 
 RegisterNUICallback('craft', function(data, cb)
-    local start = lib.callback.await('sanctuary_crafting:startCraft', false, data.recipeId, data.benchKey, data.batch)
+    local requestId = (data and data.requestId) or (GenerateCraftId and GenerateCraftId()) or tostring(GetGameTimer())
+    local start = lib.callback.await('sanctuary_crafting:startCraft', false, data.recipeId, data.benchKey, data.batch, requestId)
     if start and start.ok and trackerEnabled() then
-        local entry = CraftTracker.FromStart(start, {
+        local meta = {
             recipeId = data.recipeId,
             benchKey = data.benchKey,
             batch = data.batch,
@@ -116,7 +117,13 @@ RegisterNUICallback('craft', function(data, cb)
             count = start.resultCount,
             category = start.category or start.phaseFamily,
             benchLabel = start.benchLabel,
-        })
+        }
+        local entry
+        if start.queued and CraftTracker.FromQueueEntry then
+            entry = CraftTracker.FromQueueEntry(start.entry or start, meta)
+        else
+            entry = CraftTracker.FromStart(start, meta)
+        end
         if entry then
             CraftTracker.Upsert(entry)
         end
@@ -200,8 +207,8 @@ RegisterNUICallback('queue', function(data, cb)
     cb(r or { ok = false })
 end)
 
-RegisterNUICallback('queueList', function(_, cb)
-    local r = lib.callback.await('sanctuary_crafting:queueList', false)
+RegisterNUICallback('queueList', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:queueList', false, (data and data.benchKey) or lastBenchKey)
     cb(r or { ok = true, queue = {} })
 end)
 
@@ -407,6 +414,43 @@ RegisterNetEvent('sanctuary_crafting:client:craftAdvanced', function(payload)
             clientTimer = started,
             wallNow = wallMs(),
             useWallClock = false,
+        })
+    end
+end)
+
+RegisterNetEvent('sanctuary_crafting:client:queueUpdated', function(payload)
+    payload = type(payload) == 'table' and payload or {}
+    SendNUIMessage({ action = 'queueUpdated', data = payload })
+    if nuiOpen and lastBenchKey and (not payload.stationUid or payload.stationUid == lastBenchKey) then
+        local r = lib.callback.await('sanctuary_crafting:getCraftSession', false, lastBenchKey)
+        if r and r.ok and r.session then
+            applySessionToTracker(r.session, lastBenchKey)
+            SendNUIMessage({ action = 'session', session = r.session })
+        end
+    end
+end)
+
+RegisterNetEvent('sanctuary_crafting:client:queuePromoted', function(payload)
+    payload = type(payload) == 'table' and payload or {}
+    SendNUIMessage({ action = 'queuePromoted', data = payload })
+    if trackerEnabled() and payload.craftId then
+        local duration = tonumber(payload.duration) or tonumber(payload.durationMs) or 0
+        local started = GetGameTimer()
+        CraftTracker.Upsert({
+            craftId = payload.craftId,
+            recipeId = payload.recipeId,
+            status = 'active',
+            startedAt = started,
+            endsAt = started + duration,
+            duration = duration,
+            label = payload.label,
+            item = payload.resultItem,
+            count = payload.resultCount,
+            batch = payload.batch or 1,
+            benchKey = payload.benchKey,
+            stepLabel = 'EN COURS',
+            clientTimer = started,
+            wallNow = wallMs(),
         })
     end
 end)

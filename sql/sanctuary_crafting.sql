@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS `sanctuary_craft_queue` (
     `finish_at` INT NOT NULL,
     `finished_at` INT NULL,
     `created_at` INT NOT NULL,
+    `started_at` INT NULL,
+    `queue_position` INT NOT NULL DEFAULT 0,
+    `duration_ms` INT NULL,
     `recipe_snapshot` LONGTEXT NULL,
     `recipe_version` INT NULL,
     `owner_job` VARCHAR(32) NULL,
@@ -247,4 +250,6 @@ CREATE TABLE IF NOT EXISTS `sanctuary_schema_version` (
 --   result_item/count/metadata, quality, finished_at, owner_job, xp_granted).
 --   completed = ready to collect at the station. collected = DELETE row.
 --   NO label/description/image in SQL — ox_inventory at read time.
+-- v2.24 (224): started_at, queue_position, duration_ms — production FIFO.
+--   queued finish_at = 0 (does not occupy SORTIE). processing + queued = slots.
 -- Live ALTER — tables are NOT renamed sanctuary_* → craft_*.

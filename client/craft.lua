@@ -14,10 +14,7 @@ local function formatIngredients(ingredients)
 end
 
 function OpenCraftMenu(benchKey, opts)
-    if crafting then
-        lib.notify({ type = 'error', description = _('craft_busy') })
-        return
-    end
+    -- v2.24: station accepts a production queue — do not block the menu while one job is processing
 
     local data = lib.callback.await('sanctuary_crafting:getMenu', false, benchKey)
     if not data or not data.ok then
@@ -73,8 +70,13 @@ function OpenCraftMenu(benchKey, opts)
 end
 
 function StartCraft(recipeId, benchKey, batch)
+    local requestId = GenerateCraftId and GenerateCraftId() or (('%s-%s'):format(GetGameTimer(), math.random(10000, 99999)))
+    local start = lib.callback.await('sanctuary_crafting:startCraft', false, recipeId, benchKey, batch or 1, requestId)
+    if start and start.queued then
+        lib.notify({ type = 'inform', description = _('queue_added') })
+        return
+    end
     if crafting then return end
-    local start = lib.callback.await('sanctuary_crafting:startCraft', false, recipeId, benchKey, batch or 1)
     if not start or not start.ok then
         local reason = start and start.reason or 'craft_failed'
         if start and start.args then

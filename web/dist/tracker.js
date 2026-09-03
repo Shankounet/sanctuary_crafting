@@ -653,12 +653,15 @@
     }
     if (els.reducedPct) {
       if (live && live.status === 'paused') els.reducedPct.textContent = 'EN PAUSE';
+      else if (live && live.status === 'queued') els.reducedPct.textContent = 'FILE';
       else els.reducedPct.textContent = `${pct}%`;
     }
     const readyN = arr.filter((j) => j.status === 'ready').length;
     if (els.reducedWait) {
-      if (readyN > 0) els.reducedWait.textContent = 'À récupérer : ' + readyN;
-      else els.reducedWait.textContent = waiting > 0 ? `+${waiting} en attente` : '';
+      const bits = [];
+      if (waiting > 0) bits.push(`+${waiting} en attente`);
+      if (readyN > 0) bits.push(`+${readyN} à récupérer`);
+      els.reducedWait.textContent = bits.join(' · ');
     }
   }
 

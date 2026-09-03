@@ -62,6 +62,9 @@ end
 --- Queue refund policy: never after finishAt (race). Reserve = 1:1 before finish. Consume = RefundOnCancel.
 function CraftingMaterials.ShouldRefundQueue(entry)
     if not entry then return false end
+    if entry.state == 'queued' then
+        return true
+    end
     local finishAt = tonumber(entry.finishAt) or 0
     if finishAt > 0 and os.time() >= finishAt then
         return false
