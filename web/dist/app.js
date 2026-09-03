@@ -554,12 +554,44 @@
     return { text: 'NON FAISABLE', cls: 'bad', tip };
   }
 
-  function disableReasons(r) {
+  function prodMissingCause(recipe, batch) {
+    if (!recipe) return null;
+    const n = Math.max(1, Number(batch) || 1);
+    const fromIng = (ing) => {
+      if (!ing) return null;
+      const needUnit = Number(ing.count) || 1;
+      const need = needUnit * n;
+      const owned = typeof ing.owned === 'number' ? ing.owned : null;
+      const label = itemDisplayName(ing.item, ing.label);
+      if (owned == null) {
+        if (recipe.missingItems && !recipe.locked) return { label, need: Math.max(1, need) };
+        return null;
+      }
+      if (owned >= need) return null;
+      return { label, need: Math.max(1, need - owned) };
+    };
+    const pm = recipe.primaryMissing;
+    if (pm && (pm.item || pm.label)) {
+      const miss = fromIng(pm);
+      if (miss) return miss;
+    }
+    const ings = recipe.ingredients || [];
+    for (let i = 0; i < ings.length; i++) {
+      const miss = fromIng(ings[i]);
+      if (miss) return miss;
+    }
+    return null;
+  }
+
+  function disableReasons(r, batch) {
     const reasons = [];
     if (!r) return ['Sélectionnez une recette'];
     if (state.crafting) reasons.push('Fabrication en cours…');
     if (r.locked) reasons.push(lockText(r).text);
-    if (r.missingItems) reasons.push('Matériaux insuffisants pour fabriquer');
+    if (r.missingItems) {
+      const miss = prodMissingCause(r, batch);
+      reasons.push(miss ? ('Il manque ' + miss.label + ' x' + miss.need) : 'Matériaux insuffisants pour fabriquer');
+    }
     if (!r.canCraft && !r.locked && !r.missingItems) reasons.push('Conditions non remplies');
     return reasons;
   }
@@ -1165,15 +1197,8 @@
   function renderRightRecent() {
     const sec = $('#fiche-recent');
     const row = $('#d-recent-row');
-    if (!sec || !row) return;
-    const recents = recentRecipeList();
-    row.innerHTML = '';
-    if (!recents.length) {
-      sec.classList.add('hidden');
-      return;
-    }
-    recents.forEach((r) => row.appendChild(makeRecentMini(r)));
-    sec.classList.remove('hidden');
+    if (row) row.innerHTML = '';
+    if (sec) sec.classList.add('hidden');
   }
 
   function toggleRow(el, show) {
@@ -1776,16 +1801,22 @@
     const batch = clampBatchInput(recipe);
     syncLotSeg(batch);
 
-    const lotEl = $('#fab-ready-lot');
-    if (lotEl) lotEl.textContent = `×${batch}`;
     const engageLabel = document.querySelector('#btn-craft .craft-engage-label');
     if (engageLabel) engageLabel.textContent = `FABRIQUER x${batch}`;
     const maxBtn = document.querySelector('#batch-presets [data-batch="max"]');
     if (maxBtn) {
       const capNow = batchCap(recipe);
-      if (capNow > 0) maxBtn.title = `Maximum actuellement fabricable : ${capNow}`;
-      else maxBtn.title = `Maximum actuellement fabricable : 0 (${(recipe && (recipe.maxCraftableCause || recipe.blockReason)) || 'Non faisable'})`;
-      maxBtn.textContent = capNow > 0 && capNow !== 1 && capNow !== 5 && capNow !== 10 ? `MAX (${capNow})` : 'MAX';
+      if (capNow > 0) {
+        maxBtn.title = `Maximum actuellement fabricable : ${capNow}`;
+        maxBtn.textContent = `MAX (${capNow})`;
+      } else {
+        const lim = prodMissingCause(recipe, 1);
+        const cause = (recipe && (recipe.maxCraftableCause || recipe.blockReason)) || 'Non faisable';
+        maxBtn.title = lim
+          ? `Impossible actuellement / Matériau limitant : ${lim.label}`
+          : `Impossible actuellement / ${cause}`;
+        maxBtn.textContent = 'MAX';
+      }
     }
 
     if (recipe) {
@@ -1794,6 +1825,8 @@
       const resLabel = (recipe.result && recipe.result.label) || recipe.label || humanize(resItem);
       const resultEl = $('#fab-ready-result');
       if (resultEl) resultEl.textContent = resLabel;
+      const lotEl = $('#fab-ready-lot');
+      if (lotEl) lotEl.textContent = `x${resCount}`;
       const durEl = $('#fab-ready-dur');
       if (durEl) {
         const base = recipe.duration || 0;
@@ -1803,17 +1836,30 @@
       if (xpEl) {
         if (recipe.xp && recipe.xp.amount != null) {
           const amt = recipe.xp.amount * (state.flags.batch ? batch : 1);
-          xpEl.textContent = `+${amt}`;
+          xpEl.textContent = `+${amt} XP`;
         } else {
           xpEl.textContent = '—';
         }
       }
       const matsEl = $('#fab-ready-mats');
+      const matsLine = $('#fab-mats-line');
+      const matsMiss = $('#fab-mats-miss');
       if (matsEl) {
         const ings = recipe.ingredients || [];
         const missing = ings.filter((ing) => (ing.owned || 0) < ((ing.count || 1) * batch)).length;
         const ok = ings.length - missing;
         matsEl.textContent = ings.length ? `${ok}/${ings.length}` : '—';
+        const miss = prodMissingCause(recipe, batch);
+        if (matsMiss) {
+          if (miss && missing > 0) {
+            matsMiss.textContent = `Manque : ${miss.label} x${miss.need}`;
+            matsMiss.classList.remove('hidden');
+          } else {
+            matsMiss.textContent = '';
+            matsMiss.classList.add('hidden');
+          }
+        }
+        if (matsLine) matsLine.classList.toggle('is-short', !!(miss && missing > 0));
       }
       const noiseChip = $('#fab-chip-noise');
       const noiseVal = $('#fab-ready-noise');
@@ -1838,22 +1884,41 @@
     } else {
       const resultEl = $('#fab-ready-result');
       if (resultEl) resultEl.textContent = '—';
+      const lotEl = $('#fab-ready-lot');
+      if (lotEl) lotEl.textContent = 'x1';
       const durEl = $('#fab-ready-dur');
       if (durEl) durEl.textContent = '—';
       const xpEl = $('#fab-ready-xp');
       if (xpEl) xpEl.textContent = '—';
+      const matsMiss = $('#fab-mats-miss');
+      if (matsMiss) {
+        matsMiss.textContent = '';
+        matsMiss.classList.add('hidden');
+      }
+      const matsLine = $('#fab-mats-line');
+      if (matsLine) matsLine.classList.remove('is-short');
     }
 
     const can = !!(recipe && recipe.canCraft && !state.crafting);
     const craftBtn = $('#btn-craft');
     if (craftBtn) {
       craftBtn.disabled = !can;
-      const reasons = recipe ? disableReasons(recipe) : ['Aucune recette sélectionnée'];
+      const reasons = recipe ? disableReasons(recipe, batch) : ['Aucune recette sélectionnée'];
       const whyEl = $('#craft-why');
+      const hintEl = $('#craft-engage-hint');
+      const matsOnly = !!(recipe && recipe.missingItems && !recipe.locked && !state.crafting);
+      if (hintEl) {
+        hintEl.classList.toggle('hidden', !(matsOnly && !can));
+      }
       if (!can && reasons.length && !state.crafting) {
         if (whyEl) {
-          whyEl.textContent = reasons[0];
-          whyEl.classList.remove('hidden');
+          if (matsOnly) {
+            whyEl.textContent = '';
+            whyEl.classList.add('hidden');
+          } else {
+            whyEl.textContent = reasons[0];
+            whyEl.classList.remove('hidden');
+          }
         }
         craftBtn.title = reasons.length > 1 ? reasons.join(' · ') : reasons[0];
       } else {
