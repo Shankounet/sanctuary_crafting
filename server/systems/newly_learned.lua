@@ -1,6 +1,6 @@
 --[[
     systems/newly_learned.lua — catalogue « NOUVEAUX » (serveur > localStorage)
-    Sources: level | blueprint | teach | discovery
+    Sources: level | blueprint | teach | discovery | talent
 ]]
 
 NewlyLearned = NewlyLearned or {}
@@ -156,6 +156,19 @@ AddEventHandler("playerDropped", function()
         levelSnap[id] = nil
     end
 end)
+
+--- Mark recipes gated by a newly unlocked DevHub talent (RAM + unread table).
+function NewlyLearned.MarkFromTalent(src, skillUid)
+    if cfg().Enabled == false then return end
+    if type(skillUid) ~= 'string' or skillUid == '' then return end
+    for _, recipe in pairs(Config.RecipeById or {}) do
+        local g = SkillTree and SkillTree.RecipeGate and SkillTree.RecipeGate(recipe) or {}
+        local req = g.requiredSkill
+        if req and req == skillUid then
+            NewlyLearned.Mark(src, recipe.id, 'talent')
+        end
+    end
+end
 
 CraftingCore.On("blueprintLearned", function(src, blueprintId)
     if not src or not blueprintId then return end

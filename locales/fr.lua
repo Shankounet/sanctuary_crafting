@@ -124,4 +124,7 @@ Locales['fr'] = {
     ['admin_confirm_required'] = 'Confirmation requise pour enregistrer',
     ['admin_id_exists'] = 'Cet id de recette existe déjà',
     ['admin_command_hint'] = 'Ouvre l\'éditeur craftadmin',
+    ['craft_now_craftable'] = '%s est maintenant faisable',
+    ['craft_paused_power'] = 'Fabrication en pause — plus d\'énergie',
+    ['craft_resumed_power'] = 'Énergie rétablie — fabrication reprise',
 }

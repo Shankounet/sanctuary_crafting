@@ -169,7 +169,7 @@
 
       <div class="tech-field search-wrap">
         <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-        <input id="search" type="search" placeholder="Réf. / objet / catégorie…" autocomplete="off" />
+        <input id="search" type="search" placeholder="Recette, matériau, talent, station…" autocomplete="off" />
       </div>
 
       <div class="nav-section nav-filters">
@@ -181,12 +181,16 @@
             <button type="button" class="chip" data-filter="almost"><i class="fa-solid fa-hourglass-half"></i><span>Presque</span></button>
             <button type="button" class="chip" data-filter="favorites"><i class="fa-solid fa-star"></i><span>Favoris</span></button>
             <button type="button" class="chip" data-filter="new"><i class="fa-solid fa-certificate"></i><span>Nouveaux</span></button>
+            <button type="button" class="chip" data-filter="have"><i class="fa-solid fa-toolbox"></i><span>Avec ce que j’ai</span></button>
           </div>
-          <details class="filters-more" id="filters-more">
+          <details class="filters-more" id="filters-more" data-persist="sanctuary_hud.advancedFilters">
             <summary class="filters-more-toggle" title="Filtres avancés">Filtres avancés</summary>
             <div class="filters-secondary">
-              <button type="button" class="chip" data-filter="locked"><i class="fa-solid fa-lock"></i><span>Verrouillés</span></button>
+              <button type="button" class="chip" data-filter="locked"><i class="fa-solid fa-lock"></i><span>Verrouillées</span></button>
               <button type="button" class="chip" data-filter="plans"><i class="fa-solid fa-scroll"></i><span>Plans</span></button>
+              <button type="button" class="chip" data-filter="talent"><i class="fa-solid fa-key"></i><span>Talent requis</span></button>
+              <button type="button" class="chip" data-filter="stationNeed"><i class="fa-solid fa-warehouse"></i><span>Station</span></button>
+              <button type="button" class="chip" data-filter="unlocked"><i class="fa-solid fa-unlock"></i><span>Nouvellement débloquées</span></button>
             </div>
             <div class="nav-section nav-rarity" id="rarity-filters" hidden>
               <h2 class="t-l3 nav-heading">Rareté</h2>
@@ -358,6 +362,8 @@
           <div class="kv-row" id="row-station"><span>Station</span><span id="d-station">—</span></div>
           <div class="kv-row" id="row-station-lvl"><span>Niveau</span><span id="d-station-lvl">—</span></div>
           <div class="kv-row" id="row-station-etat"><span>État</span><span id="d-station-etat">—</span></div>
+          <div class="kv-row hidden" id="row-station-mod"><span>Module requis</span><span id="d-station-mod">—</span></div>
+          <p class="station-wear t-l6 hidden" id="d-station-wear"></p>
           <div id="station-ops" class="station-ops hidden">
             <div class="station-ops-row">
               <button type="button" id="btn-maintain" class="ghost compact" title="Entretenir la station">MAINTENIR</button>
@@ -369,7 +375,7 @@
         </div>
 
         <div class="block block-ings" id="block-ings">
-          <h3 class="t-l3"><i class="fa-solid fa-cubes"></i> Matériaux</h3>
+          <h3 class="t-l3"><i class="fa-solid fa-cubes"></i> Matériaux <span class="ing-summary" id="d-ings-summary"></span></h3>
           <ul id="d-ings" class="ing-list"></ul>
         </div>
 
@@ -456,11 +462,11 @@
                 <span class="fab-chip-v" id="fab-ready-result">—</span>
               </div>
               <div class="fab-chip" id="fab-chip-dur">
-                <span class="fab-chip-k">Durée</span>
+                <span class="fab-chip-k">Durée totale</span>
                 <span class="fab-chip-v" id="fab-ready-dur">—</span>
               </div>
               <div class="fab-chip" id="fab-chip-xp">
-                <span class="fab-chip-k">XP</span>
+                <span class="fab-chip-k">XP total</span>
                 <span class="fab-chip-v" id="fab-ready-xp">—</span>
               </div>
             </div>
@@ -575,6 +581,7 @@
     </section>
   </main>
   <div id="craft-toasts" class="craft-toasts" aria-live="polite"></div>
+  <div id="mat-popover" class="mat-popover hidden" role="menu" hidden></div>
 </div>
 
 <!-- Survival Book v2.21.2 — no flicker, no sounds -->
@@ -656,11 +663,13 @@
         <i class="fa-solid fa-minus" aria-hidden="true"></i>
       </button>
     </header>
-    <div class="ct-reduced" id="ct-reduced" aria-hidden="true">
-      <i class="fa-solid fa-hammer" aria-hidden="true"></i>
+    <div class="ct-reduced" id="ct-reduced" aria-hidden="true" title="Agrandir">
+      <span class="ct-reduced-k">PRODUCTIONS</span>
       <span id="ct-reduced-count">0</span>
-      <span class="ct-reduced-sep" aria-hidden="true">•</span>
+      <span class="ct-reduced-sep" aria-hidden="true">/</span>
+      <span id="ct-reduced-name"></span>
       <span id="ct-reduced-pct">0%</span>
+      <span id="ct-reduced-wait"></span>
     </div>
     <div class="ct-list" id="ct-list"></div>
     <p class="ct-waiting" id="ct-waiting" hidden></p>
@@ -672,7 +681,7 @@
 <div id="book-pins-hud" aria-live="polite" aria-label="Carnet — Épingles">
   <div class="ph-shell">
     <header class="ph-header">
-      <p class="ph-title">Carnet — Épingles</p>
+      <p class="ph-title">CARNET — ÉPINGLES</p>
       <span class="ph-count" id="ph-count">0</span>
       <p class="ph-summary" id="ph-summary" hidden></p>
       <button type="button" class="ph-btn" id="ph-collapse" title="Réduire" aria-label="Réduire">

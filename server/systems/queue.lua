@@ -165,6 +165,35 @@ function CraftQueue._startQueued(src, recipeId, benchKey, batch)
     return a, b, c
 end
 
+function CraftQueue.TickPower()
+    if not Config.Power or Config.Power.Enabled ~= true then return end
+    if Config.Power.PauseOnLoss == false then return end
+    if not CraftingPower or not CraftingPower.HasPower then return end
+    for src, list in pairs(queues) do
+        for i = 1, #(list or {}) do
+            local e = list[i]
+            local bench = Benches and Benches.Resolve and Benches.Resolve(e.benchKey)
+            local powered = CraftingPower.HasPower(bench) == true
+            if not powered then
+                if not e.paused then
+                    e.paused = true
+                    e.pausedAt = os.time()
+                    e.pausedRemaining = math.max(0, (tonumber(e.finishAt) or os.time()) - os.time())
+                    e.state = 'paused'
+                end
+            elseif e.paused then
+                local rem = tonumber(e.pausedRemaining) or 0
+                e.finishAt = os.time() + rem
+                e.paused = false
+                e.pausedAt = nil
+                e.pausedRemaining = nil
+                e.state = nil
+                MySQL.update('UPDATE sanctuary_craft_queue SET finish_at = ? WHERE craft_id = ?', { e.finishAt, e.craftId })
+            end
+        end
+    end
+end
+
 function CraftQueue.TryCollect(src, craftId)
     if type(craftId) ~= 'string' then return false, 'craft_invalid' end
     if busy[craftId] then return false, 'craft_busy' end
@@ -174,6 +203,9 @@ function CraftQueue.TryCollect(src, craftId)
         for i = 1, #list do
             local e = list[i]
             if e.craftId == craftId then
+                if e.paused then
+                    return false, 'queue_not_ready', e.pausedRemaining or 0
+                end
                 if os.time() < e.finishAt then
                     return false, 'queue_not_ready', e.finishAt - os.time()
                 end

@@ -295,6 +295,11 @@ RegisterNUICallback('shoppingFromPins', function(_, cb)
     cb(r or { ok = false })
 end)
 
+RegisterNUICallback('shoppingAddItem', function(data, cb)
+    local r = lib.callback.await('sanctuary_crafting:shoppingAddItem', false, data and data.item, data and data.count)
+    cb(r or { ok = false })
+end)
+
 RegisterNUICallback('notify', function(data, cb)
     local desc = data.reason or 'craft_failed'
     if data.reason == 'craft_success' and data.label then
@@ -399,4 +404,40 @@ end)
 
 RegisterNetEvent('devhub_skillTree:client:listener:levelUp', function(_categoryUid, _newLevel)
     refreshSkillsIfOpen()
+end)
+
+-- Inventory delta → follow notify (server RAM). No extra getMenu from NUI.
+AddEventHandler('ox_inventory:updateInventory', function()
+    TriggerServerEvent('sanctuary_crafting:server:invChanged')
+end)
+
+RegisterNetEvent('sanctuary_crafting:client:craftPaused', function(payload)
+    SendNUIMessage({ action = 'craftPaused', data = payload or {} })
+    if trackerEnabled() and payload and payload.craftId then
+        CraftTracker.Upsert({
+            craftId = payload.craftId,
+            status = 'paused',
+            stepLabel = 'EN PAUSE',
+        })
+    end
+end)
+
+RegisterNetEvent('sanctuary_crafting:client:craftResumed', function(payload)
+    SendNUIMessage({ action = 'craftResumed', data = payload or {} })
+    if trackerEnabled() and payload and payload.craftId then
+        local remaining = tonumber(payload.remainingMs) or 0
+        local duration = tonumber(payload.duration) or remaining
+        local started = GetGameTimer()
+        CraftTracker.Upsert({
+            craftId = payload.craftId,
+            status = 'active',
+            startedAt = started,
+            endsAt = started + remaining,
+            duration = duration,
+            stepLabel = 'Reprise',
+            clientTimer = started,
+            wallNow = wallMs(),
+            useWallClock = false,
+        })
+    end
 end)

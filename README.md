@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.21.2
+# sanctuary_crafting v2.22.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,26 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.22.0 — Craft: causes, recherche, batch, courses, DevHub
+Intelligence / UX (pas de refonte visuelle). `getMenu` snapshot unique + RAM.
+
+- **Causes** : badges PRESQUE / NON FAISABLE / Verrouillée portent `almostReason` / `blockReason` / `lockHint` (labels ox / DevHub, jamais d’uids). PRESQUE = un matériau manquant, petite quantité, ou prérequis léger (niveau ≤2, station gap 1, outil usé) — spec / plan inconnu / trop loin = NON FAISABLE.
+- **PROFIL REQUIS** : un bloc, DevHub dynamique (branche, niveau actuel/requis ✓✕, talent label + débloqué). Vide : Survie + Aucun prérequis supplémentaire.
+- **Recherche** : haystack client (résultat, desc ox, catégorie, ingrédients, spec, talent, station). « plastique » trouve les recettes qui l’utilisent.
+- **Clic matériau** : un popover (recettes utilisant / chemin connu seulement / ajouter aux courses RAM). Artisans uniquement s’ils sont déjà dans le carnet.
+- **Filtres** : Tous / Faisables / Presque / Favoris (station courante) / Nouveaux / Avec ce que j’ai (`Config.Filters.HaveWhatIHaveIncludeAlmost`, défaut true). Avancés repliés persistés `sanctuary_hud.advancedFilters` (verrouillées, plans, rareté, talent, station, nouvellement débloquées).
+- **NOUVEAU** : source discovery / talent / blueprint / level / teach. Listener DevHub `skillUnlocked` → `NewlyLearned.MarkFromTalent` (table unread existante).
+- **Batch** : FABRIQUER xN, rail lot (résultat / durée totale / XP total / énergie / outils). MAX tooltip « Maximum actuellement fabricable : N » (+ cause si 0). XP serveur = recette × qty.
+- **Matériaux** : `n/n conditions remplies` + ✓/✕ interactifs.
+- **Atelier** : nom / niveau / état ; module requis seulement si besoin ; usure existante en clair (`conditionNote`).
+- **Cartes** : sélection `#9a8866` + profondeur sans glow ; liseré blueprint / rareté discret ; tampon MAÎTRISÉ.
+- **Récents** 3–5 mini cliquables. Compteurs catégorie + faisable discret.
+- **Tracker réduit** : PRODUCTIONS N / nom % / +N en attente, clic pour agrandir. HUD épingles : CARNET — ÉPINGLES, nom + Manque N / Faisable.
+- **Follow** : `Config.Follow.NotifyWhenCraftable` (défaut true) — ox_lib notify quand une recette épinglée devient faisable.
+- **Énergie** : pause / reprise (`EN PAUSE`) si `Config.Power.Enabled` — l’intégration existe déjà (`CraftingPower`). **Enabled reste false** : pause dormant, pas de nouvelle ressource power inventée. `Config.Power.PauseOnLoss` défaut true.
+
+Sparse SQL, pas de nouvelle table. Callbacks NUI existants inchangés (`shoppingAddItem` ajouté). `bookDashboard` non-bloquant. Pas de `ml_skills`.
 
 ### v2.21.2 — Carnet: plus de scintillement, plus de sons
 Carnet NUI: plus de FOUC à l'ouverture (textures / polices / reflow). `#book-app` reste invisible (`opacity`/`visibility`/`pointer-events`, jamais `display:none`) jusqu'à `journalReady`. Preload `Image()` + `document.fonts.ready` (timeout 400 ms). Fade 150 ms. Overlay « Ouverture du carnet... » au premier open. DOM conservé à la fermeture (plus de wipe « Chargement… »). Tous les sons Carnet coupés (`Config.Book.Sounds.Enabled = false`). Callbacks NUI / bookDashboard non-bloquant / craft / tracker / SQL / DevHub inchangés.
