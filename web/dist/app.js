@@ -587,7 +587,7 @@
   function disableReasons(r, batch) {
     const reasons = [];
     if (!r) return ['Sélectionnez une recette'];
-    if (state.crafting) reasons.push('Fabrication en cours…');
+    if (state.crafting && !fileProcessing()) reasons.push('Fabrication en cours…');
     if (r.locked) reasons.push(lockText(r).text);
     if (r.missingItems) {
       const miss = prodMissingCause(r, batch);
@@ -1789,7 +1789,8 @@
       clearTimeout(fabDoneTimer);
       fabDoneTimer = null;
     }
-    ready.classList.toggle('hidden', next !== 'ready');
+    // v2.25: EN COURS on the right + keep FABRIQUER for AJOUTER À LA FILE
+    ready.classList.toggle('hidden', next === 'done');
     active.classList.toggle('hidden', next !== 'active');
     done.classList.toggle('hidden', next !== 'done');
     if (mod) mod.setAttribute('data-fab-state', next);
@@ -1825,6 +1826,7 @@
     const qtyEl = $('#fab-active-qty');
     if (nameEl) nameEl.textContent = recipe.label || recipe.id || '—';
     if (qtyEl) qtyEl.textContent = `×${resCount}`;
+    updateFabActiveStatus();
     const orig = Number(durationMs != null ? durationMs : recipe.duration) || 0;
     const rem = remainingMs != null ? Math.max(0, Number(remainingMs) || 0) : orig;
     const p = orig > 0 ? Math.min(1, Math.max(0, 1 - rem / orig)) : 0;
@@ -1924,6 +1926,97 @@
 
   function fileIsFull() {
     return fileUsedCount() >= fileCapCount();
+  }
+
+  function isActiveJob(e) {
+    const st = e && e.state;
+    return st === 'processing' || st === 'running' || st === 'paused';
+  }
+
+  function queuedJobs() {
+    return fileJobs().filter((e) => !isActiveJob(e));
+  }
+
+  function processingJobs() {
+    return fileJobs().filter((e) => isActiveJob(e));
+  }
+
+  function jobRemainingMs(e) {
+    if (!e) return 0;
+    if (e.remainingMs != null) return Math.max(0, Number(e.remainingMs) || 0);
+    const now = Math.floor(Date.now() / 1000);
+    const finishAt = Number(e.finishAt || e.finishesAt || 0);
+    if (finishAt > 0) return Math.max(0, (finishAt - now) * 1000);
+    return Math.max(0, Number(e.durationMs || e.duration) || 0);
+  }
+
+  function jobPct(e) {
+    if (!e) return 0;
+    const dur = Number(e.durationMs || e.duration) || 0;
+    const rem = jobRemainingMs(e);
+    if (dur > 0) return Math.round(Math.min(100, Math.max(0, (1 - rem / dur) * 100)));
+    const now = Math.floor(Date.now() / 1000);
+    const finishAt = Number(e.finishAt || e.finishesAt || 0);
+    const startAt = Number(e.startedAt || e.startAt || e.createdAt || 0);
+    const total = Math.max(1, finishAt - startAt);
+    const left = Math.max(0, finishAt - now);
+    return finishAt ? Math.round(Math.min(100, Math.max(0, (1 - left / total) * 100))) : 0;
+  }
+
+  function updateFabActiveStatus() {
+    const el = $('#fab-active-status');
+    if (!el) return;
+    const used = Math.max(1, fileUsedCount() || 1);
+    const proc = fileProcessing();
+    if (proc && (proc.paused || proc.state === 'paused')) {
+      el.textContent = `EN PAUSE · 1/${used}`;
+      return;
+    }
+    el.textContent = `EN COURS · 1/${used}`;
+  }
+
+  function setSumLine(id, text, zero) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('is-zero', !!zero);
+  }
+
+  function updateProdSummary() {
+    const procN = processingJobs().length || (fileProcessing() ? 1 : 0);
+    const waitN = queuedJobs().length;
+    const outN = (state.output || []).length;
+    setSumLine('sum-prod-v', procN === 1 ? '1 en cours' : (procN + ' en cours'), procN === 0);
+    setSumLine('sum-file-v', waitN === 1 ? '1 en attente' : (waitN + ' en attente'), waitN === 0);
+    let sortie = '0 prête';
+    if (outN === 1) sortie = '1 prête';
+    else if (outN > 1) sortie = outN + ' prêtes';
+    setSumLine('sum-sortie-v', sortie, outN === 0);
+  }
+
+  function syncFabActiveFromQueue() {
+    const proc = fileProcessing();
+    const mod = $('#fab-module');
+    const cur = mod && mod.getAttribute('data-fab-state');
+    if (cur === 'done' && fabDoneTimer) return;
+    if (!proc) {
+      if (cur === 'active' && !state.crafting) setFabState('ready');
+      return;
+    }
+    const recipe = recipeFromSession(proc);
+    const rem = jobRemainingMs(proc);
+    const dur = Number(proc.durationMs || proc.duration) || state.craftDurationMs || rem || 0;
+    const same = state.craftId && proc.craftId && state.craftId === proc.craftId;
+    state.craftId = proc.craftId;
+    state.craftDurationMs = dur;
+    state.progressRecipe = recipe;
+    fillFabActive(recipe, proc.batch || proc.count || proc.qty || 1, rem, dur);
+    setFabState('active');
+    // Smooth bar without completing (tracker/server own finalize)
+    if (!same || !state.crafting) {
+      state.crafting = true;
+      if (rem > 0 && dur > 0) runProgress(rem, null);
+    }
   }
 
   function updateActionBar(r) {
@@ -2079,7 +2172,7 @@
     const sBtn = $('#btn-shop');
     if (sBtn) sBtn.classList.toggle('hidden', state.flags.shopping === false);
 
-    if (!state.crafting) {
+    if (!state.crafting && !fileProcessing()) {
       const mod = $('#fab-module');
       const cur = mod && mod.getAttribute('data-fab-state');
       if (cur !== 'done') setFabState('ready');
@@ -2121,21 +2214,20 @@
   function syncFabQueueMini() {
     const mini = $('#fab-queue-mini');
     if (!mini) return;
-    const show = !!(state.flags.queue && state.queue && state.queue.length > 0);
+    const queued = queuedJobs();
+    const show = !!(state.flags.queue && queued.length > 0);
     mini.classList.toggle('hidden', !show);
     if (!show) {
       mini.innerHTML = '';
       return;
     }
-    const e = state.queue[0];
+    const e = queued[0];
     const qty = e.batch || e.count || e.qty || 1;
-    const now = Math.floor(Date.now() / 1000);
-    const left = Math.max(0, (e.finishAt || 0) - now);
-    const eta = left > 0 ? `ETA ${left}s` : 'PRÊT';
+    const n = queued.length;
     mini.innerHTML = `
       <span class="fab-q-k">File</span>
       <span class="fab-q-v">${escapeHtml(e.label || e.recipeId)} · ×${escapeHtml(qty)}</span>
-      <span class="fab-q-eta">${escapeHtml(eta)}</span>
+      <span class="fab-q-eta">${n > 1 ? (n + ' en attente') : 'EN ATTENTE · #1'}</span>
     `;
   }
 
@@ -2158,6 +2250,7 @@
       if (timeEl) timeEl.textContent = durationLabel(leftMs);
       const phaseEl = $('#fab-active-phase');
       if (phaseEl) phaseEl.textContent = craftPhaseFor(recipe, p);
+      updateFabActiveStatus();
       setFabCancelVisible(p < 1);
       return p;
     };
@@ -2216,7 +2309,7 @@
     updateFabIdleConsole();
     if (state.selected) updateActionBar(state.selected);
 
-    // v2.24: keep FABRIQUER visible while a job is processing (FILE shows EN COURS)
+    // v2.25: fab-active always tracks the processing job (never the newly queued recipe)
     const active = activeList[0];
     if (active) {
       state.craftId = active.craftId;
@@ -2226,10 +2319,9 @@
       state.craftId = null;
       state.craftDurationMs = null;
       state.progressRecipe = null;
+      state.crafting = false;
     }
-    const mod = $('#fab-module');
-    const cur = mod && mod.getAttribute('data-fab-state');
-    if (!(cur === 'done' && fabDoneTimer) && cur === 'active') setFabState('ready');
+    syncFabActiveFromQueue();
   }
 
   async function startCraft() {
@@ -2260,6 +2352,21 @@
     }
     if (data.queued) {
       showToast('Ajouté à la file', 'ok');
+      beep('click');
+      await loadQueue();
+      // Keep right panel on the processing job — never flash the queued recipe as active
+      syncFabActiveFromQueue();
+      if (state.selected) updateActionBar(state.selected);
+      return;
+    }
+    if (data.craftId) {
+      state.craftId = data.craftId;
+      state.craftDurationMs = Number(data.duration) || 0;
+      state.crafting = true;
+      state.progressRecipe = state.selected;
+      fillFabActive(state.selected, data.batch, data.duration, data.duration);
+      setFabState('active');
+      if (state.craftDurationMs > 0) runProgress(state.craftDurationMs, null);
     }
     beep('click');
     await loadQueue();
@@ -2289,7 +2396,8 @@
     if (fabDoneTimer) clearTimeout(fabDoneTimer);
     fabDoneTimer = setTimeout(() => {
       fabDoneTimer = null;
-      setFabState('ready');
+      if (fileProcessing()) syncFabActiveFromQueue();
+      else setFabState('ready');
       if (state.selected) updateActionBar(state.selected);
     }, 1600);
     return craftName;
@@ -2646,12 +2754,12 @@
     if (!badge) return;
     if (n > 0) {
       badge.classList.remove('hidden');
-      badge.classList.toggle('dot', n <= 9);
-      badge.textContent = n > 9 ? String(n) : ('RÉCUP. ' + n);
+      badge.classList.remove('dot');
+      badge.innerHTML = '<span class="tab-badge-k">RÉCUP.</span><span class="tab-badge-n">' + n + '</span>';
       badge.setAttribute('aria-label', n + ' production' + (n > 1 ? 's' : '') + ' à récupérer');
     } else {
       badge.classList.add('hidden');
-      badge.textContent = 'RÉCUP.';
+      badge.innerHTML = '<span class="tab-badge-k">RÉCUP.</span><span class="tab-badge-n">0</span>';
       badge.removeAttribute('aria-label');
     }
   }
@@ -2693,7 +2801,12 @@
     const n = list.length;
     updateSortieHeader(n);
     if (actions) actions.classList.toggle('hidden', n === 0);
-    if (collectAll) collectAll.textContent = n > 0 ? ('RÉCUPÉRER TOUT (' + n + ')') : 'RÉCUPÉRER TOUT';
+    if (collectAll) {
+      collectAll.textContent = n > 1 ? ('RÉCUPÉRER TOUT (' + n + ')') : 'RÉCUPÉRER TOUT';
+      collectAll.classList.toggle('recup-all-strong', n > 1);
+      collectAll.classList.toggle('recup-all-ghost', n === 1);
+    }
+    updateProdSummary();
     list.forEach((e) => {
       const qty = e.resultCount || e.count || e.batch || 1;
       const card = document.createElement('div');
@@ -2733,76 +2846,102 @@
     updateOutputBadge();
   }
 
-  function renderQueue() {
-    const track = $('#queue-list');
-    const empty = $('#queue-empty');
-    if (!track) return;
-    track.innerHTML = '';
-    const file = (state.queue || []).filter((e) => e && e.state !== 'completed' && e.state !== 'collected');
-    const cap = fileCapCount();
-    const used = Math.min(file.length, cap) || file.length;
-    const fileLabel = $('#file-label');
-    if (fileLabel) {
-      const hint = fileLabel.querySelector('.split-hint');
-      const title = fileLabel.querySelector('.split-title');
-      if (title) title.textContent = 'FILE';
-      if (hint) hint.textContent = `${file.length}/${cap}`;
-    }
-    const has = file.length > 0;
-    setEmpty(empty, !has);
-    let waitN = 0;
-    file.forEach((e) => {
-      const now = Math.floor(Date.now() / 1000);
-      const st = e.state || 'queued';
-      const processing = st === 'processing' || st === 'running';
-      const paused = e.paused || st === 'paused';
-      const finishAt = e.finishAt || e.finishesAt || 0;
-      const startAt = e.startedAt || e.startAt || e.createdAt || (finishAt - Math.round((e.duration || e.durationMs || 0) / 1000));
-      const left = processing || paused ? Math.max(0, finishAt - now) : 0;
-      const total = Math.max(1, finishAt - startAt);
-      let pct = 0;
-      if (processing || paused) {
-        if (e.remainingMs != null && (e.durationMs || e.duration)) {
-          const dur = Number(e.durationMs || e.duration) || 1;
-          pct = Math.round(Math.min(100, Math.max(0, (1 - (Number(e.remainingMs) / dur)) * 100)));
-        } else {
-          pct = finishAt ? Math.round(Math.min(100, Math.max(0, (1 - left / total) * 100))) : 0;
-        }
-      }
-      const qty = e.batch || e.count || e.qty || 1;
-      const card = document.createElement('div');
-      card.className = 'queue-card' + (paused ? ' paused' : '') + (processing ? ' running' : '');
-      let status;
-      if (paused) status = 'EN PAUSE';
-      else if (processing) status = `EN COURS ${pct}%`;
-      else {
-        waitN += 1;
-        const pos = e.queuePosition || waitN;
-        status = `EN ATTENTE #${pos}`;
-      }
-      const owner = e.ownerName ? ` · ${e.ownerName}` : '';
-      card.innerHTML = `
-        <div class="qlabel">${escapeHtml(e.label || e.recipeId)} — ${escapeHtml(status)}</div>
-        <div class="qmeta"><span>Lot ×${escapeHtml(qty)}${escapeHtml(owner)}</span><span>${escapeHtml(processing || paused ? (left > 0 ? ('ETA ' + left + 's') : 'FINALISATION') : status)}</span></div>
-        <div class="qbar"><div class="qfill" style="width:${processing || paused ? pct : 0}%"></div></div>
+  function bindQueueCancel(card, e) {
+    const cancelBtn = card.querySelector('.qcancel');
+    if (!cancelBtn) return;
+    cancelBtn.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      const r = await post('queueCancel', { craftId: e.craftId });
+      if (r && r.ok) showToast('Retiré de la file', 'ok');
+      else showToast((r && r.reason === 'craft_must_collect') ? 'Récupérez-la à la station' : 'Annulation impossible', 'err');
+      await loadQueue();
+      await refresh();
+    });
+  }
+
+  function buildQueueCard(e, opts) {
+    opts = opts || {};
+    const st = e.state || 'queued';
+    const paused = !!(e.paused || st === 'paused');
+    const processing = opts.kind === 'processing' || isActiveJob(e);
+    const qty = e.batch || e.count || e.qty || 1;
+    const used = Math.max(1, opts.used || fileUsedCount() || 1);
+    const pct = processing || paused ? jobPct(e) : 0;
+    const rem = jobRemainingMs(e);
+    const leftS = Math.ceil(rem / 1000);
+    let status;
+    if (paused) status = `EN PAUSE · 1/${used}`;
+    else if (processing) status = `EN COURS · 1/${used}`;
+    else status = `EN ATTENTE · #${opts.index || 1}`;
+    const owner = e.ownerName ? ` · ${e.ownerName}` : '';
+    const recipe = recipeFromSession(e);
+    const phase = processing || paused ? craftPhaseFor(recipe, pct / 100) : '';
+    let metaRight = '';
+    if (paused) metaRight = 'PAUSE';
+    else if (processing) metaRight = `${pct}%` + (leftS > 0 ? ` · ${leftS}s` : '');
+    else metaRight = '';
+    const card = document.createElement('div');
+    card.className = 'queue-card' + (paused ? ' paused' : '') + (processing ? ' running' : '');
+    card.innerHTML = `
+        <div class="qstatus">${escapeHtml(status)}</div>
+        <div class="qlabel">${escapeHtml(e.label || e.recipeId)} <span class="qqty">×${escapeHtml(qty)}</span></div>
+        <div class="qmeta"><span>${escapeHtml((phase || '') + owner)}</span><span>${escapeHtml(metaRight)}</span></div>
+        ${processing || paused ? `<div class="qbar"><div class="qfill" style="width:${pct}%"></div></div>` : ''}
         <div class="qactions">
           <button type="button" class="ghost compact qcancel" data-qid="${escapeHtml(e.craftId)}">Annuler</button>
         </div>
       `;
-      const cancelBtn = card.querySelector('.qcancel');
-      if (cancelBtn) {
-        cancelBtn.addEventListener('click', async (ev) => {
-          ev.stopPropagation();
-          const r = await post('queueCancel', { craftId: e.craftId });
-          if (r && r.ok) showToast('Retiré de la file', 'ok');
-          else showToast((r && r.reason === 'craft_must_collect') ? 'Récupérez-la à la station' : 'Annulation impossible', 'err');
-          await loadQueue();
-          await refresh();
-        });
-      }
-      track.appendChild(card);
+    bindQueueCancel(card, e);
+    return card;
+  }
+
+  function renderQueue() {
+    const track = $('#queue-list');
+    const empty = $('#queue-empty');
+    const activeTrack = $('#prod-active-list');
+    const activeSplit = $('#prod-active-split');
+    if (!track) return;
+    track.innerHTML = '';
+    if (activeTrack) activeTrack.innerHTML = '';
+
+    const processing = processingJobs();
+    const queued = queuedJobs();
+    const used = Math.max(processing.length + queued.length, fileUsedCount());
+
+    if (activeSplit) activeSplit.classList.toggle('hidden', processing.length === 0);
+    const prodHint = $('#prod-active-hint');
+    if (prodHint) prodHint.textContent = processing.length ? (processing.length + ' en cours') : '';
+
+    processing.forEach((e) => {
+      if (activeTrack) activeTrack.appendChild(buildQueueCard(e, { kind: 'processing', used }));
     });
+
+    const fileLabel = $('#file-label');
+    if (fileLabel) {
+      const hint = fileLabel.querySelector('.split-hint');
+      const title = fileLabel.querySelector('.split-title');
+      if (title) title.textContent = 'FILE D’ATTENTE';
+      if (hint) {
+        hint.textContent = queued.length ? `${queued.length} en attente` : '0 en attente';
+      }
+    }
+    setEmpty(empty, queued.length === 0);
+    if (empty) {
+      const pEl = empty.querySelector('p');
+      if (pEl) pEl.textContent = 'Aucune production en attente';
+    }
+    queued.forEach((e, i) => {
+      track.appendChild(buildQueueCard(e, { kind: 'queued', index: i + 1, used }));
+    });
+
+    updateProdSummary();
     syncFabQueueMini();
+    const proc = fileProcessing();
+    if (proc && state.craftId === proc.craftId) {
+      updateFabActiveStatus();
+    } else {
+      syncFabActiveFromQueue();
+    }
     renderOutput();
   }
 

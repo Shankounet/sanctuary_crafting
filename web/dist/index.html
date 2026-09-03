@@ -217,19 +217,38 @@
           <span class="t-l4">Sous-systèmes station</span>
         </div>
         <div class="tabs" role="tablist">
-          <button type="button" class="tab active" data-tab="queue" role="tab" title="Console de production"><i class="fa-solid fa-industry"></i><span>Production</span><span id="output-badge" class="tab-badge hidden" aria-label="À récupérer">RÉCUP.</span></button>
+          <button type="button" class="tab active" data-tab="queue" role="tab" title="Console de production"><i class="fa-solid fa-industry"></i><span>Production</span><span id="output-badge" class="tab-badge hidden" aria-label="À récupérer"><span class="tab-badge-k">RÉCUP.</span><span class="tab-badge-n">0</span></span></button>
           <button type="button" class="tab" data-tab="tree" role="tab" title="Schéma technique / dépendances"><i class="fa-solid fa-diagram-project"></i><span>Schéma</span></button>
           <button type="button" class="tab" data-tab="shop" role="tab" title="Checklist récupération"><i class="fa-solid fa-clipboard-list"></i><span>Récup.</span></button>
         </div>
         <div id="tab-queue" class="tab-body">
           <p class="side-caption"><i class="fa-solid fa-industry" aria-hidden="true"></i> Console de production</p>
+          <div class="prod-summary" id="prod-summary" aria-label="Synthèse station">
+            <div class="prod-sum-row" id="sum-prod">
+              <span class="prod-sum-k">PRODUCTION</span>
+              <span class="prod-sum-v is-zero" id="sum-prod-v">0 en cours</span>
+            </div>
+            <div class="prod-sum-row" id="sum-file">
+              <span class="prod-sum-k">FILE</span>
+              <span class="prod-sum-v is-zero" id="sum-file-v">0 en attente</span>
+            </div>
+            <div class="prod-sum-row" id="sum-sortie">
+              <span class="prod-sum-k">SORTIE</span>
+              <span class="prod-sum-v is-zero" id="sum-sortie-v">0 prête</span>
+            </div>
+          </div>
+          <div class="prod-split prod-active-split hidden" id="prod-active-split">
+            <div class="prod-split-label" id="prod-active-label">
+              <span class="split-title">PRODUCTION</span>
+              <span class="split-hint" id="prod-active-hint"></span>
+            </div>
+            <div id="prod-active-list" class="queue-track"></div>
+          </div>
           <div class="prod-split file-split" id="file-split">
-            <div class="prod-split-label" id="file-label"><span class="split-title">FILE</span><span class="split-hint">en cours</span></div>
+            <div class="prod-split-label" id="file-label"><span class="split-title">FILE D’ATTENTE</span><span class="split-hint">0 en attente</span></div>
             <div id="queue-list" class="queue-track"></div>
             <div class="empty-state empty-prod" id="queue-empty">
-              <span class="empty-kicker">STATION READY</span>
-              <p>File vide</p>
-              <span class="empty-sys"><i class="led-dot ok" aria-hidden="true"></i> Système en veille</span>
+              <p>Aucune production en attente</p>
             </div>
           </div>
           <div class="prod-split-divider" aria-hidden="true"></div>
@@ -553,6 +572,7 @@
                 </span>
               </div>
               <div class="fab-active-meta">
+                <p id="fab-active-status" class="fab-active-status">EN COURS</p>
                 <div class="fab-active-title-row">
                   <span id="fab-active-name">—</span>
                   <span id="fab-active-qty" class="fab-active-qty">×1</span>

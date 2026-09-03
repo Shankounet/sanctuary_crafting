@@ -6593,3 +6593,152 @@ button, input { font: inherit; color: inherit; }
   margin-left: 2px;
   flex: 0 0 auto;
 }
+
+/* ============================================================
+   v2.25.0 — Production queue reading coherence
+   FILE D’ATTENTE vs PRODUCTION vs SORTIE. CEF-safe.
+   ============================================================ */
+
+#app .prod-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 12px;
+  margin: 0 0 8px;
+  padding: 7px 8px 6px;
+  border: 1px solid #3a332b;
+  background: #1c1c1a;
+}
+#app .prod-sum-row { display: contents; }
+#app .prod-sum-k {
+  font-size: 0.52rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9a8866;
+}
+#app .prod-sum-v {
+  font-size: 0.62rem;
+  font-weight: 650;
+  color: #d8d2c6;
+  font-variant-numeric: tabular-nums;
+}
+#app .prod-sum-v.is-zero { color: #6a655c; }
+
+#app .prod-active-split { min-width: 0; margin-bottom: 4px; }
+#app .prod-active-split.hidden { display: none !important; }
+#app .prod-active-split .prod-split-label { color: #9a8866; }
+#app .prod-active-split .queue-card.running::before { background: #9a8866; }
+#app .prod-active-split .queue-card.running {
+  border-color: #3a332b;
+  background: #22211e;
+}
+
+#app .file-split .prod-split-label { color: var(--color-muted); }
+#app .queue-card .qstatus {
+  font-size: 0.52rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #9a8866;
+  margin-bottom: 2px;
+}
+#app .queue-card .qqty {
+  color: #9a8866;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+#app .queue-card .qcancel,
+#app .fab-cancel {
+  font-weight: 600;
+  opacity: 0.72;
+  letter-spacing: 0.06em;
+  font-size: 0.6rem;
+  padding: 4px 8px;
+  color: #a89888;
+  border-color: rgba(90, 78, 70, 0.55);
+  background: rgba(28, 24, 22, 0.45);
+}
+#app .queue-card .qcancel:hover,
+#app .fab-cancel:hover { opacity: 0.95; }
+
+#app .tab-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  margin-left: 6px;
+  background: transparent;
+  color: inherit;
+  border-radius: 0;
+}
+#app .tab-badge-k {
+  font-size: 0.5rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #9a8866;
+}
+#app .tab-badge-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  font-size: 0.55rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  color: #1a1612;
+  background: #9a8866;
+  border-radius: 2px;
+}
+
+#app .output-track { gap: 8px; }
+#app .output-card {
+  padding: 10px 9px 10px 12px;
+  gap: 8px 8px;
+  align-items: center;
+}
+#app .output-card .othumb { width: 38px; height: 38px; }
+#app .output-card .ostatus { margin-top: 3px; }
+
+#app .recup-plate.recup-all.recup-all-ghost {
+  padding: 5px 8px;
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  opacity: 0.82;
+  border-color: #3a332b;
+  box-shadow: 0 1px 0 #12100c, inset 0 1px 0 rgba(255,255,255,0.05);
+}
+#app .recup-plate.recup-all.recup-all-strong {
+  padding: 8px 10px;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  font-weight: 780;
+  border-color: #9a8866;
+  border-top-color: #b09a72;
+  box-shadow:
+    0 2px 0 #12100c,
+    0 3px 8px rgba(0,0,0,0.35),
+    inset 0 1px 0 rgba(255,255,255,0.1),
+    inset 0 0 0 1px rgba(154,136,102,0.28);
+}
+
+#app #fab-module { display: flex; flex-direction: column; }
+#app #fab-module[data-fab-state="active"] #fab-active { order: -1; }
+#app #fab-active-status,
+#app .fab-active-status {
+  margin: 0 0 3px;
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9a8866;
+}
+#app .empty-prod p {
+  margin: 4px 0;
+  font-size: 0.74rem;
+  color: rgba(198,194,184,0.82);
+}

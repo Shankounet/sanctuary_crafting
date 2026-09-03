@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.24.0
+# sanctuary_crafting v2.25.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,14 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.25.0 — Craft: cohérence lecture file de production
+Lecture immédiate de la station : **1 en cours / N en attente / M prêts**. Plus de contradiction FILE « en cours » + « File vide » pendant qu’un craft tourne.
+
+- Gauche : bandeau **PRODUCTION / FILE / SORTIE**, bloc PRODUCTION (job actif), **FILE D’ATTENTE** (queued only, `EN ATTENTE · #n`), SORTIE inchangée (completed ≠ slot).
+- Badge **RÉCUP.** + pastille `[n]` ; **RÉCUPÉRER TOUT** plus visible si n>1.
+- Droite `#fab-active` : kicker `EN COURS · 1/N`. Ajouter à la file ne remplace pas le craft actif.
+- Callbacks NUI / logique serveur file : inchangés.
 
 ### v2.24.0 — Stations: file de production FIFO (multi-craft)
 La station accepte une **vraie file** pendant qu’un craft tourne. Pleine seulement si `(processing + queued) >= queueCapacity`. Completed → SORTIE, **ne compte pas** comme slot.
