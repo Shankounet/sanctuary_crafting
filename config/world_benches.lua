@@ -94,10 +94,9 @@ Config.WorldBenches = {
         label = 'Table Medicale',
         station = 'medical',
         category = 'medical', -- craftsId / station
-        coords = vec3(-449.9554748535156, 1101.87646484375, 326.6813049316406),
+        coords = vec3(-1124.239624, 4890.592285, 219.350479),
         heading = 40.57464981079101,
-        model = 'marimonstore_bancada_medica', -- prop name (joaat côté client si besoin)
-        prop = 'marimonstore_bancada_medica',
+        type = 'coords', -- table MLO/monde déjà là: point d'interaction seul, pas de spawn prop
         queueSize = 6,
         -- camera skipped: camera = {              x = -451.73944091796,              y = 1102.3679199218,              z = 328.29345703125,       
     },
