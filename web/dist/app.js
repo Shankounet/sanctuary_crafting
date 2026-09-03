@@ -43,6 +43,7 @@
     newlyLearned: [],
     teaching: {},
     teachTarget: null,
+    recentStripExpanded: false,
   };
 
   const SEEN_KEY = 'sanctuary_crafting:seenRecipes';
@@ -826,17 +827,35 @@
       recipes.forEach((r) => grid.appendChild(makeCard(r)));
     };
 
-    const appendRecentStrip = (recipes) => {
+    const STRIP_MAX = 5;
+    const appendMiniStrip = ({ title, wrapClass, recipes, makeMini, expanded, onVoirTout }) => {
       if (!recipes.length) return;
       const wrap = document.createElement('div');
-      wrap.className = 'recent-strip';
+      wrap.className = wrapClass;
+      const head = document.createElement('div');
+      head.className = 'mini-strip-head';
       const h = document.createElement('h3');
       h.className = 'catalog-group-title';
-      h.textContent = 'RÉCEMMENT FABRIQUÉS';
-      wrap.appendChild(h);
+      h.textContent = title;
+      head.appendChild(h);
+      const showAll = !!expanded || recipes.length <= STRIP_MAX;
+      const visible = showAll ? recipes : recipes.slice(0, STRIP_MAX);
+      if (!showAll && typeof onVoirTout === 'function') {
+        const more = document.createElement('button');
+        more.type = 'button';
+        more.className = 'strip-voir-tout';
+        more.textContent = 'VOIR TOUT';
+        more.title = 'Afficher tout';
+        more.addEventListener('click', (e) => {
+          e.stopPropagation();
+          onVoirTout();
+        });
+        head.appendChild(more);
+      }
+      wrap.appendChild(head);
       const row = document.createElement('div');
       row.className = 'recent-row';
-      recipes.slice(0, 5).forEach((r) => row.appendChild(makeRecentMini(r)));
+      visible.forEach((r) => row.appendChild(makeMini(r)));
       wrap.appendChild(row);
       grid.appendChild(wrap);
     };
@@ -847,14 +866,37 @@
     const used = new Set();
     if (showGroups) {
       const favs = list.filter((r) => isFavorite(r.id));
-      appendGroup('FAVORIS', favs);
+      appendMiniStrip({
+        title: 'FAVORIS',
+        wrapClass: 'recent-strip fav-strip',
+        recipes: favs,
+        makeMini: makeFavMini,
+        onVoirTout: () => {
+          const btn = document.querySelector('#filters [data-filter="favorites"]');
+          if (btn) btn.click();
+          else {
+            state.filter = 'favorites';
+            renderList();
+          }
+        },
+      });
       favs.forEach((r) => used.add(r.id));
       const recents = [];
       (state.recentlyCrafted || []).forEach((entry) => {
         const id = typeof entry === 'string' ? entry : (entry && (entry.recipeId || entry.id));
         if (id && byId[id] && !used.has(id)) recents.push(byId[id]);
       });
-      appendRecentStrip(recents.slice(0, 5));
+      appendMiniStrip({
+        title: 'RÉCEMMENT FABRIQUÉS',
+        wrapClass: 'recent-strip',
+        recipes: recents,
+        makeMini: makeRecentMini,
+        expanded: !!state.recentStripExpanded,
+        onVoirTout: () => {
+          state.recentStripExpanded = true;
+          renderList();
+        },
+      });
       recents.forEach((r) => used.add(r.id));
       const news = list.filter((r) => isNewRecipe(r) && !used.has(r.id));
       appendGroup('NOUVEAUX', news);
@@ -863,6 +905,7 @@
       if (used.size && rest.length) appendGroup('CATALOGUE', rest);
       else rest.forEach((r) => grid.appendChild(makeCard(r)));
     } else {
+      state.recentStripExpanded = false;
       list.forEach((r) => grid.appendChild(makeCard(r)));
     }
   }
@@ -1055,6 +1098,7 @@
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'recent-mini';
+    btn.dataset.id = r.id;
     if (state.selected && state.selected.id === r.id) btn.classList.add('selected');
     btn.title = r.label || '';
     btn.innerHTML = `
@@ -1071,6 +1115,50 @@
     const ph = btn.querySelector('.ph');
     bindItemImg(img, resultItem, ph);
     btn.addEventListener('click', () => selectRecipe(r));
+    return btn;
+  }
+
+  function makeFavMini(r) {
+    const resultItem = (r.result && r.result.item) || r.id;
+    const status = cardStatus(r);
+    const favOn = isFavorite(r.id);
+    const tip = uxOn('badgeTooltips', true) ? (status.tip || status.text) : status.text;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'recent-mini fav-mini';
+    btn.dataset.id = r.id;
+    if (state.selected && state.selected.id === r.id) btn.classList.add('selected');
+    btn.title = r.label || '';
+    btn.innerHTML = `
+      <span class="recent-img">
+        <span class="ph" aria-hidden="true"><i class="fa-solid fa-cube"></i></span>
+        <img alt="" />
+      </span>
+      <span class="recent-meta">
+        <span class="recent-name">${escapeHtml(r.label || '')}</span>
+        <span class="fav-mini-status ${status.cls}" title="${escapeHtml(tip)}">${escapeHtml(status.text)}</span>
+      </span>
+      <span class="fav-mini-star${favOn ? ' on' : ''}" data-fav="${escapeHtml(r.id)}" title="Favori" aria-label="Favori">
+        <i class="fa-${favOn ? 'solid' : 'regular'} fa-star" aria-hidden="true"></i>
+      </span>
+    `;
+    const img = btn.querySelector('img');
+    const ph = btn.querySelector('.ph');
+    bindItemImg(img, resultItem, ph);
+    btn.addEventListener('click', (e) => {
+      if (e.target.closest('[data-fav]')) return;
+      selectRecipe(r);
+    });
+    const star = btn.querySelector('[data-fav]');
+    if (star) {
+      star.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const was = isFavorite(r.id);
+        await post('favorite', { recipeId: r.id });
+        showToast(was ? 'Retiré des favoris' : 'Ajouté aux favoris', 'ok');
+        await refresh();
+      });
+    }
     return btn;
   }
 
@@ -1363,6 +1451,21 @@
 
     renderRightRecent();
     renderList();
+    const rid = r && r.id;
+    if (rid) {
+      requestAnimationFrame(() => {
+        const grid = $('#recipe-grid');
+        if (!grid) return;
+        const esc = (window.CSS && CSS.escape) ? CSS.escape(String(rid)) : String(rid).replace(/"/g, '\"');
+        const card = grid.querySelector(`.recipe-card[data-id="${esc}"]`);
+        const mini = grid.querySelector(`.recent-mini[data-id="${esc}"]`);
+        const target = card || mini;
+        if (target && target.scrollIntoView) {
+          try { target.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+          catch (_) { try { target.scrollIntoView(false); } catch (__) { /* ignore */ } }
+        }
+      });
+    }
   }
 
   function syncTeachButton(r) {
