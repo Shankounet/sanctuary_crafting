@@ -20,13 +20,27 @@ function Benches.ForEach(fn)
 end
 
 function Benches.CountQueueCap(bench)
-    if not bench then return (Config.Queue and Config.Queue.MaxQueuePerPlayer) or 5 end
+    local q = Config.Queue or {}
     local extra = 0
-    if StationRuntime and StationRuntime.Modifiers then
+    if bench and StationRuntime and StationRuntime.Modifiers then
         extra = tonumber(StationRuntime.Modifiers(bench).queueSize) or 0
     end
-    local cap = bench.queueSize or ((Config.Queue and Config.Queue.MaxQueuePerPlayer) or 5)
-    return math.max(1, (tonumber(cap) or 5) + extra)
+    if bench and type(bench.queueSize) == 'number' then
+        return math.max(1, math.floor(bench.queueSize) + extra)
+    end
+    local level = 1
+    if bench then
+        level = tonumber(bench.stationLevel) or 1
+    end
+    local byLevel = q.QueueByLevel
+    local cap = nil
+    if type(byLevel) == 'table' then
+        cap = tonumber(byLevel[level] or byLevel[tostring(level)])
+    end
+    if not cap then
+        cap = tonumber(q.MaxQueuePerStation) or tonumber(q.MaxQueuePerPlayer) or 6
+    end
+    return math.max(1, math.floor(cap) + extra)
 end
 
 ---@param key string

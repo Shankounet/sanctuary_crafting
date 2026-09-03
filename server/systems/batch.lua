@@ -81,27 +81,19 @@ local function queueMax(src, bench)
     if not Config.Queue or not Config.Queue.Enabled then
         return CraftBatch.ConfiguredMax()
     end
-    local playerMax = floorPos(Config.Queue.MaxQueuePerPlayer or 5, 5)
-    local benchCap = playerMax
-    if bench then
-        local extra = 0
-        if StationRuntime and StationRuntime.Modifiers then
-            extra = floorPos(StationRuntime.Modifiers(bench).queueSize or 0, 0)
-        end
-        if type(bench.queueSize) == 'number' then
-            benchCap = floorPos(bench.queueSize, playerMax) + extra
-        else
-            benchCap = playerMax + extra
-        end
-    end
+    local benchCap = (Benches and Benches.CountQueueCap and Benches.CountQueueCap(bench))
+        or floorPos(Config.Queue.MaxQueuePerStation or Config.Queue.MaxQueuePerPlayer or 6, 6)
     local used = 0
-    if CraftQueue and CraftQueue.CountForBench then
-        used = CraftQueue.CountForBench(src, bench and bench.key)
+    local uid = bench and bench.key
+    if CraftQueue and CraftQueue.CountActiveSlots and uid then
+        used = CraftQueue.CountActiveSlots(uid)
+    elseif CraftQueue and CraftQueue.CountForBench then
+        used = CraftQueue.CountForBench(src, uid)
     elseif CraftQueue and CraftQueue.List then
         used = #(CraftQueue.List(src) or {})
     end
-    local free = math.max(0, math.min(playerMax, benchCap) - used)
-    -- queue slot is 1 job, not batch units — batch itself is unbounded by slots
+    local free = math.max(0, benchCap - used)
+    -- queue slot is 1 job (batch x10 = one slot), not batch units
     if free <= 0 then return 0 end
     return CraftBatch.ConfiguredMax()
 end

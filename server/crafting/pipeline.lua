@@ -109,6 +109,20 @@ function CraftingPipeline.HasActive(src)
     return false
 end
 
+function CraftingPipeline.GetProcessingAt(stationUid)
+    if not stationUid then return nil end
+    for _, craft in pairs(activeById) do
+        local uid = craft.stationUid or craft.benchKey
+        if uid == stationUid and not craft.completed then
+            local st = craft.state
+            if st == 'running' or st == 'paused' or st == nil or st == 'processing' then
+                return craft
+            end
+        end
+    end
+    return nil
+end
+
 function CraftingPipeline.Get(craftId)
     return activeById[craftId]
 end
@@ -220,9 +234,13 @@ function CraftingPipeline.Cancel(src, craftId, reason)
             doRefund = false
         end
     end
+    local uid = craft.stationUid or craft.benchKey
     clearActive(craftId, doRefund and craft.removed)
     CraftingCore.Emit('craftCancelled', src, craftId, reason)
     TriggerClientEvent('sanctuary_crafting:client:craftCancelled', src, craftId, reason)
+    if CraftQueue and CraftQueue.OnProcessingGone then
+        CraftQueue.OnProcessingGone(uid, craftId)
+    end
     return true
 end
 
@@ -524,7 +542,8 @@ function CraftingPipeline.ValidateStart(src, recipeId, benchKey, batch, opts)
 end
 
 function CraftingPipeline._startInner(src, recipeId, benchKey, batch)
-    local ctx, reason, args = validateStart(src, recipeId, benchKey, batch)
+    local queueOn = Config.Queue and Config.Queue.Enabled == true
+    local ctx, reason, args = validateStart(src, recipeId, benchKey, batch, { queued = queueOn })
     if not ctx then return { ok = false, reason = reason, args = args } end
 
     if CraftingSkills and CraftingSkills.NotifyBypassIfNeeded then
@@ -532,6 +551,19 @@ function CraftingPipeline._startInner(src, recipeId, benchKey, batch)
     end
 
     local recipe, bench = ctx.recipe, ctx.bench
+    local stationUid = (StationOutput and StationOutput.Uid and StationOutput.Uid(bench)) or bench.key
+    if queueOn and CraftQueue then
+        local cap = (Benches.CountQueueCap and Benches.CountQueueCap(bench))
+            or (Config.Queue and Config.Queue.MaxQueuePerStation) or 6
+        local used = CraftQueue.CountActiveSlots and CraftQueue.CountActiveSlots(stationUid) or 0
+        if used >= cap then
+            return { ok = false, reason = 'queue_full' }
+        end
+        local processing = CraftQueue.GetProcessing and CraftQueue.GetProcessing(stationUid)
+        if processing then
+            return CraftQueue.InsertQueued(src, ctx, stationUid)
+        end
+    end
     local removed = false
     if CraftingMaterials and CraftingMaterials.ConsumeOnStart and CraftingMaterials.ConsumeOnStart() then
         local okTake = CraftingMaterials.Take(src, ctx.ingredients)
@@ -561,6 +593,8 @@ function CraftingPipeline._startInner(src, recipeId, benchKey, batch)
     local craft = {
         craftId = craftId, craftUID = craftUID, src = src,
         recipeId = recipe.id, benchKey = bench.key,
+        stationUid = stationUid,
+        identifier = GetPlayerIdentifierSafe(src),
         startedAt = GetGameTimer(), startedUnix = os.time(),
         duration = duration, batch = ctx.batch,
         ingredients = ctx.ingredients, removed = removed,
@@ -605,6 +639,29 @@ function CraftingPipeline._startInner(src, recipeId, benchKey, batch)
             })
         end
     end
+    if CraftQueue and CraftQueue.InsertProcessing then
+        CraftQueue.InsertProcessing({
+            craftId = craftId,
+            identifier = GetPlayerIdentifierSafe(src),
+            recipeId = recipe.id,
+            benchKey = bench.key,
+            stationUid = craft.stationUid or stationUid or bench.key,
+            batch = ctx.batch,
+            ingredients = ctx.ingredients,
+            finishAt = os.time() + math.ceil((duration or 0) / 1000),
+            createdAt = os.time(),
+            startedAt = os.time(),
+            duration = duration,
+            durationMs = duration,
+            label = facing,
+            snapshot = craft.snapshot,
+            recipeVersion = craft.recipeVersion or 0,
+            state = 'processing',
+            source = 'interactive',
+            queuePosition = 0,
+            removed = removed,
+        })
+    end
 
     do
         local startedUnix = craft.startedUnix -- unix s
@@ -635,7 +692,11 @@ function CraftingPipeline._startInner(src, recipeId, benchKey, batch)
     }
 end
 
-function CraftingPipeline.Start(src, recipeId, benchKey, batch)
+function CraftingPipeline.Start(src, recipeId, benchKey, batch, requestId)
+    if type(requestId) == 'string' and requestId ~= '' and CraftQueue and CraftQueue.ReplayRequest then
+        local hit = CraftQueue.ReplayRequest(src, requestId)
+        if hit then return hit end
+    end
     if type(recipeId) ~= 'string' or type(benchKey) ~= 'string' then
         if CraftingAnomaly then CraftingAnomaly.Warn('unknown_recipe', src, { recipeId = recipeId }) end
         return { ok = false, reason = 'craft_invalid' }
@@ -651,15 +712,78 @@ function CraftingPipeline.Start(src, recipeId, benchKey, batch)
     end
     if not okRun then
         print(('[sanctuary_crafting] startCraft error: %s'):format(tostring(result)))
-        return { ok = false, reason = 'craft_failed' }
+        result = { ok = false, reason = 'craft_failed' }
+    end
+    if CraftQueue and CraftQueue.RememberRequest then
+        CraftQueue.RememberRequest(src, requestId, result)
     end
     return result
 end
 
-lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, benchKey, batch)
-    -- client sends only recipeId / qty / station
-    return CraftingPipeline.Start(src, recipeId, benchKey, batch)
+lib.callback.register('sanctuary_crafting:startCraft', function(src, recipeId, benchKey, batch, requestId)
+    -- client sends recipeId / qty / station / optional requestId (anti double-click)
+    return CraftingPipeline.Start(src, recipeId, benchKey, batch, requestId)
 end)
+
+function CraftingPipeline.AdoptQueued(src, entry, recipe, bench)
+    if not src or not entry or type(entry.craftId) ~= 'string' then return false end
+    if activeById[entry.craftId] then return true end
+    local duration = tonumber(entry.duration) or tonumber(entry.durationMs) or 5000
+    local remainingMs = duration
+    local finishAt = tonumber(entry.finishAt) or 0
+    if finishAt > os.time() then
+        remainingMs = math.max(500, (finishAt - os.time()) * 1000)
+    end
+    local craft = {
+        craftId = entry.craftId,
+        craftUID = entry.craftId,
+        src = src,
+        recipeId = entry.recipeId,
+        benchKey = entry.benchKey,
+        stationUid = entry.stationUid or entry.benchKey,
+        identifier = entry.identifier,
+        startedAt = GetGameTimer() - math.max(0, duration - remainingMs),
+        startedUnix = tonumber(entry.startedAt) or os.time(),
+        duration = duration,
+        batch = entry.batch or 1,
+        ingredients = entry.ingredients,
+        removed = true,
+        completed = false,
+        state = (entry.paused or entry.state == 'paused') and 'paused' or 'running',
+        stepIndex = 1,
+        totalSteps = 1,
+        snapshot = entry.snapshot or recipe,
+        recipeVersion = entry.recipeVersion or 0,
+        removedHistory = { entry.ingredients or {} },
+    }
+    if craft.state == 'paused' then
+        craft.paused = true
+        craft.pausedRemainingMs = remainingMs
+    end
+    registerActive(src, craft)
+    local facing = entry.label
+    if recipe then
+        if OxItemCatalog and OxItemCatalog.RecipeLabel then
+            facing = OxItemCatalog.RecipeLabel(recipe) or facing
+        elseif recipe.label then
+            facing = recipe.label
+        end
+    end
+    TriggerClientEvent('sanctuary_crafting:client:queuePromoted', src, {
+        craftId = craft.craftId,
+        duration = remainingMs,
+        durationMs = duration,
+        label = facing,
+        batch = craft.batch,
+        benchKey = craft.benchKey,
+        recipeId = craft.recipeId,
+        resultItem = recipe and recipe.result and recipe.result.item,
+        resultCount = recipe and recipe.result and ((recipe.result.count or 1) * (craft.batch or 1)),
+        stationUid = craft.stationUid,
+        queuedPromote = true,
+    })
+    return true
+end
 
 function CraftingPipeline.FinalizeCraft(src, craftId, opts)
     opts = opts or {}
@@ -1022,9 +1146,10 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
         output = outputOn and true or false,
     })
 
-    -- Queue-next: CraftQueue entries already have their own finishAt + collect path.
-    -- Do not force-start a queued job as an interactive craft. Auto-promote of the
-    -- next interactive job is deferred (no existing Enqueue→startCraft hook).
+    local uid = craft.stationUid or craft.benchKey
+    if CraftQueue and CraftQueue.OnProcessingGone then
+        CraftQueue.OnProcessingGone(uid, craftId)
+    end
 
     return resultPayload
 end
@@ -1176,6 +1301,15 @@ AddEventHandler('playerDropped', function()
                         createdAt = craft.startedUnix or os.time(),
                         source = 'interactive',
                     })
+                    if CraftQueue and CraftQueue.Get then
+                        local qe = CraftQueue.Get(craft.craftId)
+                        if qe then
+                            qe.finishAt = finishAt
+                            qe.state = st == 'paused' and 'paused' or 'processing'
+                            qe.paused = st == 'paused'
+                            if CraftQueue.Persist then CraftQueue.Persist(qe) end
+                        end
+                    end
                 end
                 clearActive(craft.craftId, false)
             end
@@ -1260,7 +1394,7 @@ function CraftingPipeline.SerializeActive(src, benchKey)
     if not set then return matching, other end
     for craftId in pairs(set) do
         local craft = activeById[craftId]
-        if craft and craft.src == src and (craft.state == 'running' or not craft.state) and not craft.completed then
+        if craft and craft.src == src and (craft.state == 'running' or craft.state == 'paused' or not craft.state) and not craft.completed then
             local row = serializeActiveCraft(craft)
             if benchKey and craft.benchKey ~= benchKey then
                 other[#other + 1] = row
@@ -1298,40 +1432,42 @@ function CraftingPipeline.GetSession(src, benchKey)
     end
     local active, other = CraftingPipeline.SerializeActive(src, benchKey)
     local queued = {}
-    if CraftQueue and CraftQueue.List then
+    local seen = {}
+    for i = 1, #active do
+        seen[active[i].craftId] = true
+        active[i].state = active[i].state == 'running' and 'processing' or active[i].state
+    end
+    if CraftQueue and CraftQueue.ListForStation then
+        local list = CraftQueue.ListForStation(benchKey, src) or {}
+        for i = 1, #list do
+            local e = list[i]
+            local st = e.state or 'queued'
+            if st == 'running' then st = 'processing' end
+            if st == 'processing' or st == 'paused' then
+                if not seen[e.craftId] then
+                    seen[e.craftId] = true
+                    -- overlay pipeline remainingMs when this src owns the RAM job
+                    for j = 1, #active do
+                        if active[j].craftId == e.craftId then
+                            e.remainingMs = active[j].remainingMs
+                            e.durationMs = active[j].durationMs or e.durationMs
+                            break
+                        end
+                    end
+                    active[#active + 1] = e
+                end
+            elseif st == 'queued' then
+                queued[#queued + 1] = e
+            end
+        end
+    elseif CraftQueue and CraftQueue.List then
         local list = CraftQueue.List(src) or {}
         for i = 1, #list do
             local e = list[i]
             if not benchKey or e.benchKey == benchKey then
-                local finishAt = tonumber(e.finishAt) or 0
-                local createdAt = tonumber(e.createdAt) or finishAt
-                local durationMs = tonumber(e.duration) or math.max(0, (finishAt - createdAt) * 1000)
-                local remainingMs = math.max(0, (finishAt - os.time()) * 1000)
-                local qState = e.state or (e.paused and 'paused' or 'processing')
-                if e.paused then qState = 'paused' end
-                if e.paused and e.pausedRemaining then
-                    remainingMs = math.max(0, tonumber(e.pausedRemaining) or 0) * 1000
-                end
-                if qState ~= 'completed' and qState ~= 'collected' then
-                queued[#queued + 1] = {
-                    craftId = e.craftId,
-                    recipeId = e.recipeId,
-                    benchKey = e.benchKey,
-                    stationUid = e.stationUid or e.benchKey,
-                    batch = e.batch or 1,
-                    quantity = e.batch or 1,
-                    ingredients = e.ingredients,
-                    finishAt = finishAt,
-                    finishesAt = finishAt,
-                    createdAt = createdAt,
-                    startedAt = createdAt,
-                    duration = durationMs,
-                    durationMs = durationMs,
-                    remainingMs = remainingMs,
-                    label = e.label,
-                    state = qState,
-                    paused = e.paused == true or qState == 'paused',
-                }
+                local row = CraftQueue.Serialize and CraftQueue.Serialize(e, src) or e
+                if (row.state or e.state) == 'queued' then
+                    queued[#queued + 1] = row
                 end
             end
         end
@@ -1344,6 +1480,12 @@ function CraftingPipeline.GetSession(src, benchKey)
         end
         outputCount = #output
     end
+    local fileCap = (Config.Queue and Config.Queue.MaxQueuePerStation) or 6
+    local benchObj = Benches and Benches.Resolve and Benches.Resolve(benchKey)
+    if benchObj and Benches.CountQueueCap then
+        fileCap = Benches.CountQueueCap(benchObj)
+    end
+    local fileUsed = #active + #queued
     local session = {
         stationId = benchKey,
         active = active,
@@ -1351,6 +1493,10 @@ function CraftingPipeline.GetSession(src, benchKey)
         output = output,
         outputCount = outputCount,
         other = other,
+        fileUsed = fileUsed,
+        fileCap = fileCap,
+        queueFull = fileUsed >= fileCap,
+        processing = active[1],
     }
     if craftSessionDebug() then
         local first = active[1]
@@ -2389,7 +2535,7 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
             enabled = compareCfg.Enabled == true,
             map = compareCfg.Map or {},
         },
-        queueMax = snap.queueSize or ((Config.Queue and Config.Queue.MaxQueuePerPlayer) or 5),
+        queueMax = snap.queueSize or ((Config.Queue and (Config.Queue.MaxQueuePerStation or Config.Queue.MaxQueuePerPlayer)) or 6),
         batch = {
             enabled = Config.Batch and Config.Batch.Enabled,
             maxBatch = (CraftBatch and CraftBatch.ConfiguredMax and CraftBatch.ConfiguredMax()) or (Config.Batch and Config.Batch.MaxBatch) or 50,

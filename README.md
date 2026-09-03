@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.23.4
+# sanctuary_crafting v2.24.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,17 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.24.0 — Stations: file de production FIFO (multi-craft)
+La station accepte une **vraie file** pendant qu’un craft tourne. Pleine seulement si `(processing + queued) >= queueCapacity`. Completed → SORTIE, **ne compte pas** comme slot.
+
+- **1 processing** par `stationUid`, N `queued` (FIFO `created_at` / `queue_position`). Batch x10 = **une** entrée.
+- **FABRIQUER** pendant un processing : n’est plus refusé → INSERT `state=queued`, matériaux **consommés / réservés maintenant** (`ConsumeOnStart` / `ReserveOnQueue`).
+- Fin du processing : finalize → completed → SORTIE (pas d’AddItem auto) → **auto-start** du suivant. Annuler queued = refund + reorder ; annuler processing = règles existantes puis auto-start.
+- **Capacité** : `Config.Queue.QueueByLevel` (L1=3, L2=6, L3=10) ou `MaxQueuePerStation` défaut **6** (+ module `storage_rack`). Identité = `GetPlayerIdentifierSafe`. Offline / restart : rebuild + catch-up `finish_at <= now` puis promote. Watchdog centralisé (pas de threads par craft).
+- Anti-dupe : lock joueur+station + `requestId` / debounce. File **partagée** (jobs gardent leur owner). Noms des autres : `Config.Queue.ShowOwnerNames` (défaut false).
+- **UI** : FILE `N/N` — `EN COURS 71%` / `EN ATTENTE #1`. FABRIQUER xN / **AJOUTER À LA FILE xN** / désactivé **FILE DE PRODUCTION PLEINE**. Bouton FILE ouvre la vue. Tracker : PRODUCTIONS N, % actif, +X en attente, +Y à récupérer.
+- Reorder up/down : **SKIP** (FIFO only). SORTIE / DevHub XP / SQL sparse / NUI locked names / CEF / FR / pas de ml_skills : inchangés.
 
 ### v2.23.4 — Craft: favoris scroll invisible + fades
 Bandeaux FAVORIS et RÉCEMMENT FABRIQUÉS uniquement (UX scroll / densité).

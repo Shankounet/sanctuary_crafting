@@ -159,6 +159,16 @@ local function autoMigrate()
         end
     end
 
+    -- v2.24 (224): production FIFO columns (started_at, queue_position, duration_ms)
+    if cur < 224 then
+        if CraftQueue and CraftQueue.EnsureTable then
+            CraftQueue.EnsureTable()
+        end
+        if StationOutput and StationOutput.EnsureColumns then
+            StationOutput.EnsureColumns()
+        end
+    end
+
     if cur < target then
         MySQL.query.await([[
             INSERT INTO sanctuary_schema_version (id, version) VALUES (1, ?)

@@ -237,7 +237,17 @@ function StationOutput.EnsureColumns()
         MySQL.query.await("UPDATE sanctuary_craft_queue SET station_uid = bench_key WHERE station_uid IS NULL OR station_uid = ''")
     end)
     pcall(function()
-        MySQL.query.await("UPDATE sanctuary_craft_queue SET state = 'processing' WHERE (state IS NULL OR state = '' OR state = 'queued') AND finish_at > 0")
+        -- legacy rows with no state were always in-flight; do NOT promote real queued jobs
+        MySQL.query.await("UPDATE sanctuary_craft_queue SET state = 'processing' WHERE (state IS NULL OR state = '') AND finish_at > 0")
+    end)
+    pcall(function()
+        MySQL.query.await("ALTER TABLE sanctuary_craft_queue ADD COLUMN `started_at` INT NULL")
+    end)
+    pcall(function()
+        MySQL.query.await("ALTER TABLE sanctuary_craft_queue ADD COLUMN `queue_position` INT NOT NULL DEFAULT 0")
+    end)
+    pcall(function()
+        MySQL.query.await("ALTER TABLE sanctuary_craft_queue ADD COLUMN `duration_ms` INT NULL")
     end)
 end
 
@@ -922,14 +932,32 @@ end
 
 function StationOutput.CatchUpOverdue()
     local now = os.time()
+    -- queued jobs have finish_at = 0 and must NEVER be auto-completed
     local rows = MySQL.query.await(
-        "SELECT * FROM sanctuary_craft_queue WHERE state IN ('queued','processing') AND finish_at <= ? AND finish_at > 0",
+        "SELECT * FROM sanctuary_craft_queue WHERE state IN ('processing','running') AND finish_at <= ? AND finish_at > 0",
         { now }
     ) or {}
     local n = 0
+    local stations = {}
     for i = 1, #rows do
+        local uid = rows[i].station_uid or rows[i].bench_key
+        local cid = rows[i].craft_id
+        -- Online interactive crafts: pipeline watchdog finalizes (GetGameTimer). Skip steal.
+        if cid and CraftingPipeline and CraftingPipeline.Get and CraftingPipeline.Get(cid) then
+            goto continue_catchup
+        end
         local ok = StationOutput.FinalizeRow(rows[i], nil)
-        if ok then n = n + 1 end
+        if ok then
+            n = n + 1
+            if uid then stations[uid] = true end
+            if CraftQueue and CraftQueue.Detach then CraftQueue.Detach(cid) end
+        end
+        ::continue_catchup::
+    end
+    for uid in pairs(stations) do
+        if CraftQueue and CraftQueue.PromoteNext then
+            CraftQueue.PromoteNext(uid)
+        end
     end
     if n > 0 then
         print(('[sanctuary_crafting] station_output catch-up: %d → completed'):format(n))
@@ -996,7 +1024,7 @@ AddEventHandler('esx:playerLoaded', function(playerId)
     local id = identOf(src)
     if id then
         local rows = MySQL.query.await(
-            "SELECT * FROM sanctuary_craft_queue WHERE identifier = ? AND state IN ('queued','processing') AND finish_at <= ?",
+            "SELECT * FROM sanctuary_craft_queue WHERE identifier = ? AND state IN ('processing','running') AND finish_at > 0 AND finish_at <= ?",
             { id, os.time() }
         ) or {}
         for i = 1, #rows do

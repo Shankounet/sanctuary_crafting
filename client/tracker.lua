@@ -323,6 +323,7 @@ function CraftTracker.FromStart(data, meta)
     local item = data.resultItem or meta.item or meta.resultItem
     local count = data.resultCount or meta.count or meta.resultCount or data.batch or 1
     local category = data.category or meta.category
+    local queued = data.queued == true or data.state == 'queued'
     return {
         craftId = data.craftId,
         recipeId = data.recipeId or meta.recipeId,
@@ -332,7 +333,7 @@ function CraftTracker.FromStart(data, meta)
         batch = data.batch or meta.batch or 1,
         benchKey = data.benchKey or meta.benchKey,
         benchLabel = data.benchLabel or meta.benchLabel,
-        status = 'active',
+        status = queued and 'queued' or 'active',
         startedAt = started,
         endsAt = started + duration,
         duration = duration,
@@ -363,7 +364,8 @@ function CraftTracker.FromQueueEntry(entry, meta)
         benchKey = entry.benchKey or meta.benchKey,
         benchLabel = meta.benchLabel or entry.benchLabel,
         stationLabel = entry.stationLabel or meta.benchLabel,
-        status = (entry.paused or entry.state == 'paused') and 'paused' or 'queued',
+        status = (entry.paused or entry.state == 'paused') and 'paused'
+            or ((entry.state == 'processing' or entry.state == 'running') and 'active' or 'queued'),
         startedAt = createdAt * 1000,
         endsAt = finishAt * 1000,
         duration = duration,

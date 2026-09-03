@@ -435,9 +435,11 @@ function StationRuntime.Snapshot(bench, src)
     if not bench then return {} end
     local mods = StationRuntime.ModuleList(bench)
     local queueUsed = 0
-    local queueCap = bench.queueSize or ((Config.Queue and Config.Queue.MaxQueuePerPlayer) or 5)
-    queueCap = queueCap + (StationRuntime.Modifiers(bench).queueSize or 0)
-    if src and CraftQueue and CraftQueue.CountForBench then
+    local queueCap = (Benches and Benches.CountQueueCap and Benches.CountQueueCap(bench))
+        or (Config.Queue and Config.Queue.MaxQueuePerStation) or 6
+    if CraftQueue and CraftQueue.CountActiveSlots then
+        queueUsed = CraftQueue.CountActiveSlots(bench.key)
+    elseif src and CraftQueue and CraftQueue.CountForBench then
         queueUsed = CraftQueue.CountForBench(src, bench.key)
     end
     local heatOn = StationRuntime.HeatEnabled(bench)

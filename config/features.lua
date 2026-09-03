@@ -50,9 +50,15 @@ Config.Animations = {
 
 Config.Queue = {
     Enabled = true,
-    MaxQueuePerPlayer = 5,
+    MaxQueuePerPlayer = 5,          -- legacy (player-wide); station cap is authoritative
+    MaxQueuePerStation = 6,         -- default if QueueByLevel missing
+    -- Per station type/level slot cap. Count = processing + queued (completed = SORTIE, not a slot).
+    QueueByLevel = { [1] = 3, [2] = 6, [3] = 10 },
     OfflineProgress = true,
-    AllowAll = false,
+    AllowAll = true,                -- FABRIQUER enqueues any recipe while processing
+    ShowOtherJobs = true,           -- shared station: show every job in FILE
+    ShowOwnerNames = false,         -- names on other players' jobs (permissions toggle)
+    -- Reorder up/down: SKIP — FIFO only (created_at / queue_position).
 }
 
 Config.Projects = {
