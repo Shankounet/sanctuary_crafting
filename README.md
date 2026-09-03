@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.23.3
+# sanctuary_crafting v2.23.4
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,15 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.23.4 — Craft: favoris scroll invisible + fades
+Bandeaux FAVORIS et RÉCEMMENT FABRIQUÉS uniquement (UX scroll / densité).
+
+- Scrollbar native masquée (`scrollbar-width: none` + `::-webkit-scrollbar` 0) ; `overflow-x: auto` conservé.
+- Molette verticale → horizontal sur le strip ; Shift+molette / trackpad ; drag-to-scroll (seuil : drag ≠ clic).
+- Masques dégradés bords G/D quand overflow ; masqués aux extrémités (écoute `scroll`).
+- Minis plus étroits / gaps denses ; nom ellipsis + `title` ; statut discret ; hover contraste + bordure `#9a8866` sans glow.
+- Clic → `selectRecipe` + fiche + `scrollIntoView` catalogue inchangé. Craft / PRODUCTION / SORTIE / Carnet / DevHub : **inchangés**.
 
 ### v2.23.3 — Craft: bloc PRODUCTION compact et hiérarchisé
 Panneau droit PRODUCTION uniquement : hiérarchie compacte sans changement de logique.

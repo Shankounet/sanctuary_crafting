@@ -885,10 +885,22 @@
         head.appendChild(more);
       }
       wrap.appendChild(head);
+      const viewport = document.createElement('div');
+      viewport.className = 'recent-row-viewport';
       const row = document.createElement('div');
       row.className = 'recent-row';
       visible.forEach((r) => row.appendChild(makeMini(r)));
-      wrap.appendChild(row);
+      const fadeL = document.createElement('div');
+      fadeL.className = 'recent-row-fade recent-row-fade--left';
+      fadeL.setAttribute('aria-hidden', 'true');
+      const fadeR = document.createElement('div');
+      fadeR.className = 'recent-row-fade recent-row-fade--right';
+      fadeR.setAttribute('aria-hidden', 'true');
+      viewport.appendChild(row);
+      viewport.appendChild(fadeL);
+      viewport.appendChild(fadeR);
+      wrap.appendChild(viewport);
+      enhanceMiniStrip(row, fadeL, fadeR);
       grid.appendChild(wrap);
     };
 
@@ -1122,6 +1134,94 @@
       out.push(byId[id]);
     });
     return out.slice(0, 5);
+  }
+
+
+  function enhanceMiniStrip(row, fadeL, fadeR) {
+    if (!row || row.dataset.stripEnhanced === '1') return;
+    row.dataset.stripEnhanced = '1';
+
+    const updateFades = () => {
+      const max = row.scrollWidth - row.clientWidth;
+      const overflow = max > 1;
+      const atStart = row.scrollLeft <= 1;
+      const atEnd = !overflow || row.scrollLeft >= max - 1;
+      if (fadeL) fadeL.classList.toggle('is-visible', overflow && !atStart);
+      if (fadeR) fadeR.classList.toggle('is-visible', overflow && !atEnd);
+    };
+
+    row.addEventListener('scroll', updateFades, { passive: true });
+
+    row.addEventListener('wheel', (e) => {
+      if (row.scrollWidth <= row.clientWidth + 1) return;
+      const absX = Math.abs(e.deltaX);
+      const absY = Math.abs(e.deltaY);
+      let dx = 0;
+      if (e.shiftKey) {
+        dx = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+      } else if (absX > absY) {
+        dx = e.deltaX;
+      } else if (absY > 0) {
+        dx = e.deltaY;
+      }
+      if (!dx) return;
+      const before = row.scrollLeft;
+      row.scrollLeft += dx;
+      if (row.scrollLeft !== before) e.preventDefault();
+    }, { passive: false });
+
+    let dragging = false;
+    let moved = false;
+    let startX = 0;
+    let startScroll = 0;
+    const THRESH = 6;
+
+    row.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      dragging = true;
+      moved = false;
+      startX = e.clientX;
+      startScroll = row.scrollLeft;
+      try { row.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+
+    row.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      if (!moved && Math.abs(dx) < THRESH) return;
+      moved = true;
+      row.classList.add('is-dragging');
+      row.scrollLeft = startScroll - dx;
+      updateFades();
+    });
+
+    const endDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+      row.classList.remove('is-dragging');
+      if (moved) {
+        row.dataset.suppressClick = '1';
+        setTimeout(() => { delete row.dataset.suppressClick; }, 40);
+      }
+    };
+    row.addEventListener('pointerup', endDrag);
+    row.addEventListener('pointercancel', endDrag);
+    row.addEventListener('lostpointercapture', endDrag);
+
+    row.addEventListener('click', (e) => {
+      if (row.dataset.suppressClick !== '1') return;
+      e.preventDefault();
+      e.stopPropagation();
+      delete row.dataset.suppressClick;
+    }, true);
+
+    requestAnimationFrame(updateFades);
+    if (typeof ResizeObserver !== 'undefined') {
+      try {
+        const ro = new ResizeObserver(() => updateFades());
+        ro.observe(row);
+      } catch (_) {}
+    }
   }
 
   function makeRecentMini(r) {
