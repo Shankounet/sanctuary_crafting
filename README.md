@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.21.0
+# sanctuary_crafting v2.21.1
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,10 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.21.1 — Craft: PROFIL REQUIS DevHub, panneau droit compact
+Atelier `#app` only. Compétence + Spécialisation fusionnés en **PROFIL REQUIS** (Branche, Niveau actuel/requis ✓✕, Talent label DevHub ✓✕). Snapshot `getMenu` (level/xp/unlocked labels) — pas de `ml_skills` / GetSkill dans le panneau. Atelier compact (Station / Niveau / État). Production : rangée LOT·RÉSULTAT·DURÉE·XP, Matériaux n/n, rail 1|5|10|MAX, plaque FABRIQUER. Récents = bandeau mini. Filtres avancés repliés. STATION READY court. Carte sélectionnée liseré `#9a8866`. Callbacks NUI / carnet / tracker / SQL inchangés.
+
 
 ### v2.21.0 — Skills: removed ml_skills → devhub_skillTree
 Couche skill/XP/level/unlock uniquement. Exports officiels (`getPlayerLevel`, `getPlayerXp`, `getPlayerTotalXp`, `getPlayerGlobalStats`, `getUnlockedSkills`, `hasUnlockedSkill`, `addXp` serveur, `getConfig`). Config `SkillCategories` KEY→UID (`survie`/`medecin`/`ingenieur`/`armurier`). Recette `skillTree = { category, requiredLevel, requiredSkill }` (alias `requiredSkillTree`) ; migration one-time des anciens `requireLevel`/`requireSkill`/`skill`. Snapshot + cache par source (join / 1er craft / carnet, TTL 8s, invalidate addXp / skillUnlocked / skillReset / drop). Ressource down : `[CRAFT] devhub_skillTree is not started.` — gates fail-closed, crafts sans skillTree OK. Pas de barre % inventée. BypassRequirements **conservé à true** (live). `unlockSkill` unused. Maîtrise recette SQL inchangée (pas d'XP DevHub).

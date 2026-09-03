@@ -5732,3 +5732,214 @@ button, input { font: inherit; color: inherit; }
     overflow: visible;
   }
 }
+
+/* ============================================================
+   v2.21.1 — Craft right panel compact: PROFIL REQUIS DevHub
+   Composition only. Catalog card SIZE unchanged. No glow / gold veil.
+   ============================================================ */
+
+/* PROFIL REQUIS — one block, discrete ok / missing */
+#app .block-profil {
+  padding: 7px 10px 8px !important;
+}
+#app .block-profil .t-l3 {
+  margin-bottom: 5px !important;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.62rem;
+  color: rgba(154,136,102,0.78);
+}
+#app .profil-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+#app .profil-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+#app .profil-k {
+  color: rgba(154,148,138,0.72);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+#app .profil-v {
+  color: #d8d4cc;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+#app .profil-bare {
+  color: #d8d4cc;
+  font-weight: 600;
+}
+#app .profil-line.profil-branch .profil-bare {
+  font-size: 0.84rem;
+  letter-spacing: 0.02em;
+}
+#app .profil-line.profil-none .profil-bare {
+  color: rgba(154,148,138,0.72);
+  font-weight: 500;
+  font-size: 0.72rem;
+}
+#app .profil-mark {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-left: 4px;
+}
+#app .profil-line.ok .profil-v,
+#app .profil-mark.ok {
+  color: #7a9468;
+}
+#app .profil-line.bad .profil-v,
+#app .profil-mark.bad {
+  color: #8a6a50;
+}
+#app .d-station-etat.ok,
+#app #d-station-etat.ok { color: #7a9468; }
+#app #d-station-etat.warn { color: #a09070; }
+#app #d-station-etat.bad { color: #8a6a50; }
+
+/* Atelier compact — 3 rows, no empty gauges / ops */
+#app .block-station {
+  padding: 7px 10px !important;
+}
+#app .block-station .station-ops { display: none !important; }
+#app .block-station .kv-row { padding: 1px 0; }
+
+/* Production glance: LOT | RÉSULTAT | DURÉE | XP then MATÉRIAUX */
+#app #fab-chip-lot { display: flex !important; }
+#app .fab-readouts {
+  display: flex !important;
+  margin-top: 0 !important;
+}
+#app .fab-idle-console,
+#app .fab-idle-console.hidden { display: none !important; }
+#app .fab-mats-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 6px;
+  padding: 4px 8px;
+  background: #1c1c1c;
+  border: 1px solid #3a332b;
+  font-size: 0.72rem;
+}
+#app .fab-mats-line .fab-chip-k {
+  font-size: 0.48rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(154,148,138,0.62);
+  font-weight: 700;
+}
+#app .fab-mats-line .fab-chip-v {
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  color: #e4e0d6;
+}
+#app .fiche-sec-prod .block-xp { display: none !important; }
+#app #fab-module.panel-action,
+#app #fab-module.actions {
+  padding: 8px 9px 9px !important;
+}
+
+/* FABRIQUER — slightly more presence, still matte steel, no glow */
+#app #btn-craft.primary,
+#app #btn-craft.craft-engage {
+  min-height: 58px !important;
+  border-top-color: #9a8866 !important;
+  box-shadow:
+    0 4px 0 #0e0c0a,
+    0 8px 16px rgba(0,0,0,0.52),
+    inset 0 1px 0 rgba(220,210,180,0.18),
+    inset 0 -3px 8px rgba(0,0,0,0.5),
+    inset 0 0 0 1px rgba(154,136,102,0.34),
+    inset 10px 0 10px rgba(0,0,0,0.12),
+    inset -10px 0 10px rgba(0,0,0,0.12) !important;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 110ms ease,
+    color 120ms ease !important;
+}
+#app #btn-craft.craft-engage:hover:not(:disabled) {
+  transition-duration: 120ms !important;
+  filter: none !important;
+}
+#app #btn-craft.craft-engage:active:not(:disabled) {
+  transform: translateY(2px) !important;
+  filter: none !important;
+}
+#app #btn-craft.craft-engage:disabled {
+  color: #6a6660 !important;
+  filter: none !important;
+}
+
+/* RÉCEMMENT FABRIQUÉS — compact strip, no tall hole */
+#app .recent-strip {
+  height: auto !important;
+  min-height: 0 !important;
+  align-self: start;
+  grid-row: auto;
+}
+#app .fiche-sec-recent {
+  padding: 6px 9px 8px;
+}
+#app .fiche-sec-recent .recent-row {
+  padding-bottom: 0;
+}
+#app .recent-mini {
+  height: 40px;
+  width: 156px;
+}
+
+/* LEFT: FILTRES AVANCÉS (no PLUS +) */
+#app .filters-more-toggle::after {
+  content: "▾";
+  font-size: 0.58rem;
+  color: rgba(154,136,102,0.7);
+}
+#app .filters-more[open] > .filters-more-toggle::after { content: "▴"; }
+
+/* STATION READY — shorter */
+#app .empty-prod {
+  padding: 8px 8px 7px !important;
+  min-height: 0;
+}
+#app .empty-prod .empty-ico,
+#app .empty-prod .empty-hint { display: none !important; }
+#app .empty-prod p {
+  margin: 2px 0 3px;
+  font-size: 0.78rem;
+}
+
+/* SELECTED card — stronger #9a8866, little depth, no glow */
+#app .recipe-card.selected {
+  border-color: #9a8866 !important;
+  border-width: 1px !important;
+  background: #272724 !important;
+  box-shadow:
+    inset 3px 0 0 #9a8866,
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    0 6px 14px rgba(0,0,0,0.42) !important;
+  transform: none;
+  filter: none !important;
+}
+#app .recipe-card.selected .card-title {
+  color: #f2eee6 !important;
+}
+#app .recipe-card.selected .card-img-zone {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -8px 14px rgba(0,0,0,0.24),
+    inset 0 0 0 1px rgba(154,136,102,0.4) !important;
+}

@@ -441,12 +441,17 @@ function CraftingSkills.FacingSkill(src, recipe, snap)
     snap = snap or CraftingSkills.Snapshot(src)
     local cat = (snap.categories and snap.categories[catKey]) or {}
     local talentLabel = g.requiredSkill and CraftingSkills.SkillLabel(g.requiredSkill, catKey) or nil
+    local hasRequiredSkill = nil
+    if g.requiredSkill then
+        hasRequiredSkill = CraftingSkills.HasSkill(src, catKey, g.requiredSkill)
+    end
     return {
         category = catKey,
         categoryLabel = CraftingSkills.CategoryLabel(catKey),
         requireLevel = g.requiredLevel,
         requireSkill = g.requiredSkill,
         requiredSkillLabel = talentLabel,
+        hasRequiredSkill = hasRequiredSkill,
         playerSkillLevel = cat.level or 0,
         playerSkillXp = cat.xp or 0,
         playerTotalXp = cat.totalXp or 0,
