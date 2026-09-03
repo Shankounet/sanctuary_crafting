@@ -117,7 +117,7 @@ function Projects.Finish(src, projectUid)
     end
     exports.ox_inventory:AddItem(src, recipe.result.item, recipe.result.count or 1, meta)
     if recipe.xp and recipe.xp.category then
-        CraftingSkills.AddXP(recipe.xp.category, recipe.xp.amount or 0, src)
+        CraftingSkills.AddCraftXp(src, recipe.xp.category, recipe.xp.amount or 0)
     end
     p.status = 'done'
     projects[projectUid] = nil

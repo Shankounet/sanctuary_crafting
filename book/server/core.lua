@@ -460,13 +460,14 @@ function SurvivalBook.LiveObjectiveChildren(src, recipeId, parentId)
             }
         end
     end
-    if recipe.requireLevel then
-        local cat = CraftingSkills and CraftingSkills.LevelCategoryForRecipe and CraftingSkills.LevelCategoryForRecipe(recipe)
+    local gate = SkillTree and SkillTree.RecipeGate and SkillTree.RecipeGate(recipe) or {}
+    if gate.requiredLevel then
+        local cat = gate.category
         local cur = 0
         if CraftingSkills and CraftingSkills.GetLevel then
-            cur = CraftingSkills.GetLevel(cat, src) or 0
+            cur = CraftingSkills.GetLevel(src, cat) or 0
         end
-        local need = tonumber(recipe.requireLevel) or 0
+        local need = tonumber(gate.requiredLevel) or 0
         children[#children + 1] = {
             id = nil, kind = 'skill', live = true,
             title = string.format('Atteindre le niveau %s', tostring(need)),

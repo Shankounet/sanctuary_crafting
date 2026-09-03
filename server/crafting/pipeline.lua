@@ -250,7 +250,7 @@ local function rollQuality(src, recipe)
     local tiers = Config.Quality.Tiers or { 'poor', 'normal', 'good', 'excellent', 'masterwork' }
     local idx = 2 -- normal
     if Config.Quality.SkillInfluence then
-        local bonus = CraftingSkills.GetCategoryBonus(Config.Skills.craftingCategory or 'crafting', src)
+        local bonus = CraftingSkills.GetCategoryBonus(Config.Skills.defaultCategory or 'engineer', src)
         idx = math.min(#tiers, math.max(1, idx + math.floor((bonus or 0) / 25)))
     end
     -- mastery nudge
@@ -813,7 +813,7 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
     if recipe.dismantle and Config.Dismantling and Config.Dismantling.Enabled and recipe.dismantleYields then
         local bonus = 0
         if Config.Dismantling.SkillYieldBonus then
-            bonus = (CraftingSkills.GetCategoryBonus(Config.Skills.craftingCategory or 'crafting', src) or 0) / 100
+            bonus = (CraftingSkills.GetCategoryBonus(Config.Skills.defaultCategory or 'engineer', src) or 0) / 100
         end
         for _, y in ipairs(recipe.dismantleYields) do
             local chance = math.min(1.0, (y.chance or 1.0) + bonus * 0.2)
@@ -878,7 +878,7 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
     ))
 
     if recipe.xp and recipe.xp.category and recipe.xp.amount then
-        CraftingSkills.AddXP(recipe.xp.category, recipe.xp.amount * batch, src)
+        CraftingSkills.AddCraftXp(src, recipe.xp.category, recipe.xp.amount * batch)
         if NewlyLearned and NewlyLearned.ScanLevelUnlocks then
             NewlyLearned.ScanLevelUnlocks(src)
         end
@@ -1398,7 +1398,7 @@ local function buildPathHints(src, r, entry, artisans)
 
     -- artisan potential (specialty match) — do not claim they know the recipe
     if artisans and #artisans > 0 then
-        local spec = r.requireSkill or r.requireSkillCategory or r.category or r.station
+        local spec = (r.skillTree and r.skillTree.category) or r.requireSpec or r.category or r.station
         if spec then
             local specL = tostring(spec):lower()
             for i = 1, #artisans do
@@ -1433,7 +1433,7 @@ local function buildArtisanHints(src, r, artisans, orders)
     end
     if not artisans then artisans = {} end
     local potential, confirmed = {}, {}
-    local spec = r.requireSkill or r.requireSkillCategory or r.category or r.station
+    local spec = (r.skillTree and r.skillTree.category) or r.requireSpec or r.category or r.station
     local specL = spec and tostring(spec):lower() or nil
     local recipeId = r.id
 
@@ -1531,16 +1531,21 @@ local function buildRecipeEntry(src, r, ctx)
     local skillCategory = nil
     local playerSkillLevel = nil
     local hasSpecialization = nil
-    if CraftingSkills and CraftingSkills.LevelCategoryForRecipe then
+    local skillSnap = ctx and ctx.skillSnap
+    local facing = nil
+    if CraftingSkills and CraftingSkills.FacingSkill then
+        facing = CraftingSkills.FacingSkill(src, r, skillSnap)
+        skillCategory = facing.category
+        playerSkillLevel = facing.playerSkillLevel
+    elseif CraftingSkills and CraftingSkills.LevelCategoryForRecipe then
         skillCategory = CraftingSkills.LevelCategoryForRecipe(r)
+        if skillSnap and skillSnap.categories and skillSnap.categories[skillCategory] then
+            playerSkillLevel = skillSnap.categories[skillCategory].level
+        end
     elseif r.xp and r.xp.category then
         skillCategory = r.xp.category
     end
-    if CraftingSkills and CraftingSkills.IsAvailable and CraftingSkills.IsAvailable() then
-        if skillCategory and CraftingSkills.GetLevel then
-            playerSkillLevel = CraftingSkills.GetLevel(skillCategory, src)
-        end
-    elseif lockReason == 'craft_level_required' and lockArgs and lockArgs[2] ~= nil then
+    if playerSkillLevel == nil and lockReason == 'craft_level_required' and lockArgs and lockArgs[2] ~= nil then
         playerSkillLevel = lockArgs[2]
     end
 
@@ -1617,7 +1622,7 @@ local function buildRecipeEntry(src, r, ctx)
 
     local levelGap = nil
     if lockReason == 'craft_level_required' then
-        local need = (lockArgs and lockArgs[1]) or r.requireLevel
+        local need = (lockArgs and lockArgs[1]) or (r.skillTree and r.skillTree.requiredLevel) or r.requireLevel
         local cur = (lockArgs and lockArgs[2]) or playerSkillLevel
         if need ~= nil and cur ~= nil then
             levelGap = math.max(0, (tonumber(need) or 0) - (tonumber(cur) or 0))
@@ -1681,6 +1686,11 @@ local function buildRecipeEntry(src, r, ctx)
         ingredients = ingsOut,
         result = resultOut, duration = r.duration,
         xp = r.xp, requireLevel = r.requireLevel, requireSkill = r.requireSkill,
+        skillTree = r.skillTree,
+        skillCategoryLabel = facing and facing.categoryLabel or (SkillTree and SkillTree.CategoryLabel and SkillTree.CategoryLabel(skillCategory)) or nil,
+        requiredSkillLabel = facing and facing.requiredSkillLabel or nil,
+        playerSkillXp = facing and facing.playerSkillXp or nil,
+        playerTotalXp = facing and facing.playerTotalXp or nil,
         requireBlueprint = bpId,
         requireTool = r.requireTool, tools = (function()
             local srcTools = r.tools
@@ -1799,7 +1809,8 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
     if SurvivalBook and SurvivalBook.ListOrders and BookDB and BookDB.Mod and BookDB.Mod('Orders') then
         orders = SurvivalBook.ListOrders(src) or {}
     end
-    local ctx = { artisans = artisans, orders = orders, includeHints = true, bench = bench }
+    local skillSnap = (CraftingSkills and CraftingSkills.Snapshot and CraftingSkills.Snapshot(src)) or nil
+    local ctx = { artisans = artisans, orders = orders, includeHints = true, bench = bench, skillSnap = skillSnap }
     local out = {}
     for i = 1, #recipes do
         out[#out + 1] = buildRecipeEntry(src, recipes[i], ctx)
@@ -1871,6 +1882,16 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
         maxLevel = snap.maxLevel,
         recipes = out, favorites = favorites, pinned = pinned,
         playerSpec = (Specializations and Specializations.Resolve and Specializations.Resolve(src)) or nil,
+        skillSnapshot = skillSnap and {
+            available = skillSnap.available == true,
+            categories = (function()
+                local o = {}
+                for k, c in pairs(skillSnap.categories or {}) do
+                    o[k] = { key = k, label = c.label, level = c.level, xp = c.xp, totalXp = c.totalXp }
+                end
+                return o
+            end)(),
+        } or nil,
         recentlyCrafted = (RecentlyCrafted and RecentlyCrafted.List and RecentlyCrafted.List(src)) or {},
         newlyLearned = (NewlyLearned and NewlyLearned.Ids and NewlyLearned.Ids(src)) or {},
         shoppingPins = (ShoppingList and ShoppingList.BuildFromPins and select(1, ShoppingList.BuildFromPins(src))) or nil,

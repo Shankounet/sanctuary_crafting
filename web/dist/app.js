@@ -446,8 +446,8 @@
       return 'Niveau requis';
     },
     craft_skill_required: (r) => {
-      const sk = (r.lockArgs && r.lockArgs[0]) || r.requireSkill;
-      return sk ? `Spécialisation requise : ${humanize(sk)}` : 'Compétence requise';
+      const sk = (r.lockArgs && r.lockArgs[0]) || r.requiredSkillLabel;
+      return sk ? `Talent requis ${sk}` : 'Talent requis';
     },
     craft_blueprint_required: (r) => {
       const bp = (r.lockArgs && r.lockArgs[0]) || r.requireBlueprint;
@@ -953,51 +953,46 @@
     $('#d-duration').textContent = durationLabel(r.duration);
     $('#d-qty').textContent = `×${resCount}`;
 
-    // —— Skill (ml_skills payload only) ——
+    // —— Skill (devhub_skillTree snapshot) ——
     const skillBlock = $('#block-skill');
-    const skillName = r.skillCategory || (r.xp && r.xp.category) || null;
-    const reqLvl = r.requireLevel;
+    const st = r.skillTree || {};
+    const skillName = r.skillCategoryLabel || r.skillCategory || (r.xp && r.xp.category) || null;
+    const reqLvl = st.requiredLevel != null ? st.requiredLevel : r.requireLevel;
     let curLvl = typeof r.playerSkillLevel === 'number' ? r.playerSkillLevel : null;
     if (curLvl == null && r.lockReason === 'craft_level_required' && r.lockArgs && r.lockArgs[1] != null) {
       curLvl = r.lockArgs[1];
     }
-    const hasSkillInfo = !!(skillName || reqLvl != null || curLvl != null);
+    const talentLabel = r.requiredSkillLabel || null;
+    const hasSkillInfo = !!(skillName || reqLvl != null || curLvl != null || talentLabel);
     toggleRow(skillBlock, hasSkillInfo);
     if (hasSkillInfo) {
-      $('#d-skill').textContent = skillName ? humanize(skillName) : 'Compétence';
+      $('#d-skill').textContent = skillName ? String(skillName) : 'Compétence';
       if (reqLvl != null && curLvl != null) {
-        $('#d-skill-level').textContent = `${curLvl} / ${reqLvl}`;
+        $('#d-skill-level').textContent = `Niveau requis ${reqLvl} · actuel ${curLvl}`;
       } else if (reqLvl != null) {
-        $('#d-skill-level').textContent = `requis ${reqLvl}`;
+        $('#d-skill-level').textContent = `Niveau requis ${reqLvl}`;
       } else if (curLvl != null) {
-        $('#d-skill-level').textContent = `niv. ${curLvl}`;
+        $('#d-skill-level').textContent = `Niveau ${curLvl}`;
       } else {
         $('#d-skill-level').textContent = 'Aucun niveau requis';
       }
       const barWrap = $('#d-skill-bar-wrap');
       const fill = $('#d-skill-fill');
       const barLabel = $('#d-skill-bar-label');
-      if (reqLvl != null && curLvl != null) {
+      // No invented XP % bar. Talent label only.
+      if (talentLabel) {
         barWrap.classList.remove('hidden');
-        const pct = Math.max(0, Math.min(100, Math.round((curLvl / Math.max(1, reqLvl)) * 100)));
-        fill.style.width = `${pct}%`;
-        if (curLvl >= reqLvl) {
-          barLabel.textContent = 'Niveau requis atteint';
-        } else {
-          barLabel.textContent = `Progression vers niv. ${reqLvl}`;
-        }
-      } else if (curLvl != null) {
-        barWrap.classList.remove('hidden');
-        fill.style.width = `${Math.min(100, (curLvl % 10) * 10)}%`;
-        barLabel.textContent = `Niveau actuel ${curLvl}`;
+        fill.style.width = '0%';
+        barLabel.textContent = `Talent requis ${talentLabel}`;
       } else {
         barWrap.classList.add('hidden');
+        barLabel.textContent = '';
       }
     }
 
     // —— Specialization ——
     const specBlock = $('#block-spec');
-    const specNeed = r.requireSpec || r.requireSkill;
+    const specNeed = r.requireSpec;
     if (specNeed) {
       specBlock.classList.remove('hidden');
       $('#d-spec-need').textContent = humanize(specNeed);
@@ -2631,6 +2626,18 @@
         document.documentElement.style.setProperty('--accent', msg.data.ui.Accent);
       }
       if (msg.data && msg.data.ui && msg.data.ui.Sounds) state.sounds = msg.data.ui.Sounds;
+    } else if (msg.action === 'skillSnapshot' && msg.data) {
+      state.skillSnapshot = msg.data;
+      if (state.selected) {
+        const cat = state.selected.skillCategory;
+        const row = msg.data.categories && cat && msg.data.categories[cat];
+        if (row && typeof row.level === 'number') {
+          state.selected.playerSkillLevel = row.level;
+          state.selected.playerSkillXp = row.xp;
+          state.selected.playerTotalXp = row.totalXp;
+        }
+        if (typeof selectRecipe === 'function') selectRecipe(state.selected);
+      }
     } else if (msg.action === 'close' || msg.action === 'craftUiClose') {
       // Close craft catalogue only — do NOT cancel active craft / clear craftId.
       // Tracker (sibling #craft-tracker) keeps progress + completion ownership when pinned.

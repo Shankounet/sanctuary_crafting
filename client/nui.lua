@@ -383,3 +383,20 @@ end)
 AddEventHandler('onResourceStop', function(res)
     if res == GetCurrentResourceName() then CloseCraftNui() end
 end)
+
+-- Optional: refresh NUI skill panel if already open. Never grant XP here.
+local function refreshSkillsIfOpen()
+    if not nuiOpen then return end
+    local snap = lib.callback.await('sanctuary_crafting:skillSnapshot', false)
+    if snap then
+        SendNUIMessage({ action = 'skillSnapshot', data = snap })
+    end
+end
+
+RegisterNetEvent('devhub_skillTree:client:listener:newXp', function(_categoryUid, _amount)
+    refreshSkillsIfOpen()
+end)
+
+RegisterNetEvent('devhub_skillTree:client:listener:levelUp', function(_categoryUid, _newLevel)
+    refreshSkillsIfOpen()
+end)

@@ -29,7 +29,7 @@ function ReverseEng.Analyze(src, itemName)
     end
 
     local chance = 0.35
-    local bonus = CraftingSkills.GetCategoryBonus(Config.Skills.craftingCategory or 'crafting', src)
+    local bonus = CraftingSkills.GetCategoryBonus(Config.Skills.defaultCategory or 'engineer', src)
     chance = math.min(0.9, chance + (bonus or 0) / 200)
 
     if math.random() > chance then

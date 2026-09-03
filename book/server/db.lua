@@ -1,5 +1,5 @@
 --[[
-    book/server/db.lua — tables Survival Book (minimal, no ml_skills XP)
+    book/server/db.lua — tables Survival Book (minimal, no skill-tree XP)
 ]]
 
 BookDB = BookDB or {}

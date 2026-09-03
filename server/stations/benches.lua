@@ -195,8 +195,8 @@ function Benches.Upgrade(src, key)
     local req = upgrades and upgrades[nextLevel]
     -- Skill check BEFORE consume (or refund)
     if req and req.requireLevel then
-        local cat = req.skillCategory or (Config.Skills and Config.Skills.craftingCategory) or 'ingenieur'
-        local ok = CraftingSkills.HasRequiredLevel(cat, req.requireLevel, src)
+        local cat = req.skillCategory or (SkillTree and SkillTree.StationCategory and SkillTree.StationCategory(bench.category)) or (Config.Skills and Config.Skills.defaultCategory) or 'engineer'
+        local ok = CraftingSkills.HasRequiredLevel(src, cat, req.requireLevel)
         if not ok then return false, 'craft_level_required', { req.requireLevel } end
     end
     if req and req.costItems then

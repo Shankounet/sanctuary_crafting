@@ -1,6 +1,6 @@
 --[[
     systems/specializations.lua — spec principale (SQL > job ESX > survie)
-    Identité ≠ niveau ml_skills. BypassRequirements ne saute PAS ces gates.
+    Identité ≠ niveau skill tree. BypassRequirements ne saute PAS ces gates.
 ]]
 
 Specializations = Specializations or {}

@@ -66,7 +66,7 @@ Config.Dismantling = {
 }
 
 Config.Mastery = {
-    Enabled = true, -- maîtrise locale par recette — PAS d'XP global parallèle à ml_skills
+    Enabled = true, -- maîtrise locale par recette — PAS d'XP global parallèle à devhub_skillTree
     XpPerCraft = 1,
     MaxMastery = 100,
     MasteredThreshold = 100, -- mastery >= threshold → état « maîtrisé »
@@ -182,7 +182,7 @@ Config.Teaching = {
 
 Config.Follow = {
     -- true: pin/follow inserts a SINGLE parent recipe objective (kind='recipe').
-    -- Gather / skill / blueprint children are reconstructed LIVE (inventory + ml_skills)
+    -- Gather / skill / blueprint children are reconstructed LIVE (inventory + skill tree snapshot)
     -- and NEVER persisted. Shopping list is RAM-only from pins + followed projects.
     AutoObjectives = true,
 }
