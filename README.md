@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.23.0
+# sanctuary_crafting v2.23.1
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,16 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.23.1 — Craft: polish SORTIE / RÉCUP
+UX sortie station uniquement (pas de changement de logique v2.23.0 — pas d’auto AddItem, completed reste à la station).
+
+- **SORTIE** : en-tête clair (`1 production prête` / `SORTIE (N)`), cartes denses (image ox, label, qty, fabricant, lot, date/heure, **PRÊT**), scroll max-height + scrollbar fine.
+- **RÉCUP.** : badge compteur sur Production (`RÉCUP. N`, masqué si 0) ; boutons plaque industrielle `[ RÉCUPÉRER ]` / `RÉCUPÉRER TOUT (N)`.
+- **FILE vs SORTIE** : séparation visuelle renforcée (headers + divider). FILE = queued/processing/paused ; SORTIE = completed only.
+- **Tracker** : état **TERMINÉ** + « Disponible à [Station] » ; optionnel « À récupérer : N ». Clic entrée terminée : près de la station → ouvre craft sur panneau SORTIE/RÉCUP ; loin → notify nom de station seulement (pas de GPS).
+- **Notify** : `Production terminée / Label xN / Disponible à la [Station].`
+- Server collect / inventaire plein / anti-dupe / OutputAccess / SQL sparse / DevHub / Carnet textures : **inchangés**.
 
 ### v2.23.0 — Stations: sortie à récupérer (plus de giveItem auto)
 Les résultats de craft restent à la **sortie de station** jusqu’à collecte. Plus d’`ox_inventory:AddItem` à la fin du timer (interactif + file + catch-up offline).

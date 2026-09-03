@@ -203,7 +203,7 @@ Config.Filters = {
 
 
 --------------------------------------------------------------------------------
--- Station output (v2.23.0) — results stay at the bench until collected.
+-- Station output (v2.23.0+) — results stay at the bench until collected. UI polish v2.23.1.
 -- On timer end / offline catch-up: snapshot once, state=completed, NO AddItem.
 -- Collect at the SAME station (default). Shared stations do not allow steal.
 --------------------------------------------------------------------------------

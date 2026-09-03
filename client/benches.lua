@@ -140,6 +140,40 @@ CreateThread(function()
     TriggerServerEvent('sanctuary_crafting:server:requestSync')
 end)
 
+
+--- Resolve bench coords for proximity checks (tracker click → open RÉCUP).
+---@param benchKey string
+---@return vector3|table|nil
+function GetClientBenchCoords(benchKey)
+    if type(benchKey) ~= 'string' or benchKey == '' then return nil end
+    local entry = spawned[benchKey]
+    if entry then
+        if entry.entity and DoesEntityExist(entry.entity) then
+            return GetEntityCoords(entry.entity)
+        end
+        if entry.data and entry.data.coords then
+            return entry.data.coords
+        end
+    end
+    local worldId = benchKey:match('^world:(.+)$')
+    if worldId then
+        for i = 1, #(Config.WorldBenches or {}) do
+            local w = Config.WorldBenches[i]
+            if w and w.id == worldId and w.coords then
+                return w.coords
+            end
+        end
+    end
+    -- bare id without world: prefix
+    for i = 1, #(Config.WorldBenches or {}) do
+        local w = Config.WorldBenches[i]
+        if w and (w.id == benchKey or w.key == benchKey) and w.coords then
+            return w.coords
+        end
+    end
+    return nil
+end
+
 -- Blips monde (si Config.WorldBenches[].blip)
 CreateThread(function()
     Wait(1000)

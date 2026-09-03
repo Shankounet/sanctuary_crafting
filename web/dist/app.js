@@ -2351,10 +2351,32 @@
     if (!badge) return;
     if (n > 0) {
       badge.classList.remove('hidden');
-      badge.textContent = n > 9 ? '● ' + n : 'RÉCUP. ' + n;
       badge.classList.toggle('dot', n <= 9);
+      badge.textContent = n > 9 ? String(n) : ('RÉCUP. ' + n);
+      badge.setAttribute('aria-label', n + ' production' + (n > 1 ? 's' : '') + ' à récupérer');
     } else {
       badge.classList.add('hidden');
+      badge.textContent = 'RÉCUP.';
+      badge.removeAttribute('aria-label');
+    }
+  }
+
+  function updateSortieHeader(n) {
+    const sortieLab = $('#sortie-label');
+    const countEl = $('#sortie-count');
+    const split = $('#sortie-split');
+    const divider = document.querySelector('#app .prod-split-divider');
+    const show = n > 0 || !!(state.flags && state.flags.stationOutput);
+    if (sortieLab) sortieLab.classList.toggle('hidden', !show && n === 0);
+    if (split) split.classList.toggle('hidden', !show && n === 0);
+    if (divider) divider.classList.toggle('hidden', !show && n === 0);
+    if (!countEl) return;
+    if (n <= 0) {
+      countEl.textContent = '';
+    } else if (n === 1) {
+      countEl.textContent = '1 production prête';
+    } else {
+      countEl.textContent = '(' + n + ')';
     }
   }
 
@@ -2369,12 +2391,14 @@
   function renderOutput() {
     const track = $('#output-list');
     const actions = $('#output-actions');
-    const sortieLab = $('#sortie-label');
+    const collectAll = $('#btn-collect-all');
     if (!track) return;
     track.innerHTML = '';
     const list = state.output || [];
-    if (sortieLab) sortieLab.classList.toggle('hidden', list.length === 0 && !(state.flags && state.flags.stationOutput));
-    if (actions) actions.classList.toggle('hidden', list.length === 0);
+    const n = list.length;
+    updateSortieHeader(n);
+    if (actions) actions.classList.toggle('hidden', n === 0);
+    if (collectAll) collectAll.textContent = n > 0 ? ('RÉCUPÉRER TOUT (' + n + ')') : 'RÉCUPÉRER TOUT';
     list.forEach((e) => {
       const qty = e.resultCount || e.count || e.batch || 1;
       const card = document.createElement('div');
@@ -2384,18 +2408,20 @@
       img.alt = '';
       bindItemImg(img, e.resultItem || e.item || e.recipeId, null);
       const mid = document.createElement('div');
+      mid.className = 'omid';
       const bits = [];
-      if (e.quality) bits.push(e.quality);
       if (e.craftedBy) bits.push(e.craftedBy);
       if (e.lot) bits.push('LOT ' + e.lot);
-      if (e.finishedAt) bits.push(formatFinished(e.finishedAt));
-      mid.innerHTML = '<div class="olabel"></div><div class="ometa"></div>';
+      if (e.quality) bits.push(e.quality);
+      if (e.finishedAt || e.finishAt) bits.push(formatFinished(e.finishedAt || e.finishAt));
+      mid.innerHTML = '<div class="olabel"></div><div class="ometa"></div><div class="ostatus">PRÊT</div>';
       mid.querySelector('.olabel').textContent = (e.label || e.recipeId || 'Objet') + ' ×' + qty;
-      mid.querySelector('.ometa').textContent = bits.join(' · ') || 'Prêt';
+      mid.querySelector('.ometa').textContent = bits.join(' · ') || '—';
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'ghost compact qrecup';
+      btn.className = 'recup-plate qrecup';
       btn.textContent = 'RÉCUPÉRER';
+      btn.setAttribute('aria-label', 'Récupérer');
       btn.addEventListener('click', async (ev) => {
         ev.stopPropagation();
         const r = await post('collectCraft', { craftId: e.craftId, benchKey: state.benchKey });
@@ -2996,7 +3022,15 @@
       } else {
         loadQueue().then(() => updateFabIdleConsole());
       }
-      openTab(state.sideTab || 'queue');
+      if (msg.data && msg.data.focusOutput) {
+        openTab('queue');
+        requestAnimationFrame(() => {
+          const sortie = $('#sortie-split') || $('#sortie-label') || $('#output-list');
+          if (sortie && sortie.scrollIntoView) sortie.scrollIntoView({ block: 'nearest' });
+        });
+      } else {
+        openTab(state.sideTab || 'queue');
+      }
       if (msg.data && msg.data.ui && msg.data.ui.Accent) {
         document.documentElement.style.setProperty('--accent', msg.data.ui.Accent);
       }
