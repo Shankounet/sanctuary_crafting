@@ -1,13 +1,12 @@
 /* =============================================================================
-   Survival Book v2.9.0 — diegetic field journal
-   Ivory paper, leather binding, edge tabs. Scope: #book-app only.
-   CEF-safe: system fonts, no @import, no feTurbulence, no mix-blend,
-   no opacity-open animations stuck at 0.
+   Survival Book v2.20.0 — textures calées sur les refs vintage
+   Leather cover/spine only. Yellowed pages + distinct insert papers.
+   CEF-safe: system fonts, no @import, no feTurbulence, no mix-blend.
    ============================================================================= */
 
 :root {
   --book-accent: #9a8866;
-  --book-ink: #2c2418;
+  --book-ink: #2a2218;
   --book-ink-soft: #5a4e3c;
   --book-muted: #7a6e5a;
   --book-paper: #f2e6c8;
@@ -2631,20 +2630,23 @@
    ONE principal texture per element. No overlays. No gradients on PNGs.
    NEVER transparent pages/inserts over leather.
 
-   MAPPING
-     cover / outer / binding     tex/leather_cover.png
-     left + right pages          tex/paper_aged_new.png
-     Accueil glued fiches        tex/paper_aged_new.png (LIGHT crop, not paper_dark)
-     Resource fiche + index slips tex/paper_aged_new.png (LIGHT crop, not paper_dark)
-     Notes clips / detail fiche  tex/paper_aged_new.png (LIGHT crop, not paper_dark)
-     new note leaf               tex/paper_aged_new.png (different crop)
+   MAPPING v2.20.0 (crops from docs/refs/)
+     cover / outer / binding     tex/ref_cover.png
+     left + right pages          tex/ref_page.png
+     notes leaf / clips          tex/ref_sheet_lined.png
+     projet / déblocage / slips  tex/ref_sheet_tan.png
+     découverte / polaroid/fiches tex/ref_sheet_worn.png (LIGHT)
      post-its                    tex/postit_{yellow,blue,green,pink}.png
+     tabs                        CSS colors only (no paper PNG)
    ============================================================ */
 #book-app {
-  --bookCoverTexture: url("tex/leather_cover.png");
-  --mainPageTexture: url("tex/paper_aged_new.png");
-  --alternatePageTexture: url("tex/paper_dark.png");
-  --lightSheetTexture: url("tex/paper_aged_new.png");
+  --bookCoverTexture: url("tex/ref_cover.png");
+  --mainPageTexture: url("tex/ref_page.png");
+  --linedSheetTexture: url("tex/ref_sheet_lined.png");
+  --tanSheetTexture: url("tex/ref_sheet_tan.png");
+  --wornSheetTexture: url("tex/ref_sheet_worn.png");
+  --alternatePageTexture: url("tex/ref_sheet_tan.png");
+  --lightSheetTexture: url("tex/ref_sheet_worn.png");
   --postitBlue: url("tex/postit_blue.png");
   --postitGreen: url("tex/postit_green.png");
   --postitPink: url("tex/postit_pink.png");
@@ -2744,33 +2746,19 @@
   border-width: 0 !important;
 }
 
-/* MAIN paper inserts: polaroid, visit cards, tabs, blueprints, index */
-
+/* MAIN paper inserts: visit cards / blueprints / index sheet — NOT tabs */
 #book-app .visit-card,
 #book-app .visit-card.business-card,
 #book-app .vc-card,
 #book-app .blueprint-sheet,
 #book-app .bp-sheet,
-#book-app .book-index-sheet,
-#book-app .book-edge-tabs button,
-#book-app .book-edge-tabs button:nth-child(n),
-#book-app .book-edge-tabs button.active,
-#book-app .book-edge-tabs button.active:nth-child(odd),
-#book-app .book-edge-tabs button.active:nth-child(even),
-#book-app .book-index-tab,
-#book-app .book-index-tab.active {
-  background-color: #e8dcc4 !important;
-  background-image: var(--mainPageTexture) !important;
-  background-size: cover !important;
+#book-app .book-index-sheet {
+  background-color: #cbb892 !important;
+  background-image: var(--tanSheetTexture) !important;
+  background-size: 140% 140% !important;
   background-repeat: no-repeat !important;
-  background-position: center !important;
-}
-#book-app .book-edge-tabs button,
-#book-app .book-edge-tabs button:nth-child(n),
-#book-app .book-edge-tabs button.active,
-#book-app .book-index-tab,
-#book-app .book-index-tab.active {
-  color: #2a2014 !important;
+  background-position: 40% 30% !important;
+  color: #2a2218 !important;
 }
 
 #book-app .blueprint-sheet.folded::after {
@@ -2778,20 +2766,28 @@
   border-color: transparent !important;
 }
 
-/* SECONDARY paper: glued fiches / documents — ONE texture, tints do not recolor */
+/* SECONDARY papers: tan projet / worn découverte — never leather, never page fill */
 #book-app .scrap-note,
 #book-app .scrap-note.tint-warm,
-#book-app .scrap-note.tint-cool,
 #book-app .scrap-note.tint-rose,
 #book-app .dossier-sheet,
-#book-app .disc-card,
-#book-app .discovery-card,
 #book-app .tech-plan {
-  background-color: #c4ae86 !important;
-  background-image: var(--alternatePageTexture) !important;
-  background-size: cover !important;
+  background-color: #cbb892 !important;
+  background-image: var(--tanSheetTexture) !important;
+  background-size: 145% 145% !important;
   background-repeat: no-repeat !important;
-  background-position: center !important;
+  background-position: 30% 40% !important;
+  color: #2a2218 !important;
+}
+#book-app .scrap-note.tint-cool,
+#book-app .disc-card,
+#book-app .discovery-card {
+  background-color: #e8dcc4 !important;
+  background-image: var(--wornSheetTexture) !important;
+  background-size: 150% 150% !important;
+  background-repeat: no-repeat !important;
+  background-position: 60% 30% !important;
+  color: #2a2218 !important;
 }
 #book-app .scrap-note.tint-warm { background-position: 20% 30% !important; }
 #book-app .scrap-note.tint-cool { background-position: 70% 40% !important; }
@@ -2843,11 +2839,11 @@
     76% 99.5%, 39% 98.7%, 1.8% 100%,
     0% 68%, 0.9% 31%
   );
-  background-color: #e8dcc4 !important;
-  background-image: var(--mainPageTexture) !important;
+  background-color: #e6d9b8 !important;
+  background-image: var(--linedSheetTexture) !important;
   background-repeat: no-repeat !important;
-  background-size: 170% 170% !important;
-  background-position: 74% 18% !important;
+  background-size: 140% 140% !important;
+  background-position: 20% 10% !important;
   color: #2a2218;
 }
 #book-app .note-leaf-head {
@@ -3268,7 +3264,7 @@
 
 /* ============================================================
    v2.18.0 — Resources encyclopedia: LIGHT paper crop on fiches
-   leather remains cover/binding only. paper_dark is not writing surface.
+   leather remains cover/binding only. inserts use worn/tan, never cover.
    ============================================================ */
 #book-app .ency-fiche,
 #book-app .ency-slip,
@@ -3408,19 +3404,21 @@
   text-underline-offset: 3px;
 }
 
-/* Hunt: Notes content must never paint leather / paper_dark / coverTexture */
+/* Hunt: Notes content never leather / cover — lined sheet family */
 #book-app .note-leaf,
-#book-app .note-leaf-wrap,
 #book-app .note-clip,
-#book-app .note-detail,
+#book-app .note-detail {
+  background-image: var(--linedSheetTexture);
+}
+#book-app .note-leaf-wrap,
 #book-app .notes-empty,
 #book-app #note-list {
-  background-image: var(--lightSheetTexture, var(--mainPageTexture));
+  background-image: none;
 }
 #book-app .note-leaf {
-  background-image: var(--mainPageTexture) !important;
-  background-size: 170% 170% !important;
-  background-position: 74% 18% !important;
+  background-image: var(--linedSheetTexture) !important;
+  background-size: 140% 140% !important;
+  background-position: 20% 10% !important;
 }
 #book-app .note-leaf-wrap,
 #book-app .notes-empty,
@@ -3430,6 +3428,278 @@
 }
 #book-app .note-clip,
 #book-app .note-detail {
-  background-image: var(--lightSheetTexture) !important;
-  background-color: #e8dcc4 !important;
+  background-image: var(--linedSheetTexture) !important;
+  background-color: #e6d9b8 !important;
+}
+
+
+/* ============================================================
+   v2.20.0 — STRICT ref mapping (wins over earlier material rules)
+   cover = ref_cover (leather outer/spine only)
+   pages = ref_page (direct PNG, no beige overlay)
+   inserts = lined / tan / worn — one texture each
+   tabs = muted distinct CSS colors, never page paper
+   CEF-safe: no mix-blend, no feTurbulence, no Google Fonts
+   ============================================================ */
+
+#book-app .book-page-inner,
+#book-app .book-page-inner p,
+#book-app .book-page-inner li,
+#book-app .book-page-inner h2,
+#book-app .book-page-inner h3,
+#book-app .book-page-inner h4,
+#book-app .scrap-title,
+#book-app .scrap-body,
+#book-app .hand-note,
+#book-app .hand-name,
+#book-app .section-title,
+#book-app .book-page-title {
+  color: #2a2218;
+}
+#book-app .scrap-title,
+#book-app .section-title,
+#book-app .book-page-title,
+#book-app .dossier-mark {
+  font-family: var(--book-ui);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+#book-app .scrap-body {
+  font-family: "Courier New", Courier, "Lucida Console", monospace;
+}
+#book-app .checklist .box {
+  border-radius: 50%;
+  background: transparent !important;
+  border: 1.5px solid #2a2218;
+}
+
+/* Pages: PNG only, no solid beige hiding the crop */
+#book-app .book-page,
+#book-app .book-page-left,
+#book-app .book-page-right,
+#book-app.is-open .book-page,
+#book-app.is-open .book-page-left,
+#book-app.is-open .book-page-right,
+#book-app:not(.hidden) .book-page,
+#book-app:not(.hidden) .book-page-left,
+#book-app:not(.hidden) .book-page-right {
+  background-color: #d8c49a !important;
+  background-image: var(--mainPageTexture) !important;
+  background-size: 130% 130% !important;
+  background-repeat: no-repeat !important;
+}
+#book-app .book-page-left,
+#book-app.is-open .book-page-left,
+#book-app:not(.hidden) .book-page-left {
+  background-position: 8% 40% !important;
+}
+#book-app .book-page-right,
+#book-app.is-open .book-page-right,
+#book-app:not(.hidden) .book-page-right {
+  background-position: 88% 55% !important;
+}
+
+/* Cover / binding leather ONLY */
+#book-app .book-cover,
+#book-app .book-cover-left,
+#book-app .book-cover-right,
+#book-app .book-binding,
+#book-app.is-open .book-binding {
+  background-color: #2a1a10 !important;
+  background-image: var(--bookCoverTexture) !important;
+}
+
+/* Accueil polaroid = light worn paper, not leather */
+#book-app .id-polaroid,
+#book-app .id-polaroid.accueil-sheet,
+#book-app .accueil-hero .id-polaroid {
+  background-color: #eadcc0 !important;
+  background-image: var(--wornSheetTexture) !important;
+  background-size: 160% 160% !important;
+  background-position: 25% 70% !important;
+  color: #2a2218 !important;
+}
+
+/* Accueil day-note = lined leaf */
+#book-app .day-note,
+#book-app .day-note.accueil-sheet {
+  background-color: #e6d9b8 !important;
+  background-image: var(--linedSheetTexture) !important;
+  background-size: 150% 150% !important;
+  background-position: 40% 20% !important;
+  color: #2a2218 !important;
+}
+
+/* Accueil projet tan / découverte worn / déblocage tan */
+#book-app .scrap-note.accueil-sheet.tint-warm,
+#book-app .scrap-note.accueil-sheet.rot-l {
+  background-image: var(--tanSheetTexture) !important;
+  background-color: #cbb892 !important;
+  background-size: 150% 150% !important;
+  background-position: 22% 40% !important;
+}
+#book-app .scrap-note.accueil-sheet.tint-cool,
+#book-app .scrap-note.accueil-sheet.rot-r {
+  background-image: var(--wornSheetTexture) !important;
+  background-color: #eadcc0 !important;
+  background-size: 155% 155% !important;
+  background-position: 70% 28% !important;
+}
+#book-app .dossier-sheet.accueil-sheet,
+#book-app .dossier-sheet {
+  background-image: var(--tanSheetTexture) !important;
+  background-color: #cbb892 !important;
+  background-size: 160% 160% !important;
+  background-position: 48% 80% !important;
+}
+
+/* Notes composer + list slips = lined, never cover leather */
+#book-app .note-leaf,
+#book-app .note-clip,
+#book-app .note-detail {
+  background-image: var(--linedSheetTexture) !important;
+  background-color: #e6d9b8 !important;
+  color: #2a2218 !important;
+}
+#book-app .note-leaf-wrap,
+#book-app .notes-empty,
+#book-app #note-list {
+  background: none !important;
+  background-image: none !important;
+}
+
+/* Resources fiches = light worn; index slips = tan */
+#book-app .ency-fiche,
+#book-app .ency-polaroid {
+  background-image: var(--wornSheetTexture) !important;
+  background-color: #eadcc0 !important;
+  color: #2a2218 !important;
+}
+#book-app .ency-slip {
+  background-image: var(--tanSheetTexture) !important;
+  background-color: #cbb892 !important;
+  color: #2a2218 !important;
+}
+
+/* ---- Colored edge tabs (ref: beige/olive/slate/rust/terra/mustard/teal/purple) ---- */
+#book-app .book-edge-tabs {
+  right: -112px !important;
+  width: 112px !important;
+  top: 22px !important;
+  bottom: 28px !important;
+  gap: 5px !important;
+  overflow: visible !important;
+}
+#book-app .book-edge-tabs button,
+#book-app .book-edge-tabs button:nth-child(n),
+#book-app .book-edge-tabs button.active,
+#book-app .book-edge-tabs button.active:nth-child(odd),
+#book-app .book-edge-tabs button.active:nth-child(even) {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 7px !important;
+  width: 112px !important;
+  min-height: 46px !important;
+  height: auto !important;
+  max-height: none !important;
+  padding: 8px 10px 8px 8px !important;
+  font-family: var(--book-ui) !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.07em !important;
+  text-transform: uppercase !important;
+  line-height: 1.15 !important;
+  background-image: none !important;
+  border: 1px solid rgba(40, 28, 16, 0.38) !important;
+  border-left: none !important;
+  border-radius: 0 6px 6px 0 !important;
+  box-shadow:
+    2px 2px 5px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+  overflow: hidden !important;
+}
+#book-app .book-edge-tabs button i {
+  flex: 0 0 14px;
+  width: 14px;
+  font-size: 11px;
+  text-align: center;
+  color: inherit;
+}
+#book-app .book-edge-tabs button span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 1 Accueil beige */
+#book-app .book-edge-tabs button:nth-child(1),
+#book-app .book-edge-tabs button.mat-terre {
+  background: #c4b392 !important;
+  color: #2a2218 !important;
+}
+/* 2 Progrès olive */
+#book-app .book-edge-tabs button:nth-child(2),
+#book-app .book-edge-tabs button.mat-olive {
+  background: #6a7048 !important;
+  color: #f4efe4 !important;
+}
+/* 3 Objectifs slate blue */
+#book-app .book-edge-tabs button:nth-child(3),
+#book-app .book-edge-tabs button.mat-ocre {
+  background: #5c6b7a !important;
+  color: #f4efe4 !important;
+}
+/* 4 Projets rusty orange */
+#book-app .book-edge-tabs button:nth-child(4),
+#book-app .book-edge-tabs button.mat-bleu {
+  background: #b5683a !important;
+  color: #f4efe4 !important;
+}
+/* 5 Ressources terracotta */
+#book-app .book-edge-tabs button:nth-child(5),
+#book-app .book-edge-tabs button.mat-brun {
+  background: #a35442 !important;
+  color: #f4efe4 !important;
+}
+/* 6 Plans mustard */
+#book-app .book-edge-tabs button:nth-child(6),
+#book-app .book-edge-tabs button.mat-beige {
+  background: #c4a04a !important;
+  color: #2a2218 !important;
+}
+/* 7 Artisans teal */
+#book-app .book-edge-tabs button:nth-child(7),
+#book-app .book-edge-tabs button.mat-cardboard {
+  background: #3f7a72 !important;
+  color: #f4efe4 !important;
+}
+/* 8 Notes dusty purple */
+#book-app .book-edge-tabs button:nth-child(8),
+#book-app .book-edge-tabs button.mat-cloth {
+  background: #7a6580 !important;
+  color: #f4efe4 !important;
+}
+
+#book-app .book-edge-tabs button.active {
+  transform: translateX(4px) !important;
+  padding-right: 12px !important;
+  box-shadow:
+    3px 3px 8px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+}
+#book-app .book-edge-tabs button:hover {
+  transform: translateX(3px) !important;
+}
+
+#book-app .book-index-tab,
+#book-app .book-index-tab.active {
+  background-image: none !important;
+  background: #5a4636 !important;
+  color: #f4efe4 !important;
+}
+#book-app .book-index-tab.active {
+  background: #7a6548 !important;
 }

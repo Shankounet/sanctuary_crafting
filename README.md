@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.19.2
+# sanctuary_crafting v2.20.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,9 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.20.0 — Carnet: textures et style calés sur les refs vintage
+Carnet visuel recalé sur les mockups vintage: cuir `ref_cover` uniquement sur couverture/tranche, pages `ref_page`, inserts lined/tan/worn (crops depuis les refs). Onglets colorés distincts (plus de beige uniforme). Encre `#2a2218`. Callbacks NUI / craft / tracker / SQL inchangés.
 
 ### v2.19.2 -- Table Medicale: point d'interaction seul (pas de prop spawn)
 Banc monde `medical_crafting` (station/category `medical`) déplacé vers vec3(-1124.239624, 4890.592285, 219.350479). Heading inchangé. `type = 'coords'` (plus de `model`/`prop`). ox_target zone sur la table MLO existante. Autres stations inchangées.
