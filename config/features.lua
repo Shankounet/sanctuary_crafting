@@ -120,6 +120,8 @@ Config.UI = {
         KnowledgeMarks = true,    -- marques knowledge (silhouette / voile / plan / maîtrise)
         PathHints = true,         -- module CHEMIN RECOMMANDÉ (fiche droite)
         ArtisanHints = true,      -- module ARTISANS CONNUS (fiche droite)
+        HaveWhatIHave = true,     -- filtre AVEC CE QUE J'AI
+        MaterialPopover = true,   -- popover clic matériau (recettes / chemin / courses)
     },
 }
 
@@ -134,6 +136,10 @@ Config.Compare = {
 Config.Power = Config.Power or { Enabled = false }
 if Config.Power.FallbackModules == nil then
     Config.Power.FallbackModules = { 'power_cell', 'generator' }
+end
+-- Pause in-progress crafts when station power is lost (only if Config.Power.Enabled).
+if Config.Power.PauseOnLoss == nil then
+    Config.Power.PauseOnLoss = true
 end
 
 -- Survival Book : voir config/book.lua (Config.Book.*)
@@ -185,6 +191,14 @@ Config.Follow = {
     -- Gather / skill / blueprint children are reconstructed LIVE (inventory + skill tree snapshot)
     -- and NEVER persisted. Shopping list is RAM-only from pins + followed projects.
     AutoObjectives = true,
+    -- ox_lib notify when a followed/pinned recipe becomes faisable (inventory / craft complete).
+    NotifyWhenCraftable = true,
+}
+
+-- Catalogue filters (NUI, client-side on getMenu payload)
+Config.Filters = {
+    -- AVEC CE QUE J'AI = faisable + optionally PRESQUE with exactly 1 missing material
+    HaveWhatIHaveIncludeAlmost = true,
 }
 
 -- Full craft history in sanctuary_book_history. Default OFF (sparse).

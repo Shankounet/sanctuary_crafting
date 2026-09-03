@@ -52,6 +52,27 @@ local function recipeFacingDesc(recipe)
     return (recipe and recipe.description) or 'Aucune description disponible.'
 end
 
+local function categoryFacingLabel(cat)
+    if not cat then return nil end
+    local def = Config.RecipeCategories and Config.RecipeCategories[cat]
+    if def and type(def.label) == 'string' and def.label ~= '' then
+        return def.label
+    end
+    return nil
+end
+
+local function stationFacingLabel(station)
+    if type(station) ~= 'string' or station == '' then return nil end
+    local localeKey = Config.BenchLabels and Config.BenchLabels[station]
+    if localeKey then
+        local lab = _(localeKey)
+        if type(lab) == 'string' and lab ~= '' and lab ~= localeKey then
+            return lab
+        end
+    end
+    return nil
+end
+
 local function recipeHasSteps(recipe)
     return recipe and type(recipe.steps) == 'table' and #recipe.steps > 0
 end
@@ -127,8 +148,12 @@ local function clearActive(craftId, refund)
 end
 
 --- remainingMs: duration(ms) - elapsed(ms). Never mix with os.time() seconds.
+--- Paused crafts freeze remaining (power loss) — do not tick, do not delete.
 local function remainingMsOf(craft)
     if not craft then return 0 end
+    if craft.paused or craft.state == 'paused' then
+        return math.max(0, tonumber(craft.pausedRemainingMs) or 0)
+    end
     local nowMs = GetGameTimer() -- ms
     local startedAtMs = tonumber(craft.startedAt) or nowMs -- GetGameTimer ms
     local durationMs = tonumber(craft.duration) or 0 -- ms
@@ -937,7 +962,56 @@ lib.callback.register('sanctuary_crafting:completeCraft', function(src, craftId)
     })
 end)
 
+local function powerPauseEnabled()
+    return Config.Power and Config.Power.Enabled == true and Config.Power.PauseOnLoss ~= false
+end
+
+local function craftHasPower(craft)
+    if not powerPauseEnabled() then return true end
+    if not craft then return true end
+    local bench = Benches and Benches.Resolve and Benches.Resolve(craft.benchKey)
+    local recipe = (RecipeSnapshot and RecipeSnapshot.Of and RecipeSnapshot.Of(craft)) or craft.snapshot
+    if CraftingPower and CraftingPower.HasPower then
+        return CraftingPower.HasPower(bench, recipe) == true
+    end
+    return true
+end
+
+local function pauseCraftPower(craft)
+    if not craft or craft.paused or craft.state == 'paused' then return end
+    if craft.state and craft.state ~= 'running' then return end
+    craft.pausedRemainingMs = remainingMsOf(craft)
+    craft.paused = true
+    craft.state = 'paused'
+    craft.pausedAt = os.time()
+    TriggerClientEvent('sanctuary_crafting:client:craftPaused', craft.src, {
+        craftId = craft.craftId,
+        remainingMs = craft.pausedRemainingMs,
+        benchKey = craft.benchKey,
+        label = craft.recipeId,
+    })
+end
+
+local function resumeCraftPower(craft)
+    if not craft or not (craft.paused or craft.state == 'paused') then return end
+    local rem = math.max(0, tonumber(craft.pausedRemainingMs) or 0)
+    local orig = tonumber(craft.duration) or rem
+    -- Keep original duration; shift startedAt so remaining = rem
+    craft.startedAt = GetGameTimer() - math.max(0, orig - rem)
+    craft.paused = false
+    craft.pausedRemainingMs = nil
+    craft.pausedAt = nil
+    craft.state = 'running'
+    TriggerClientEvent('sanctuary_crafting:client:craftResumed', craft.src, {
+        craftId = craft.craftId,
+        remainingMs = rem,
+        duration = orig,
+        benchKey = craft.benchKey,
+    })
+end
+
 --- Watchdog: never leave a craft running at remainingMs<=0 (100% / 0s / FINALISATION).
+--- Also pause/resume on station power when Config.Power.Enabled (existing integration).
 CreateThread(function()
     while true do
         Wait(2000)
@@ -947,15 +1021,28 @@ CreateThread(function()
         end
         for i = 1, #ids do
             local craft = activeById[ids[i]]
-            if craft and craft.state == 'running' and remainingMsOf(craft) <= 0 then
-                craftLog(('[CRAFT] finished timestamp reached id=%s finishesAt=%s'):format(
-                    craft.craftId, tostring(finishesAtUnixOf(craft))
-                ))
-                CraftingPipeline.FinalizeCraft(craft.src, craft.craftId, {
-                    reason = 'watchdog',
-                    requireNear = false,
-                })
+            if craft then
+                if powerPauseEnabled() then
+                    local powered = craftHasPower(craft)
+                    if not powered and (craft.state == 'running' or not craft.state) then
+                        pauseCraftPower(craft)
+                    elseif powered and (craft.paused or craft.state == 'paused') then
+                        resumeCraftPower(craft)
+                    end
+                end
+                if craft.state == 'running' and remainingMsOf(craft) <= 0 then
+                    craftLog(('[CRAFT] finished timestamp reached id=%s finishesAt=%s'):format(
+                        craft.craftId, tostring(finishesAtUnixOf(craft))
+                    ))
+                    CraftingPipeline.FinalizeCraft(craft.src, craft.craftId, {
+                        reason = 'watchdog',
+                        requireNear = false,
+                    })
+                end
             end
+        end
+        if powerPauseEnabled() and CraftQueue and CraftQueue.TickPower then
+            CraftQueue.TickPower()
         end
     end
 end)
@@ -1035,6 +1122,7 @@ local function serializeActiveCraft(craft)
         batch = batch,
         quantity = batch,
         state = craft.state or 'running',
+        paused = craft.paused == true or craft.state == 'paused',
         startedAt = startedUnix,
         finishesAt = finishesAt,
         duration = remainingMs,
@@ -1102,6 +1190,10 @@ function CraftingPipeline.GetSession(src, benchKey)
                 local createdAt = tonumber(e.createdAt) or finishAt
                 local durationMs = tonumber(e.duration) or math.max(0, (finishAt - createdAt) * 1000)
                 local remainingMs = math.max(0, (finishAt - os.time()) * 1000)
+                local qState = e.paused and 'paused' or 'queued'
+                if e.paused and e.pausedRemaining then
+                    remainingMs = math.max(0, tonumber(e.pausedRemaining) or 0) * 1000
+                end
                 queued[#queued + 1] = {
                     craftId = e.craftId,
                     recipeId = e.recipeId,
@@ -1117,7 +1209,8 @@ function CraftingPipeline.GetSession(src, benchKey)
                     durationMs = durationMs,
                     remainingMs = remainingMs,
                     label = e.label,
-                    state = 'queued',
+                    state = qState,
+                    paused = e.paused == true,
                 }
             end
         end
@@ -1642,16 +1735,39 @@ local function buildRecipeEntry(src, r, ctx)
         levelGap = nil
     end
 
+    -- PRESQUE: only if close — one missing material OR small missing qty OR one light prereq.
+    -- Totally inaccessible (wrong spec, unknown blueprint, far from level) = NON FAISABLE.
+    local hardLock = lockReason == 'craft_spec_required'
+        or lockReason == 'craft_blueprint_required'
+        or lockReason == 'craft_knowledge_required'
+        or lockReason == 'craft_skills_unavailable'
+    local farLevel = (levelGap ~= nil and levelGap > 2)
+    local stationGap = nil
+    if lockReason == 'craft_station_level' and r.stationLevel and bench then
+        stationGap = math.max(0, (tonumber(r.stationLevel) or 0) - (tonumber(bench.stationLevel) or 1))
+        if stationGap > 1 then farLevel = true end
+    end
+    local oneMissingMat = (missingCount == 1)
+    local smallMissingQty = false
+    if oneMissingMat and primaryMissing then
+        local deficit = (primaryMissing.count or 1) - (primaryMissing.owned or 0)
+        smallMissingQty = deficit > 0 -- single ingredient missing (any deficit of that one item)
+    end
+    local lightPrereq = false
+    if not hardLock and hasItems then
+        if levelGap ~= nil and levelGap > 0 and levelGap <= 2 then lightPrereq = true end
+        if stationGap ~= nil and stationGap == 1 then lightPrereq = true end
+        if lockReason == 'craft_tool_required' and toolDurability ~= nil and toolDurability > 0 and toolDurability <= 15 then
+            lightPrereq = true
+        end
+    end
     local almostCraftable = false
-    if not (canCraft and hasItems) then
-        if canCraft and not hasItems and missingCount == 1 then
+    if not (canCraft and hasItems) and not hardLock and not farLevel then
+        if canCraft and not hasItems and oneMissingMat then
             almostCraftable = true
-        elseif levelGap ~= nil and levelGap > 0 and levelGap <= 2 and hasItems then
+        elseif (not canCraft) and hasItems and lightPrereq then
             almostCraftable = true
-        elseif toolDurability ~= nil and toolDurability > 0 and toolDurability <= 15 and hasItems and canCraft == false then
-            -- tool nearly broken while other gates may vary — hint only when tools matter
-            almostCraftable = true
-        elseif not canCraft and hasItems and lockReason == 'craft_tool_required' and toolDurability ~= nil and toolDurability <= 15 then
+        elseif canCraft and not hasItems and smallMissingQty then
             almostCraftable = true
         end
     end
@@ -1760,6 +1876,144 @@ local function buildRecipeEntry(src, r, ctx)
         relatedRecipeId = r.relatedRecipeId,
     }
 
+    -- Structured French reasons for NUI badges (never dump uids / snake_case).
+    local catLab = (facing and facing.categoryLabel) or (SkillTree and SkillTree.CategoryLabel and SkillTree.CategoryLabel(skillCategory)) or nil
+    local talentLab = facing and facing.requiredSkillLabel or nil
+    local specLab = requireSpecLabel
+    local stationLab = stationFacingLabel(r.station) or (ctx and ctx.bench and ctx.bench.label) or nil
+    local uiCatLab = categoryFacingLabel(r.category)
+
+    local function fmtMissing(pm)
+        if not pm then return 'Matériaux insuffisants' end
+        local lab = pm.label or itemLabelOf(pm.item)
+        local n = math.max(1, (pm.count or 1) - (pm.owned or 0))
+        return ('Il manque : %s x%d'):format(lab, n)
+    end
+
+    local almostReason = nil
+    if almostCraftable then
+        if missingCount >= 1 and primaryMissing then
+            almostReason = fmtMissing(primaryMissing)
+        elseif lockReason == 'craft_level_required' then
+            local need = (lockArgs and lockArgs[1]) or (r.skillTree and r.skillTree.requiredLevel) or r.requireLevel
+            local cur = (lockArgs and lockArgs[2]) or playerSkillLevel
+            almostReason = ('Niveau %s %s / %s'):format(catLab or 'Survie', tostring(cur or '—'), tostring(need or '—'))
+        elseif lockReason == 'craft_skill_required' then
+            almostReason = talentLab and ('Talent requis : %s'):format(talentLab) or 'Talent DevHub non débloqué'
+        elseif lockReason == 'craft_station_level' then
+            almostReason = ('Station niveau %s requise'):format(tostring(r.stationLevel or 2))
+        elseif lockReason == 'craft_tool_required' then
+            almostReason = 'Outil usé'
+        else
+            almostReason = 'Une seule condition mineure manque'
+        end
+    end
+
+    local blockReason
+    if canCraft and hasItems then
+        blockReason = 'Conditions remplies'
+    elseif lockReason == 'craft_knowledge_required' then
+        blockReason = 'Plan inconnu'
+    elseif lockReason == 'craft_blueprint_required' then
+        blockReason = 'Plan inconnu'
+    elseif lockReason == 'craft_spec_required' then
+        blockReason = specLab and ('Spécialisation %s requise'):format(specLab) or 'Spécialisation requise'
+    elseif lockReason == 'craft_skill_required' then
+        blockReason = talentLab and ('Talent DevHub non débloqué : %s'):format(talentLab) or 'Talent DevHub non débloqué'
+    elseif lockReason == 'craft_level_required' then
+        local need = (lockArgs and lockArgs[1]) or (r.skillTree and r.skillTree.requiredLevel) or r.requireLevel
+        local cur = (lockArgs and lockArgs[2]) or playerSkillLevel
+        blockReason = ('Niveau %s %s / %s'):format(catLab or 'Survie', tostring(cur or '—'), tostring(need or '—'))
+    elseif lockReason == 'craft_station_level' then
+        blockReason = ('Station niveau %s requise'):format(tostring(r.stationLevel or ''))
+    elseif lockReason == 'craft_no_power' then
+        blockReason = 'Atelier hors tension'
+    elseif lockReason == 'craft_tool_required' then
+        blockReason = 'Outil requis manquant ou usé'
+    elseif lockReason == 'craft_skills_unavailable' then
+        blockReason = 'Système de compétences indisponible'
+    elseif not hasItems then
+        if missingCount == 1 and primaryMissing then
+            blockReason = fmtMissing(primaryMissing)
+        else
+            blockReason = 'Matériaux insuffisants'
+        end
+    else
+        blockReason = 'Non faisable'
+    end
+
+    local lockHint = nil
+    if not canCraft then
+        if lockReason == 'craft_skill_required' then
+            lockHint = talentLab and ('Verrouillée — Talent requis : %s'):format(talentLab) or 'Verrouillée — Talent requis'
+        elseif lockReason == 'craft_blueprint_required' or lockReason == 'craft_knowledge_required' then
+            lockHint = 'Verrouillée — Plan requis'
+        elseif lockReason == 'craft_spec_required' then
+            lockHint = specLab and ('Verrouillée — Spécialisation %s requise'):format(specLab) or 'Verrouillée — Spécialisation requise'
+        else
+            lockHint = 'Verrouillée — ' .. (blockReason or 'condition manquante')
+        end
+    end
+
+    -- max currently craftable from already-fetched owned counts (no extra ox/DevHub)
+    local maxCraftable = 0
+    local maxCraftableCause = nil
+    do
+        local cap = 50
+        if CraftBatch and CraftBatch.RecipeCap then
+            cap = CraftBatch.RecipeCap(r)
+        elseif r.batchMax then
+            cap = tonumber(r.batchMax) or cap
+        elseif r.maxQuantity then
+            cap = tonumber(r.maxQuantity) or cap
+        end
+        local matsMax = cap
+        for i = 1, #ingsOut do
+            local need = ingsOut[i].count or 1
+            if need < 1 then need = 1 end
+            local canN = math.floor((ingsOut[i].owned or 0) / need)
+            if canN < matsMax then matsMax = canN end
+        end
+        if not canCraft then
+            maxCraftable = 0
+            maxCraftableCause = blockReason
+        elseif toolDurability ~= nil and toolDurability <= 0 then
+            maxCraftable = 0
+            maxCraftableCause = 'Outil requis manquant ou usé'
+        else
+            maxCraftable = math.max(0, matsMax)
+            if maxCraftable <= 0 then
+                maxCraftableCause = (primaryMissing and fmtMissing(primaryMissing)) or 'Matériaux insuffisants'
+            end
+        end
+    end
+
+    local hayParts = {
+        recipeFacingLabel(r), recipeFacingDesc(r), uiCatLab, r.category,
+        stationLab, r.station, specLab, talentLab, catLab,
+    }
+    for i = 1, #ingsOut do
+        hayParts[#hayParts + 1] = ingsOut[i].label
+    end
+    if type(resultOut) == 'table' then
+        hayParts[#hayParts + 1] = resultOut.label
+        hayParts[#hayParts + 1] = resultOut.description
+    end
+    local searchHaystack = table.concat(hayParts, ' '):lower()
+
+    entry.almostReason = almostReason
+    entry.blockReason = blockReason
+    entry.lockHint = lockHint
+    entry.maxCraftable = maxCraftable
+    entry.maxCraftableCause = maxCraftableCause
+    entry.searchHaystack = searchHaystack
+    entry.categoryLabel = uiCatLab
+    entry.stationLabel = stationLab
+    entry.requireModule = r.requireModule or r.requiredModule or (r.needsVentilation and 'ventilation') or nil
+    if entry.requireModule == 'ventilation' and r.needsVentilation then
+        entry.requireModuleLabel = 'Ventilation'
+    end
+
     local artisans = ctx and ctx.artisans or nil
     local includeHeavy = not ctx or ctx.includeHints ~= false
     if includeHeavy then
@@ -1856,16 +2110,78 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
         end
     end
 
-    -- station-level almost gap fill for stationLevel locks
+    -- station-level almost gap fill for stationLevel locks (light prereq = 1 level)
     local benchLevel = bench.stationLevel or 1
     for i = 1, #out do
         local e = out[i]
         if e.lockReason == 'craft_station_level' and e.stationLevel then
             local gap = math.max(0, (tonumber(e.stationLevel) or 0) - benchLevel)
             e.levelGap = gap
-            if not e.canCraft and e.missingItems == false and gap > 0 and gap <= 2 then
+            local hard = e.lockReason == 'craft_spec_required' or e.lockReason == 'craft_blueprint_required' or e.lockReason == 'craft_knowledge_required'
+            if not e.canCraft and e.missingItems == false and gap == 1 and not hard then
                 e.almostCraftable = true
+                e.almostReason = ('Station niveau %s requise'):format(tostring(e.stationLevel))
+            elseif gap > 1 then
+                e.almostCraftable = false
+                e.almostReason = nil
+                e.blockReason = e.blockReason or ('Station niveau %s requise'):format(tostring(e.stationLevel))
             end
+        end
+    end
+
+    -- Known producers (RAM, current snapshot knowledge) for material popover path.
+    local producers = {}
+    for _, rr in pairs(Config.RecipeById or {}) do
+        local item = rr.result and rr.result.item
+        if item and not rr.dismantle then
+            local known = true
+            if Blueprints and Blueprints.KnowsRecipe then
+                known = Blueprints.KnowsRecipe(src, rr) == true
+            end
+            if known then
+                producers[item] = producers[item] or {}
+                local list = producers[item]
+                if #list < 6 then
+                    list[#list + 1] = {
+                        recipeId = rr.id,
+                        label = recipeFacingLabel(rr),
+                        station = stationFacingLabel(rr.station),
+                    }
+                end
+            end
+        end
+    end
+    local artisanBook = {}
+    if SurvivalBook and SurvivalBook.ListArtisans and BookDB and BookDB.Mod and BookDB.Mod('Artisans') then
+        for _, a in ipairs(artisans or {}) do
+            artisanBook[#artisanBook + 1] = {
+                id = a.contactId or a.id,
+                name = a.displayName or a.name,
+                specialty = a.specialty,
+            }
+        end
+    end
+    for i = 1, #out do
+        local e = out[i]
+        local paths = {}
+        for j = 1, #(e.ingredients or {}) do
+            local item = e.ingredients[j].item
+            if item then
+                local recs = producers[item] or {}
+                -- only known recipes; never invent NPCs — artisans already in carnet contacts
+                paths[item] = { recipes = recs }
+            end
+        end
+        e.materialPaths = paths
+        if e.unreadSource and type(e.unreadSource) == 'string' then
+            local srcMap = {
+                discovery = 'Nouvelle découverte',
+                talent = 'Débloqué par un talent',
+                blueprint = 'Plan appris',
+                level = 'Niveau atteint',
+                teach = 'Enseigné',
+            }
+            e.unreadSourceLabel = srcMap[e.unreadSource] or 'Nouveau'
         end
     end
 
@@ -1879,6 +2195,21 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
     local modsArr = snap.modules or bench.modules or {}
     if type(modsArr) ~= 'table' then modsArr = {} end
 
+    local conditionNote = nil
+    if snap.conditionEnabled and snap.condition ~= nil and StationRuntime and StationRuntime.Modifiers then
+        local pct = tonumber(snap.condition)
+        if pct and pct < 50 then
+            local mods = StationRuntime.Modifiers(bench)
+            local factor = 1 - (mods.speed or 0)
+            local slower = math.max(0, math.floor((factor - 1) * 100 + 0.5))
+            if slower > 0 then
+                conditionNote = ('Station %d%% — fabrication +%d%% plus lente'):format(math.floor(pct), slower)
+            else
+                conditionNote = ('Station %d%%'):format(math.floor(pct))
+            end
+        end
+    end
+
     return {
         ok = true, benchKey = benchKey, category = bench.category,
         label = bench.label or _(Config.BenchLabels[bench.category] or 'bench_scrap'),
@@ -1886,6 +2217,7 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
         powered = snap.powered,
         condition = snap.condition, temp = snap.temp, ventilation = snap.ventilation,
         efficiency = realEff, energy = snap.powered and 'OK' or 'Off',
+        conditionNote = conditionNote,
         queue = snap.queue, queueSize = snap.queueSize,
         brokenParts = snap.brokenParts, moduleCatalog = snap.moduleCatalog,
         canUpgrade = snap.canUpgrade, canModule = snap.canModule,
@@ -1893,6 +2225,7 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
         overheat = snap.overheat, stationKind = snap.kind,
         maxLevel = snap.maxLevel,
         recipes = out, favorites = favorites, pinned = pinned,
+        knownArtisans = artisanBook,
         playerSpec = (Specializations and Specializations.Resolve and Specializations.Resolve(src)) or nil,
         skillSnapshot = skillSnap and {
             available = skillSnap.available == true,
@@ -1953,6 +2286,10 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
             knowledgeMarks = ux.KnowledgeMarks ~= false,
             pathHints = ux.PathHints ~= false,
             artisanHints = ux.ArtisanHints ~= false,
+            haveWhatIHave = ux.HaveWhatIHave ~= false,
+            haveWhatIHaveAlmost = (Config.Filters and Config.Filters.HaveWhatIHaveIncludeAlmost) ~= false,
+            materialPopover = ux.MaterialPopover ~= false,
+            followNotify = (Config.Follow and Config.Follow.NotifyWhenCraftable) ~= false,
             knowledge = Config.Knowledge and Config.Knowledge.Enabled ~= false,
             compare = compareCfg.Enabled == true,
         },

@@ -244,3 +244,15 @@
   border: 1px solid rgba(154, 136, 102, 0.22);
   border-radius: 3px;
 }
+
+#book-pins-hud .ph-title {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+#book-pins-hud .ph-row .ph-status {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+#book-pins-hud .ph-row.is-ok .ph-status { color: #6f9a6a; }
+#book-pins-hud .ph-row.is-almost .ph-status,
+#book-pins-hud .ph-row.is-blocked .ph-status { color: #b39a5a; }

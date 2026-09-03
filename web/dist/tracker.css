@@ -451,3 +451,30 @@
   display: none !important;
 }
 
+
+#craft-tracker .ct-reduced {
+  flex-wrap: wrap;
+  cursor: pointer;
+  gap: 6px;
+}
+#craft-tracker .ct-reduced-k {
+  letter-spacing: 0.12em;
+  font-size: 10px;
+  color: var(--ct-accent);
+}
+#craft-tracker #ct-reduced-name {
+  color: var(--ct-text);
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#craft-tracker #ct-reduced-wait {
+  color: var(--ct-warn);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+}

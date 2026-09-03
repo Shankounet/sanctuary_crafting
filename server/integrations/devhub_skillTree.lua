@@ -498,6 +498,9 @@ RegisterNetEvent('devhub_skillTree:server:listener:skillUnlocked', function(src,
     }
     if catKey then fillCategory(snap, src, catKey) end
     snap.loadedAt = nowMs()
+    if NewlyLearned and NewlyLearned.MarkFromTalent then
+        NewlyLearned.MarkFromTalent(src, skillUid)
+    end
 end)
 
 RegisterNetEvent('devhub_skillTree:server:listener:skillReset', function(src, categoryUid)

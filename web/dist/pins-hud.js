@@ -70,9 +70,7 @@
   function applyChrome() {
     root.classList.toggle('is-collapsed', collapsed);
     if (els.title) {
-      els.title.textContent = collapsed
-        ? ('Épingles ' + lastPins.length)
-        : 'Carnet — Épingles';
+      els.title.textContent = 'CARNET — ÉPINGLES';
     }
     if (els.collapse) {
       els.collapse.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
@@ -176,7 +174,6 @@
     const max = lastMax;
     if (els.count) els.count.textContent = String(pins.length);
     paintSummary();
-    if (collapsed && els.title) els.title.textContent = 'Épingles ' + pins.length;
     if (!els.list) return;
     els.list.innerHTML = '';
     if (!pins.length) return;
@@ -214,9 +211,6 @@
       els.list.appendChild(more);
     }
     paintSummary();
-    if (collapsed && els.title) {
-      els.title.textContent = 'Épingles ' + pins.length;
-    }
   }
 
   function render(payload) {

@@ -14,6 +14,7 @@
     filter: 'all',
     category: 'all',
     search: '',
+    materialFilter: null,
     compact: false,
     crafting: false,
     craftId: null,
@@ -164,6 +165,7 @@
 
   function computeAlmost(r) {
     if (!r || r.canCraft) return false;
+    if (r.almostCraftable === false) return false;
     if (r.almostCraftable === true) return true;
     let missing = typeof r.missingCount === 'number' ? r.missingCount : null;
     if (missing == null && Array.isArray(r.ingredients)) {
@@ -181,7 +183,7 @@
     }
     if (r.lockReason === 'craft_station_level' && r.stationLevel != null && state.menuMeta && state.menuMeta.stationLevel != null) {
       const gap = r.stationLevel - state.menuMeta.stationLevel;
-      if (gap > 0 && gap <= 2) return true;
+      if (gap === 1) return true;
     }
     if (r.toolDurability != null && r.toolDurability > 0 && r.toolDurability <= 15) return true;
     return false;
@@ -349,8 +351,11 @@
     return s;
   }
 
-  function categoryLabel(cat) {
+  function categoryLabel(cat, recipe) {
     if (!cat || cat === 'all') return 'Toutes';
+    if (recipe && recipe.categoryLabel) return recipe.categoryLabel;
+    const hit = (state.recipes || []).find((r) => r.category === cat && r.categoryLabel);
+    if (hit) return hit.categoryLabel;
     return humanize(cat);
   }
 
@@ -381,21 +386,19 @@
   }
 
   function buildRecipeHaystack(r) {
+    if (r.searchHaystack) return String(r.searchHaystack).toLowerCase();
     const parts = [
-      r.label, r.id, r.category, r.description, r.desc,
-      r.station, r.skillCategory,
+      r.label, r.categoryLabel, r.category, r.description, r.desc,
+      r.stationLabel, r.station, r.skillCategoryLabel, r.skillCategory,
+      r.requireSpecLabel, r.requiredSkillLabel,
       (r.tags || []).join(' '),
     ];
     (r.ingredients || []).forEach((ing) => {
-      parts.push(ing.item, ing.label);
+      parts.push(ing.label);
     });
     if (r.result) {
-      parts.push(r.result.item, r.result.label);
+      parts.push(r.result.label, r.result.description);
     }
-    if (r.blueprintId || r.requireBlueprint) {
-      parts.push(r.blueprintId || r.requireBlueprint);
-    }
-    if (r.knowledge) parts.push(r.knowledge);
     return parts.filter(Boolean).join(' ').toLowerCase();
   }
 
@@ -410,14 +413,31 @@
 
   function matchesFilter(r) {
     if (state.category && state.category !== 'all' && r.category !== state.category) return false;
+    if (state.materialFilter) {
+      const item = state.materialFilter;
+      const hit = (r.ingredients || []).some((ing) => ing && ing.item === item);
+      if (!hit) return false;
+    }
     if (state.filter === 'craftable' && !r.canCraft) return false;
     if (state.filter === 'almost') {
       if (r.canCraft || !uxOn('almostCraftable', true) || !computeAlmost(r)) return false;
     }
+    if (state.filter === 'have') {
+      if (r.canCraft) {
+        /* ok */
+      } else {
+        const includeAlmost = state.flags.haveWhatIHaveAlmost !== false;
+        const oneMissing = (typeof r.missingCount === 'number' ? r.missingCount : 0) === 1;
+        if (!(includeAlmost && computeAlmost(r) && oneMissing && !r.locked)) return false;
+      }
+    }
     if (state.filter === 'locked' && !r.locked) return false;
     if (state.filter === 'favorites' && !isFavorite(r.id)) return false;
     if (state.filter === 'new' && !isNewRecipe(r)) return false;
+    if (state.filter === 'unlocked' && !(r.newlyUnlocked || r.unreadSource === 'talent' || r.unreadSource === 'level' || r.unreadSource === 'blueprint')) return false;
     if (state.filter === 'plans' && !hasKnownPlan(r)) return false;
+    if (state.filter === 'talent' && !talentLabelOf(r)) return false;
+    if (state.filter === 'stationNeed' && !(r.stationLevel > 1 || r.requireModule)) return false;
     if (state.rarityFilter && state.rarityFilter !== 'all') {
       const rk = rarityKey(r.rarity);
       if (rk !== state.rarityFilter) return false;
@@ -425,14 +445,8 @@
     if (state.search) {
       const q = state.search.toLowerCase().trim();
       if (q) {
-        if (uxOn('smartSearch', true)) {
-          const hay = (state.searchIndex && state.searchIndex[r.id]) || buildRecipeHaystack(r);
-          if (!hay.includes(q)) return false;
-        } else {
-          const tags = (r.tags || []).join(' ');
-          const hay = `${r.label} ${r.id} ${tags} ${r.category || ''} ${r.result && r.result.item || ''}`.toLowerCase();
-          if (!hay.includes(q)) return false;
-        }
+        const hay = (state.searchIndex && state.searchIndex[r.id]) || buildRecipeHaystack(r);
+        if (!hay.includes(q)) return false;
       }
     }
     return true;
@@ -529,11 +543,13 @@
       return { text: 'FAISABLE', cls: 'ok', tip: bits.join(' · ') };
     }
     const almostEnabled = uxOn('almostCraftable', true);
-    const reason = primaryBadgeReason(r);
     if (almostEnabled && computeAlmost(r)) {
-      return { text: 'PRESQUE', cls: 'almost', tip: almostMissingTip(r) };
+      const tip = r.almostReason || almostMissingTip(r);
+      return { text: 'PRESQUE', cls: 'almost', tip };
     }
-    return { text: 'NON FAISABLE', cls: 'bad', tip: reason || 'Conditions non remplies' };
+    const locked = r.locked || r.lockReason;
+    const tip = (locked && r.lockHint) || r.blockReason || primaryBadgeReason(r) || 'Non faisable';
+    return { text: 'NON FAISABLE', cls: 'bad', tip };
   }
 
   function disableReasons(r) {
@@ -636,20 +652,24 @@
     const nav = $('#cat-list');
     if (!nav) return;
     const counts = {};
+    const faisable = {};
     state.recipes.forEach((r) => {
       const c = r.category || 'autre';
       counts[c] = (counts[c] || 0) + 1;
+      if (r.canCraft) faisable[c] = (faisable[c] || 0) + 1;
     });
     const cats = Object.keys(counts).sort((a, b) => categoryLabel(a).localeCompare(categoryLabel(b), 'fr'));
     const total = state.recipes.length;
+    const totalOk = state.recipes.filter((r) => r.canCraft).length;
     let html = `<button type="button" class="cat-item${state.category === 'all' ? ' active' : ''}" data-cat="all">
       <i class="fa-solid ${categoryIcon('all')}" aria-hidden="true"></i>
-      <span>Toutes</span><span class="count">${total}</span>
+      <span>Toutes</span><span class="count">${total}</span>${totalOk ? `<span class="count-ok" title="Faisables">${totalOk}</span>` : ''}
     </button>`;
     cats.forEach((c) => {
+      const ok = faisable[c] || 0;
       html += `<button type="button" class="cat-item${state.category === c ? ' active' : ''}" data-cat="${escapeHtml(c)}">
         <i class="fa-solid ${categoryIcon(c)}" aria-hidden="true"></i>
-        <span>${escapeHtml(categoryLabel(c))}</span><span class="count">${counts[c]}</span>
+        <span>${escapeHtml(categoryLabel(c))}</span><span class="count">${counts[c]}</span>${ok ? `<span class="count-ok" title="Faisables">${ok}</span>` : ''}
       </button>`;
     });
     nav.innerHTML = html;
@@ -713,12 +733,23 @@
           card.dataset.cat = ck;
         }
       }
+      if (r.requireBlueprint || r.blueprintId || r.knowledge === 'blueprint' || r.knowledgeSource === 'blueprint') {
+        card.classList.add('is-blueprint');
+      }
+      if (r.mastered) card.classList.add('is-mastered');
       const resultItem = (r.result && r.result.item) || r.id;
       const code = recipeCode(r);
       const showNouveau = uxOn('nouveauIndicator', true) && isNewRecipe(r);
       const tip = uxOn('badgeTooltips', true) ? (status.tip || status.text) : status.text;
+      const nouveauTip = r.unreadSourceLabel || ({
+        discovery: 'Nouvelle découverte',
+        talent: 'Débloqué par un talent',
+        blueprint: 'Plan appris',
+        level: 'Niveau atteint',
+        teach: 'Enseigné',
+      }[r.unreadSource] || 'Nouveau');
       const nouveauHtml = showNouveau
-        ? '<span class="card-nouveau">NOUVEAU</span>'
+        ? `<span class="card-nouveau" title="${escapeHtml(nouveauTip)}">NOUVEAU</span>`
         : '';
       const kn = (uxOn('knowledgeMarks', true) && (state.flags.knowledge !== false)) ? (r.knowledge || null) : null;
       if (kn) {
@@ -728,9 +759,9 @@
       let cornerHtml = '';
       const masteredOn = uxOn('masteredBadge', true) && (r.mastered === true || kn === 'mastered');
       if (masteredOn) {
-        cornerHtml = '<span class="card-corner-mark is-mastered" title="Maîtrisé"><i class="fa-solid fa-certificate" aria-hidden="true"></i></span>';
-      } else if (kn === 'blueprint') {
-        cornerHtml = '<span class="card-corner-mark is-blueprint" title="Appris via blueprint / plan technique"><i class="fa-solid fa-drafting-compass" aria-hidden="true"></i></span>';
+        cornerHtml = '<span class="card-stamp-mastered" title="Maîtrisé">MAÎTRISÉ</span>';
+      } else if (kn === 'blueprint' || r.requireBlueprint || r.blueprintId) {
+        cornerHtml = '<span class="card-corner-mark is-blueprint" title="Plan technique"><i class="fa-solid fa-drafting-compass" aria-hidden="true"></i></span>';
       } else if (isPinned(r.id)) {
         cornerHtml = '<span class="card-corner-mark is-followed" title="Suivi dans le Carnet"><i class="fa-solid fa-bookmark" aria-hidden="true"></i></span>';
       }
@@ -1174,14 +1205,47 @@
           etatEl.className = etat.cls;
         }
       }
+      const rowMod = $('#row-station-mod');
+      const modNeed = r.requireModuleLabel || (r.requireModule && frLabel(r.requireModule, humanize(r.requireModule)));
+      if (rowMod) {
+        if (modNeed) {
+          rowMod.classList.remove('hidden');
+          const modEl = $('#d-station-mod');
+          if (modEl) modEl.textContent = modNeed;
+        } else {
+          rowMod.classList.add('hidden');
+        }
+      }
+      const wearEl = $('#d-station-wear');
+      if (wearEl) {
+        const note = meta.conditionNote;
+        if (note) {
+          wearEl.textContent = note;
+          wearEl.classList.remove('hidden');
+        } else {
+          wearEl.textContent = '';
+          wearEl.classList.add('hidden');
+        }
+      }
     }
 
     // —— Materials ——
     const ings = $('#d-ings');
     ings.innerHTML = '';
-    (r.ingredients || []).forEach((ing) => {
+    const batchNow = (() => {
+      const el = $('#batch');
+      const n = el ? parseInt(el.value, 10) : 1;
+      return Number.isFinite(n) && n > 0 ? n : 1;
+    })();
+    let okN = 0;
+    const ingList = r.ingredients || [];
+    ingList.forEach((ing) => {
+      const scaled = Object.assign({}, ing, { count: (ing.count || 1) * batchNow });
+      const info = ingOwnedRequired(scaled, r);
+      if (info.cls === 'ok') okN += 1;
       const li = document.createElement('li');
-      const info = ingOwnedRequired(ing, r);
+      li.className = 'ing-row is-interactive';
+      li.tabIndex = 0;
       li.innerHTML = `
         <img class="ing-thumb" alt="" />
         <span class="mark ${info.cls}">${info.mark}</span>
@@ -1189,9 +1253,18 @@
         <span class="icount ${info.cls}">${escapeHtml(info.text)}</span>
       `;
       bindItemImg(li.querySelector('img'), ing.item, null);
+      li.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        openMaterialPopover(ing, r, li);
+      });
       ings.appendChild(li);
     });
-    if (!(r.ingredients || []).length) {
+    const sumEl = $('#d-ings-summary');
+    if (sumEl) {
+      if (ingList.length) sumEl.textContent = `${okN}/${ingList.length} conditions remplies`;
+      else sumEl.textContent = '';
+    }
+    if (!ingList.length) {
       ings.innerHTML = '<li><span class="iname muted">Aucun matériau</span></li>';
     }
 
@@ -1542,6 +1615,9 @@
     const cfg = state.batch || {};
     const hard = Number(cfg.hardCap) || 100;
     const maxB = Number(cfg.maxBatch) || 50;
+    if (recipe && typeof recipe.maxCraftable === 'number') {
+      return Math.max(0, Math.min(recipe.maxCraftable, hard, maxB));
+    }
     let cap = Math.min(maxB, hard);
     if (recipe) {
       const rec = Number(recipe.batchMax || recipe.maxQuantity);
@@ -1598,6 +1674,15 @@
 
     const lotEl = $('#fab-ready-lot');
     if (lotEl) lotEl.textContent = `×${batch}`;
+    const engageLabel = document.querySelector('#btn-craft .craft-engage-label');
+    if (engageLabel) engageLabel.textContent = `FABRIQUER x${batch}`;
+    const maxBtn = document.querySelector('#batch-presets [data-batch="max"]');
+    if (maxBtn) {
+      const capNow = batchCap(recipe);
+      if (capNow > 0) maxBtn.title = `Maximum actuellement fabricable : ${capNow}`;
+      else maxBtn.title = `Maximum actuellement fabricable : 0 (${(recipe && (recipe.maxCraftableCause || recipe.blockReason)) || 'Non faisable'})`;
+      maxBtn.textContent = capNow > 0 && capNow !== 1 && capNow !== 5 && capNow !== 10 ? `MAX (${capNow})` : 'MAX';
+    }
 
     if (recipe) {
       const resCount = ((recipe.result && recipe.result.count) || 1) * batch;
@@ -1686,7 +1771,32 @@
       if (cur !== 'done') setFabState('ready');
     }
 
+    if (recipe && $('#d-ings') && state.selected && recipe.id === state.selected.id) {
+      refreshMaterialCounts(recipe, batch);
+    }
+
     updateFabIdleConsole();
+  }
+
+  function refreshMaterialCounts(r, batch) {
+    const ings = $('#d-ings');
+    if (!ings) return;
+    const list = r.ingredients || [];
+    const rows = ings.querySelectorAll('li.ing-row');
+    let okN = 0;
+    list.forEach((ing, i) => {
+      const scaled = Object.assign({}, ing, { count: (ing.count || 1) * (batch || 1) });
+      const info = ingOwnedRequired(scaled, r);
+      if (info.cls === 'ok') okN += 1;
+      const li = rows[i];
+      if (!li) return;
+      const mark = li.querySelector('.mark');
+      const count = li.querySelector('.icount');
+      if (mark) { mark.className = `mark ${info.cls}`; mark.textContent = info.mark; }
+      if (count) { count.className = `icount ${info.cls}`; count.textContent = info.text; }
+    });
+    const sumEl = $('#d-ings-summary');
+    if (sumEl && list.length) sumEl.textContent = `${okN}/${list.length} conditions remplies`;
   }
 
   function updateFabIdleConsole() {
@@ -1780,6 +1890,18 @@
     if (active) {
       const recipe = recipeFromSession(active);
       const batch = active.batch || active.quantity || 1;
+      if (active.paused || active.state === 'paused') {
+        state.crafting = true;
+        state.craftId = active.craftId;
+        state.craftDurationMs = Number(active.durationMs) || Number(active.duration) || 0;
+        state.progressRecipe = recipe;
+        fillFabActive(recipe, batch, active.remainingMs, state.craftDurationMs);
+        setFabState('active');
+        const phaseEl = $('#fab-active-phase');
+        if (phaseEl) phaseEl.textContent = 'EN PAUSE';
+        setFabCancelVisible(true);
+        return;
+      }
       const remaining = Math.max(0, Number(
         active.remainingMs != null ? active.remainingMs : active.duration
       ) || 0);
@@ -2038,6 +2160,7 @@
       canUpgrade: data.canUpgrade,
       canModule: data.canModule,
       conditionEnabled: data.conditionEnabled,
+      conditionNote: data.conditionNote,
       heatEnabled: data.heatEnabled,
       brokenParts: data.brokenParts || [],
       maxLevel: data.maxLevel,
@@ -2169,6 +2292,7 @@
     if (data.itemLabels) state.itemLabels = data.itemLabels;
     state.favorites = data.favorites || [];
     state.pinned = data.pinned || [];
+    state.knownArtisans = data.knownArtisans || [];
     state.playerSpec = data.playerSpec || null;
     if (data.skillSnapshot) state.skillSnapshot = data.skillSnapshot;
     state.recentlyCrafted = data.recentlyCrafted || [];
@@ -2178,12 +2302,14 @@
       state.shop = data.shoppingPins;
       renderShop();
     }
-    const rarityNav = $('#rarity-filters');
-    if (rarityNav) rarityNav.hidden = !uxOn('rarityFilters', true);
     state.flags = data.flags || {};
     if (data.batch) state.batch = data.batch;
     if (data.queueSize != null) state.queueMax = data.queueSize;
     state.ux = (data.ui && data.ui.Ux) || data.ux || state.ux || {};
+    const rarityNavApply = $('#rarity-filters');
+    if (rarityNavApply) rarityNavApply.hidden = !uxOn('rarityFilters', true);
+    const haveChip = document.querySelector('.filters-primary [data-filter="have"]');
+    if (haveChip) haveChip.hidden = state.flags.haveWhatIHave === false;
     state.compare = data.compare || { enabled: !!(state.flags && state.flags.compare), map: {} };
     if (data.queueMax != null) state.queueMax = data.queueMax;
     if (data.ui && data.ui.Sounds) state.sounds = data.ui.Sounds;
@@ -2373,6 +2499,90 @@
     });
   }
 
+  const ADV_KEY = 'sanctuary_hud.advancedFilters';
+
+  function hideMaterialPopover() {
+    const pop = $('#mat-popover');
+    if (!pop) return;
+    pop.classList.add('hidden');
+    pop.hidden = true;
+    pop.innerHTML = '';
+  }
+
+  function openMaterialPopover(ing, recipe, anchor) {
+    const pop = $('#mat-popover');
+    if (!pop || !ing) return;
+    const label = ing.label || itemDisplayName(ing.item);
+    const paths = (recipe && recipe.materialPaths && recipe.materialPaths[ing.item]) || { recipes: [] };
+    const knownRecipes = (paths.recipes || []).filter((x) => x && x.label);
+    const hints = (recipe && recipe.artisanHints) || {};
+    const knownArtisans = [].concat(hints.confirmed || [], hints.potential || []).filter((a) => a && (a.name || a.id));
+    let html = `<p class="mat-pop-title">${escapeHtml(label)}</p>`;
+    html += `<button type="button" class="mat-pop-act" data-act="filter">Voir les recettes utilisant cette ressource</button>`;
+    html += `<div class="mat-pop-sec"><p class="mat-pop-k">Chemin recommandé</p>`;
+    if (knownRecipes.length) {
+      knownRecipes.slice(0, 4).forEach((x) => {
+        html += `<button type="button" class="mat-pop-act" data-act="goto" data-rid="${escapeHtml(x.recipeId)}">${escapeHtml(x.label)}${x.station ? ` <span class="muted">${escapeHtml(x.station)}</span>` : ''}</button>`;
+      });
+    } else {
+      html += `<p class="mat-pop-empty">Aucune recette connue pour produire ceci.</p>`;
+    }
+    if (knownArtisans.length) {
+      knownArtisans.slice(0, 3).forEach((a) => {
+        html += `<p class="mat-pop-art">${escapeHtml(a.name || a.id || '')}${a.specialty ? ` · ${escapeHtml(a.specialty)}` : ''}</p>`;
+      });
+    }
+    html += `</div>`;
+    html += `<button type="button" class="mat-pop-act" data-act="shop">Ajouter aux courses</button>`;
+    pop.innerHTML = html;
+    pop.classList.remove('hidden');
+    pop.hidden = false;
+    const rect = (anchor && anchor.getBoundingClientRect) ? anchor.getBoundingClientRect() : { left: 24, bottom: 24, right: 24 };
+    const w = pop.offsetWidth || 240;
+    const left = Math.max(8, Math.min(window.innerWidth - w - 8, rect.left));
+    const top = Math.min(window.innerHeight - 12, rect.bottom + 6);
+    pop.style.left = `${left}px`;
+    pop.style.top = `${top}px`;
+    pop.querySelectorAll('[data-act]').forEach((btn) => {
+      btn.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const act = btn.getAttribute('data-act');
+        if (act === 'filter') {
+          state.materialFilter = ing.item;
+          state.search = label;
+          const searchEl = $('#search');
+          if (searchEl) searchEl.value = label;
+          hideMaterialPopover();
+          renderList();
+        } else if (act === 'goto') {
+          const rid = btn.getAttribute('data-rid');
+          const found = (state.recipes || []).find((x) => x.id === rid);
+          hideMaterialPopover();
+          if (found) selectRecipe(found);
+        } else if (act === 'shop') {
+          const need = Math.max(1, (ing.count || 1) - (ing.owned || 0));
+          const r = await post('shoppingAddItem', { item: ing.item, count: need });
+          if (r && r.ok) {
+            if (r.list) state.shop = r.list;
+            renderShop();
+            openTab('shop');
+            showToast(`${label} ajouté aux courses`, 'ok');
+          } else {
+            showToast('Courses indisponibles', 'err');
+          }
+          hideMaterialPopover();
+        }
+      });
+    });
+  }
+
+  document.addEventListener('click', (ev) => {
+    const pop = $('#mat-popover');
+    if (!pop || pop.hidden) return;
+    if (ev.target.closest && ev.target.closest('#mat-popover, .ing-row')) return;
+    hideMaterialPopover();
+  });
+
   // events — null-safe so a missing craft control never kills the NUI page (book.js needs the page alive)
   const bindUi = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
   bindUi('#btn-close', 'click', () => post('close', {}));
@@ -2387,14 +2597,32 @@
     state.compact = !state.compact;
     app.dataset.compact = state.compact ? '1' : '0';
   });
-  bindUi('#search', 'input', (e) => { state.search = e.target.value; renderList(); });
+  bindUi('#search', 'input', (e) => {
+    state.search = e.target.value;
+    if (!state.search) state.materialFilter = null;
+    renderList();
+  });
 
   function syncFiltersMore() {
     const more = $('#filters-more');
     if (!more) return;
-    const secondaryOn = state.filter === 'locked' || state.filter === 'plans' || (state.rarityFilter && state.rarityFilter !== 'all');
+    const secondaryOn = state.filter === 'locked' || state.filter === 'plans' || state.filter === 'talent'
+      || state.filter === 'stationNeed' || state.filter === 'unlocked'
+      || (state.rarityFilter && state.rarityFilter !== 'all');
     if (secondaryOn) more.setAttribute('open', '');
+    try { localStorage.setItem(ADV_KEY, more.open ? '1' : '0'); } catch (_) { /* ignore */ }
   }
+
+  (function restoreAdvFilters() {
+    const more = $('#filters-more');
+    if (!more) return;
+    try {
+      if (localStorage.getItem(ADV_KEY) === '1') more.setAttribute('open', '');
+    } catch (_) { /* ignore */ }
+    more.addEventListener('toggle', () => {
+      try { localStorage.setItem(ADV_KEY, more.open ? '1' : '0'); } catch (_) { /* ignore */ }
+    });
+  })();
 
   $$('#filters [data-filter]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -2733,6 +2961,26 @@
       const phaseEl = $('#fab-active-phase');
       if (phaseEl && msg.stepLabel) phaseEl.textContent = msg.stepLabel;
       runProgress(msg.duration, finishCraft);
+    } else if (msg.action === 'craftPaused') {
+      const d = msg.data || {};
+      if (d.craftId && state.craftId && d.craftId !== state.craftId) return;
+      state.progressGen = (state.progressGen || 0) + 1;
+      const phaseEl = $('#fab-active-phase');
+      if (phaseEl) phaseEl.textContent = 'EN PAUSE';
+      setFabCancelVisible(true);
+      setFabState('active');
+    } else if (msg.action === 'craftResumed') {
+      const d = msg.data || {};
+      if (d.craftId) state.craftId = d.craftId;
+      state.crafting = true;
+      const rem = Number(d.remainingMs) || 0;
+      const orig = Number(d.duration) || rem;
+      state.craftDurationMs = orig;
+      setFabCancelVisible(true);
+      setFabState('active');
+      const phaseEl = $('#fab-active-phase');
+      if (phaseEl) phaseEl.textContent = 'Reprise';
+      runProgress(rem, finishCraft);
     }
   });
 

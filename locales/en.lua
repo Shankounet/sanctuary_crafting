@@ -124,4 +124,7 @@ Locales['en'] = {
     ['admin_confirm_required'] = 'Confirmation required to save',
     ['admin_id_exists'] = 'This recipe id already exists',
     ['admin_command_hint'] = 'Opens the craftadmin editor',
+    ['craft_now_craftable'] = '%s is now craftable',
+    ['craft_paused_power'] = 'Craft paused — no power',
+    ['craft_resumed_power'] = 'Power restored — craft resumed',
 }

@@ -275,7 +275,7 @@ local function recipeCraftability(src, recipe)
         spec = specOk,
         specReason = specReason,
         missing = missing,
-        almost = (not okIngredients) and #missing <= 2 and gatesOk and bpOk and specOk,
+        almost = (not okIngredients) and #missing == 1 and gatesOk and bpOk and specOk,
         oneLevelAway = (not gatesOk) and gateReason == 'craft_level_required',
     }
 end
@@ -590,9 +590,9 @@ local function enrichPinsHud(src, list)
             if can then
                 p.tone = 'ok'
                 p.status = 'Faisable'
-            elseif info and info.almost then
-                p.tone = 'almost'
-                p.status = missN > 0 and ('Manque ' .. missN) or 'Presque'
+            elseif missN > 0 then
+                p.tone = (info and info.almost) and 'almost' or 'blocked'
+                p.status = 'Manque ' .. missN
             else
                 p.tone = 'blocked'
                 p.status = 'Non faisable'

@@ -257,6 +257,28 @@ function ShoppingList.Remove(src, item)
     if lists[src] then lists[src][item] = nil end
 end
 
+--- RAM-only: add a single material to the shopping list (merge counts).
+function ShoppingList.AddItem(src, item, count)
+    if not Config.ShoppingList or not Config.ShoppingList.Enabled then
+        return nil, 'shopping_disabled'
+    end
+    if type(item) ~= 'string' or item == '' then return nil, 'craft_invalid' end
+    count = math.max(1, math.floor(tonumber(count) or 1))
+    lists[src] = lists[src] or {}
+    local cur = lists[src][item]
+    if type(cur) == 'table' then
+        cur.count = (cur.count or 0) + count
+        cur.need = (cur.need or cur.count) + count
+        cur.remaining = (cur.remaining or cur.count)
+        lists[src][item] = cur
+    elseif type(cur) == 'number' then
+        lists[src][item] = cur + count
+    else
+        lists[src][item] = count
+    end
+    return lists[src]
+end
+
 AddEventHandler('playerDropped', function()
     lists[source] = nil
 end)
@@ -264,10 +286,23 @@ end)
 local function enrichShopMap(map)
     local out = {}
     for item, count in pairs(map or {}) do
+        local n, owned, remaining, need, label
+        if type(count) == 'table' then
+            n = tonumber(count.count or count.need or count.remaining) or 0
+            owned = count.owned
+            remaining = count.remaining
+            need = count.need or n
+            label = count.label
+        else
+            n = tonumber(count) or 0
+            need = n
+        end
         out[item] = {
-            count = count,
-            need = count,
-            label = (OxItemCatalog and OxItemCatalog.Label and OxItemCatalog.Label(item)) or item,
+            count = n,
+            need = need or n,
+            owned = owned,
+            remaining = remaining or n,
+            label = label or (OxItemCatalog and OxItemCatalog.Label and OxItemCatalog.Label(item)) or item,
         }
     end
     return out
@@ -296,4 +331,10 @@ end)
 lib.callback.register('sanctuary_crafting:shoppingClear', function(src)
     ShoppingList.Clear(src)
     return { ok = true }
+end)
+
+lib.callback.register('sanctuary_crafting:shoppingAddItem', function(src, item, count)
+    local list, err = ShoppingList.AddItem(src, item, count)
+    if not list then return { ok = false, reason = err } end
+    return { ok = true, list = enrichShopMap(list) }
 end)

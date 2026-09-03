@@ -24,6 +24,8 @@
     reduced: root.querySelector('#ct-reduced'),
     reducedCount: root.querySelector('#ct-reduced-count'),
     reducedPct: root.querySelector('#ct-reduced-pct'),
+    reducedName: root.querySelector('#ct-reduced-name'),
+    reducedWait: root.querySelector('#ct-reduced-wait'),
     waiting: root.querySelector('#ct-waiting'),
   };
 
@@ -431,6 +433,7 @@
       return 'FABRICATION TERMINÉE';
     }
     if (st === 'queued') return 'EN ATTENTE';
+    if (st === 'paused') return 'EN PAUSE';
     if (entry.stepLabel && entry.totalSteps > 1) {
       return entry.stepLabel;
     }
@@ -629,9 +632,23 @@
 
   function paintReduced(arr) {
     const n = liveJobCount(arr);
+    const live = arr.find((j) => j.status === 'active')
+      || arr.find((j) => j.status === 'paused')
+      || arr.find((j) => j.status === 'queued')
+      || arr[0];
     const pct = primaryProgressPct(arr);
+    const waiting = Math.max(0, arr.filter((j) => j.status === 'queued' || j.status === 'paused').length);
     if (els.reducedCount) els.reducedCount.textContent = String(n);
-    if (els.reducedPct) els.reducedPct.textContent = `${pct}%`;
+    if (els.reducedName) {
+      els.reducedName.textContent = live && live.label ? live.label : '';
+    }
+    if (els.reducedPct) {
+      if (live && live.status === 'paused') els.reducedPct.textContent = 'EN PAUSE';
+      else els.reducedPct.textContent = `${pct}%`;
+    }
+    if (els.reducedWait) {
+      els.reducedWait.textContent = waiting > 0 ? `+${waiting} en attente` : '';
+    }
   }
 
   function paintWaiting(arr) {

@@ -5943,3 +5943,105 @@ button, input { font: inherit; color: inherit; }
     inset 0 -8px 14px rgba(0,0,0,0.24),
     inset 0 0 0 1px rgba(154,136,102,0.4) !important;
 }
+
+
+/* —— v2.22.0 intelligence (no visual redesign) —— */
+#app .cat-item .count-ok {
+  margin-left: 4px;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: rgba(154,136,102,0.75);
+  font-weight: 650;
+}
+#app .ing-summary {
+  margin-left: 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: rgba(200,192,176,0.78);
+}
+#app .ing-row.is-interactive { cursor: pointer; }
+#app .ing-row.is-interactive:hover { background: rgba(154,136,102,0.08); }
+#app .station-wear {
+  margin: 4px 0 0;
+  color: #b39a5a;
+}
+#app .recipe-card.is-blueprint .card-img-zone::before {
+  content: "";
+  position: absolute;
+  top: 0; right: 0;
+  width: 18px; height: 18px;
+  border-top: 2px solid rgba(130,150,168,0.7);
+  border-right: 2px solid rgba(130,150,168,0.7);
+  pointer-events: none;
+  z-index: 3;
+}
+#app .card-stamp-mastered {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 5;
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: #e2d4b0;
+  background: rgba(28,28,26,0.92);
+  border: 1px solid rgba(154,136,102,0.7);
+  padding: 2px 4px;
+  pointer-events: none;
+}
+#app .recipe-card.rarity-common .card-img-zone::after { display: none; }
+#app .recipe-card.rarity-uncommon .card-img-zone::after {
+  content: "";
+  position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: rgba(90,120,88,0.7);
+  pointer-events: none;
+}
+#app .recipe-card.rarity-rare .card-img-zone::after {
+  background: rgba(112,128,144,0.8);
+}
+#app .recipe-card.rarity-epic .card-img-zone::after {
+  background: rgba(96,72,104,0.8);
+}
+#app .recipe-card.rarity-legendary .card-img-zone::after {
+  background: rgba(154,136,102,0.85);
+}
+#app .recipe-card.selected {
+  box-shadow:
+    inset 3px 0 0 #9a8866,
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    0 6px 14px rgba(0,0,0,0.42) !important;
+  filter: none !important;
+}
+#app .filters-primary .chip[data-filter="have"] { white-space: nowrap; }
+
+.mat-popover {
+  position: fixed;
+  z-index: 2147482800;
+  min-width: 220px;
+  max-width: 280px;
+  padding: 8px;
+  background: #1e1e1c;
+  border: 1px solid #9a8866;
+  color: #d8d2c6;
+  font-size: 12px;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.45);
+}
+.mat-popover.hidden { display: none !important; }
+.mat-pop-title { margin: 0 0 6px; font-weight: 700; color: #e8e0d0; }
+.mat-pop-k { margin: 6px 0 4px; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: #9a8866; }
+.mat-pop-act {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #262624;
+  border: 1px solid #333;
+  color: #d8d2c6;
+  padding: 6px 8px;
+  margin: 3px 0;
+  cursor: pointer;
+  font-size: 12px;
+}
+.mat-pop-act:hover { border-color: #9a8866; }
+.mat-pop-empty, .mat-pop-art { margin: 4px 0; color: #8a8478; font-size: 11px; }
