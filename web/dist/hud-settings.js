@@ -5,6 +5,7 @@
   const KEY_PINS = 'sanctuary_hud.pinsVisible';
   const KEY_POS = 'sanctuary_hud.trackerPos';
   const KEY_XY = 'craftTrackerPosition';
+  const KEY_PIN_XY = 'pinnedTrackerPosition';
   const OLD_MODE = 'sc_tracker_mode';
   const OLD_POS = 'sc_tracker_pos';
   const OLD_COLLAPSE = 'sanctuary_crafting:pinsHudCollapsed';
@@ -155,6 +156,7 @@
     lsDel(OLD_POS);
     lsDel(OLD_COLLAPSE);
     lsDel(KEY_XY);
+    lsDel(KEY_PIN_XY);
     lsSet(KEY_MODE, 'expanded');
     lsSet(KEY_PINS, '1');
     lsSet(KEY_POS, JSON.stringify(DEFAULT_POS));
@@ -238,7 +240,7 @@
   }
 
   window.SanctuaryHud = {
-    KEYS: { mode: KEY_MODE, pins: KEY_PINS, pos: KEY_POS },
+    KEYS: { mode: KEY_MODE, pins: KEY_PINS, pos: KEY_POS, trackerXY: KEY_XY, pinsXY: KEY_PIN_XY },
     MODES,
     DEFAULT_POS,
     normalizeMode,

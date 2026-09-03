@@ -4,7 +4,12 @@
   if (!root) return;
   const COLLAPSE_KEY = 'sanctuary_crafting:pinsHudCollapsed';
   const PINNED_KEY = 'sanctuary_crafting:pinsHudPinned';
+  const LS_POS_XY = 'pinnedTrackerPosition'; /* {x, y} viewport left/top — independent of craftTrackerPosition */
   const HUD = () => window.SanctuaryHud;
+  const DRAG_THRESHOLD = 6;
+  const DEFAULT_POS = { top: 22, right: 22 };
+  const EDGE = 8;
+  const MIN_VISIBLE = 40;
   const els = {
     list: document.getElementById('ph-list'),
     count: document.getElementById('ph-count'),
@@ -14,6 +19,7 @@
     summary: document.getElementById('ph-summary'),
     title: root.querySelector('.ph-title'),
     shell: root.querySelector('.ph-shell'),
+    header: document.getElementById('ph-header') || root.querySelector('.ph-header'),
   };
 
   function post(name, data) {
@@ -35,6 +41,20 @@
   function saveFlag(key, on) {
     try { localStorage.setItem(key, on ? '1' : '0'); } catch (_) { /* ignore */ }
   }
+  function lsGet(key, fallback) {
+    try {
+      const v = localStorage.getItem(key);
+      return v == null ? fallback : v;
+    } catch (_) {
+      return fallback;
+    }
+  }
+  function lsSet(key, value) {
+    try { localStorage.setItem(key, value); } catch (_) { /* ignore */ }
+  }
+  function lsDel(key) {
+    try { localStorage.removeItem(key); } catch (_) { /* ignore */ }
+  }
 
   let collapsed = loadFlag(COLLAPSE_KEY, false);
   let pinned = loadFlag(PINNED_KEY, true);
@@ -45,6 +65,8 @@
   let lastCrafts = [];
   let lastMax = 4;
   let lastFeature = true;
+  let drag = null;
+  let dragMoved = false;
 
   function pinToneCounts(pins) {
     let ok = 0, almost = 0, blocked = 0;
@@ -226,39 +248,245 @@
     applyVisibility();
   }
 
+  function isFiniteNum(n) {
+    return typeof n === 'number' && Number.isFinite(n);
+  }
+
+  function widgetSize() {
+    const rect = root.getBoundingClientRect();
+    const w = rect.width > 1 ? rect.width : 248;
+    const headerH = els.header ? els.header.getBoundingClientRect().height : 0;
+    const h = rect.height > 1 ? rect.height : (headerH > 1 ? headerH : 48);
+    return { w, h };
+  }
+
+  function onScreen(x, y, w, h) {
+    if (!isFiniteNum(x) || !isFiniteNum(y) || !isFiniteNum(w) || !isFiniteNum(h)) return false;
+    const vw = window.innerWidth || 0;
+    const vh = window.innerHeight || 0;
+    if (vw < 2 || vh < 2) return true;
+    if (x + w < MIN_VISIBLE || y + h < MIN_VISIBLE) return false;
+    if (x > vw - MIN_VISIBLE || y > vh - MIN_VISIBLE) return false;
+    return true;
+  }
+
+  function clampXY(x, y) {
+    const { w, h } = widgetSize();
+    const headerH = (els.header && els.header.getBoundingClientRect().height > 1)
+      ? els.header.getBoundingClientRect().height
+      : Math.min(h, 48);
+    const vw = window.innerWidth || 800;
+    const vh = window.innerHeight || 600;
+    const maxX = Math.max(EDGE, vw - w - EDGE);
+    /* Keep the header on-screen even if the list hangs off the bottom. */
+    const maxY = Math.max(EDGE, vh - headerH - EDGE);
+    return {
+      x: Math.round(Math.max(EDGE, Math.min(maxX, x))),
+      y: Math.round(Math.max(EDGE, Math.min(maxY, y))),
+    };
+  }
+
+  function applyDefault() {
+    root.style.top = `${DEFAULT_POS.top}px`;
+    root.style.right = `${DEFAULT_POS.right}px`;
+    root.style.left = 'auto';
+    root.style.bottom = 'auto';
+  }
+
+  function applyXY(x, y) {
+    const { w, h } = widgetSize();
+    if (!onScreen(x, y, w, h)) {
+      applyDefault();
+      return false;
+    }
+    const c = clampXY(x, y);
+    root.style.left = `${c.x}px`;
+    root.style.top = `${c.y}px`;
+    root.style.right = 'auto';
+    root.style.bottom = 'auto';
+    return true;
+  }
+
+  function parseXY(raw) {
+    if (!raw) return null;
+    try {
+      const o = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!o || typeof o !== 'object') return null;
+      const x = Number(o.x);
+      const y = Number(o.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+      return { x, y };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function currentXY() {
+    const rect = root.getBoundingClientRect();
+    if (rect.width > 1) return { x: Math.round(rect.left), y: Math.round(rect.top) };
+    const left = parseInt(root.style.left, 10);
+    const top = parseInt(root.style.top, 10);
+    if (Number.isFinite(left) && Number.isFinite(top)) return { x: left, y: top };
+    return null;
+  }
+
+  function persistXY(x, y) {
+    const { w, h } = widgetSize();
+    if (!onScreen(x, y, w, h)) {
+      applyDefault();
+      lsDel(LS_POS_XY);
+      return;
+    }
+    const c = clampXY(x, y);
+    root.style.left = `${c.x}px`;
+    root.style.top = `${c.y}px`;
+    root.style.right = 'auto';
+    root.style.bottom = 'auto';
+    lsSet(LS_POS_XY, JSON.stringify({ x: c.x, y: c.y }));
+  }
+
+  function restorePosition() {
+    const stored = parseXY(lsGet(LS_POS_XY, ''));
+    if (stored) {
+      if (!applyXY(stored.x, stored.y)) applyDefault();
+      return;
+    }
+    applyDefault();
+  }
+
+  function resetPosition() {
+    lsDel(LS_POS_XY);
+    applyDefault();
+  }
+
+  function reclampIfPositioned() {
+    const xy = currentXY();
+    if (!xy) return;
+    const { w, h } = widgetSize();
+    if (!onScreen(xy.x, xy.y, w, h)) applyDefault();
+    else applyXY(xy.x, xy.y);
+  }
+
+  function isHeaderControl(target) {
+    if (!target || typeof target.closest !== 'function') return false;
+    if (target.closest('#ph-pin, #ph-collapse, #ph-hide')) return true;
+    if (target.closest('.ph-btn')) return true;
+    if (target.closest('button')) return true;
+    return false;
+  }
+
+  /* Drag from empty header (not PIN / collapse / hide). Threshold so a click is not a drag.
+     PIN never locks drag. Collapsed header stays draggable. */
+  function onPointerDown(ev) {
+    if (drag) return;
+    if (ev.button != null && ev.button !== 0) return;
+    if (isHeaderControl(ev.target)) return;
+    if (!els.header || !els.header.contains(ev.target)) return;
+    const rect = root.getBoundingClientRect();
+    drag = {
+      ox: ev.clientX - rect.left,
+      oy: ev.clientY - rect.top,
+      w: rect.width,
+      h: rect.height,
+      headerH: (els.header.getBoundingClientRect().height) || 48,
+      startX: ev.clientX,
+      startY: ev.clientY,
+      moved: false,
+    };
+    dragMoved = false;
+  }
+
+  function onPointerMove(ev) {
+    if (!drag) return;
+    const dx = ev.clientX - drag.startX;
+    const dy = ev.clientY - drag.startY;
+    if (!drag.moved && (dx * dx + dy * dy) >= DRAG_THRESHOLD * DRAG_THRESHOLD) {
+      drag.moved = true;
+      root.classList.add('is-dragging');
+    }
+    if (!drag.moved) return;
+    dragMoved = true;
+    const headerH = drag.headerH || 48;
+    const left = Math.max(EDGE, Math.min(window.innerWidth - drag.w - EDGE, ev.clientX - drag.ox));
+    const top = Math.max(EDGE, Math.min(window.innerHeight - headerH - EDGE, ev.clientY - drag.oy));
+    root.style.left = `${left}px`;
+    root.style.top = `${top}px`;
+    root.style.right = 'auto';
+    root.style.bottom = 'auto';
+  }
+
+  function onPointerUp() {
+    if (!drag) return;
+    const moved = drag.moved;
+    drag = null;
+    root.classList.remove('is-dragging');
+    if (!moved) return;
+    dragMoved = true;
+    const rect = root.getBoundingClientRect();
+    persistXY(Math.round(rect.left), Math.round(rect.top));
+  }
+
+  if (els.header) {
+    els.header.addEventListener('mousedown', onPointerDown);
+    els.header.addEventListener('pointerdown', onPointerDown);
+  }
+  window.addEventListener('mousemove', onPointerMove);
+  window.addEventListener('mouseup', onPointerUp);
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+
+  function stopOwn(ev, fn) {
+    ev.stopPropagation();
+    fn(ev);
+  }
+
   if (els.collapse) {
-    els.collapse.addEventListener('click', (ev) => {
-      ev.stopPropagation();
+    els.collapse.addEventListener('click', (ev) => stopOwn(ev, () => {
       collapsed = !collapsed;
       saveFlag(COLLAPSE_KEY, collapsed);
       applyChrome();
-    });
+      reclampIfPositioned();
+    }));
+    els.collapse.addEventListener('mousedown', (ev) => ev.stopPropagation());
+    els.collapse.addEventListener('pointerdown', (ev) => ev.stopPropagation());
   }
   if (els.pin) {
-    els.pin.addEventListener('click', (ev) => {
-      ev.stopPropagation();
+    els.pin.addEventListener('click', (ev) => stopOwn(ev, () => {
       pinned = !pinned;
       saveFlag(PINNED_KEY, pinned);
       applyChrome();
-      /* Pin stays pin — does not hide, does not empty SQL. */
-    });
+      /* Pin stays pin — keep visible only. Never locks drag, never hides, never empties SQL. */
+    }));
+    els.pin.addEventListener('mousedown', (ev) => ev.stopPropagation());
+    els.pin.addEventListener('pointerdown', (ev) => ev.stopPropagation());
   }
   if (els.hide) {
-    els.hide.addEventListener('click', (ev) => {
-      ev.stopPropagation();
+    els.hide.addEventListener('click', (ev) => stopOwn(ev, () => {
       /* D: hide → pinsVisible=false ONLY. Never unpin, never empty SQL, never miniHud=false-only. */
       setPinsVisible(false);
-    });
+    }));
+    els.hide.addEventListener('mousedown', (ev) => ev.stopPropagation());
+    els.hide.addEventListener('pointerdown', (ev) => ev.stopPropagation());
   }
   if (els.shell) {
     els.shell.addEventListener('click', (ev) => {
       if (!collapsed) return;
-      if (ev.target.closest('#ph-pin, #ph-hide, #ph-collapse')) return;
+      if (dragMoved) { dragMoved = false; return; }
+      if (ev.target.closest('#ph-pin, #ph-hide, #ph-collapse, .ph-btn')) return;
       collapsed = false;
       saveFlag(COLLAPSE_KEY, false);
       applyChrome();
+      reclampIfPositioned();
     });
   }
+
+  window.addEventListener('resize', () => {
+    const xy = currentXY();
+    if (!xy) return;
+    const { w, h } = widgetSize();
+    if (!onScreen(xy.x, xy.y, w, h)) applyDefault();
+    else applyXY(xy.x, xy.y);
+  });
 
   window.addEventListener('message', (ev) => {
     const data = ev.data || {};
@@ -279,6 +507,7 @@
       saveFlag(COLLAPSE_KEY, false);
       applyChrome();
       setPinsVisible(true, { skipPost: true });
+      resetPosition();
     }
   });
 
@@ -294,16 +523,23 @@
       applyChrome();
       pinsVisible = true;
       applyVisibility();
+      resetPosition();
     }
   });
 
   applyChrome();
   applyVisibility();
+  restorePosition();
 
   window.__pinsHud = {
     setVisible: setPinsVisible,
     getVisible: () => pinsVisible,
     applyVisibility,
+    resetPosition,
+    restorePosition,
+    applyDefault,
+    clampXY,
+    LS_POS_XY,
     /* D: SQL pins live in Lua/server — this widget never sends empty pins on hide. */
   };
 })();
