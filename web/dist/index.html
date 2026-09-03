@@ -11,42 +11,78 @@
 <link rel="stylesheet" href="pins-hud.css" />
 <link rel="stylesheet" href="admin.css" />
 <style id="book-critical">
-  /* CEF hard paint — book must never stay blank when open */
-  #book-app.hidden { display: none !important; }
-  #book-app:not(.hidden), #book-app.is-open {
+  /* v2.21.2 — no FOUC: never display:none; never beige #f3ead6; hide until .is-ready */
+  #book-opening-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483100;
+    display: grid;
+    place-items: center;
+    background: rgba(10, 8, 6, 0.42);
+    color: #e8dcc8;
+    font-family: Georgia, "Times New Roman", Times, serif;
+    font-size: 18px;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+    visibility: visible;
+    opacity: 1;
+  }
+  #book-opening-overlay.hidden {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+  #book-app {
     display: block !important;
     position: fixed !important;
     inset: 0 !important;
     z-index: 2147483000 !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
+    background: transparent !important;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 150ms ease;
   }
-  #book-app.is-open .book-stage { display: grid !important; place-items: center; inset: 0; position: absolute; }
-  #book-app.is-open .book-world-dim {
+  #book-app.hidden,
+  #book-app:not(.is-ready) {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+  #book-app.is-open.is-ready {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  #book-app .book-stage { display: grid !important; place-items: center; inset: 0; position: absolute; }
+  #book-app .book-world-dim {
     position: absolute; inset: 0;
     background: rgba(8, 6, 4, 0.78) !important;
   }
-  #book-app.is-open .book-spread {
+  #book-app .book-spread {
     position: relative; z-index: 2;
     width: min(1080px, 88vw) !important;
     height: min(680px, 82vh) !important;
+    aspect-ratio: 1080 / 680;
     display: grid !important;
     grid-template-columns: 1fr 28px 1fr !important;
-    opacity: 1 !important;
     transform: none !important;
     animation: none !important;
   }
-  #book-app.is-open .book-page {
+  #book-app .book-page {
     color: #2c2418 !important;
-    min-height: 200px !important;
-    opacity: 1 !important;
+    height: 100%;
+    width: auto;
+    min-height: 0;
+    background-color: transparent;
   }
-  #book-app.is-open .book-page-inner {
+  #book-app .book-page-inner {
     color: #2c2418 !important;
-    opacity: 1 !important;
     padding: 22px 26px;
+    height: 100%;
   }
+  #book-app .book-edge-tabs { width: 40px; }
 </style>
 </head>
 <body>
@@ -541,8 +577,9 @@
   <div id="craft-toasts" class="craft-toasts" aria-live="polite"></div>
 </div>
 
-<!-- Survival Book v2.11.0 — field notebook -->
-<div id="book-app" class="hidden" data-identity="physical-book" data-book-version="2.20.1" aria-hidden="true">
+<!-- Survival Book v2.21.2 — no flicker, no sounds -->
+<div id="book-opening-overlay" class="hidden" aria-hidden="true" aria-live="polite">Ouverture du carnet...</div>
+<div id="book-app" class="hidden" data-identity="physical-book" data-book-version="2.21.2" aria-hidden="true">
   <div class="book-stage" id="book-stage">
     <div class="book-world-dim" aria-hidden="true"></div>
 
