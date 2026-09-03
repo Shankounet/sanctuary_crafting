@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.20.0
+# sanctuary_crafting v2.20.1
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,9 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.20.1 — Carnet: papiers fournis (page, tan, worn, ligné)
+Pages et inserts du carnet utilisent les 5 papiers fournis: `paper_page` (vignette, Accueil L/R), `paper_page_alt` (fond noir → alpha), `paper_sheet_tan` (rides, projet/déblocage), `paper_sheet_worn` (taches, découverte/polaroid), `paper_sheet_lined` (notes). Cuir `ref_cover` uniquement sur couverture/tranche. Encre `#2a2218`. Onglets colorés v2.20.0 inchangés. Callbacks NUI / craft / tracker / SQL inchangés.
 
 ### v2.20.0 — Carnet: textures et style calés sur les refs vintage
 Carnet visuel recalé sur les mockups vintage: cuir `ref_cover` uniquement sur couverture/tranche, pages `ref_page`, inserts lined/tan/worn (crops depuis les refs). Onglets colorés distincts (plus de beige uniforme). Encre `#2a2218`. Callbacks NUI / craft / tracker / SQL inchangés.
