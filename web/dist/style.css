@@ -6152,3 +6152,89 @@ button, input { font: inherit; color: inherit; }
 #app .output-actions.hidden { display: none !important; }
 #app .sortie-split.hidden,
 #app .prod-split-divider.hidden { display: none !important; }
+
+
+/* v2.23.2 — FAVORIS + RÉCENTS: bandeaux compact (hauteur contenu, pas de trou) */
+#app .recent-strip,
+#app .fav-strip {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 2px;
+  padding: 0;
+  height: auto !important;
+  min-height: 0 !important;
+  align-self: start;
+  grid-row: auto;
+}
+#app .mini-strip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  grid-column: 1 / -1;
+  min-height: 0;
+}
+#app .mini-strip-head .catalog-group-title {
+  flex: 1 1 auto;
+  margin: 4px 2px 0;
+  padding: 2px 0 2px;
+}
+#app .strip-voir-tout {
+  flex: 0 0 auto;
+  margin: 2px 2px 0 0;
+  padding: 2px 8px;
+  border: 1px solid rgba(154,136,102,0.4);
+  background: #202020;
+  color: #9a8866;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  clip-path: polygon(0 2px, 2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px));
+}
+#app .strip-voir-tout:hover {
+  border-color: #9a8866;
+  background: #242424;
+  color: #c4b48a;
+}
+#app .fav-mini {
+  width: 172px;
+  padding-right: 4px;
+}
+#app .fav-mini-status {
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+  color: rgba(154,136,102,0.75);
+}
+#app .fav-mini-status.ok { color: rgba(138,171,106,0.9); }
+#app .fav-mini-status.almost { color: rgba(196,160,112,0.9); }
+#app .fav-mini-status.bad { color: rgba(170,120,110,0.85); }
+#app .fav-mini-star {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  color: rgba(154,136,102,0.55);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+#app .fav-mini-star.on,
+#app .fav-mini-star:hover {
+  color: #9a8866;
+}
+#app .recent-row {
+  min-height: 0;
+  height: auto;
+  padding-bottom: 2px;
+}

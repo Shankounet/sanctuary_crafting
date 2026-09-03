@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.23.1
+# sanctuary_crafting v2.23.2
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,15 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.23.2 — Craft: favoris et récents en bandeaux compact
+FAVORIS et RÉCEMMENT FABRIQUÉS passent en **bandeaux horizontaux mini** (plus de cartes catalogue pleine hauteur pour les favoris).
+
+- **FAVORIS** : strip image + nom + statut discret + étoile ; masqué si 0 ; max 5 + **VOIR TOUT** → filtre Favoris.
+- **RÉCENTS** : strip image + nom + ×n inchangé ; masqué si 0 ; max 5 + **VOIR TOUT** → déplie le bandeau.
+- Hauteur = contenu (1–2 items → bandeau court, pas de trou). Catalogue reste dominant.
+- Clic mini → `selectRecipe` + fiche ; `scrollIntoView` vers la carte catalogue si présente.
+- Palette / 3-col / FABRIQUER / SORTIE·RÉCUP / Carnet / DevHub / callbacks NUI : **inchangés**.
 
 ### v2.23.1 — Craft: polish SORTIE / RÉCUP
 UX sortie station uniquement (pas de changement de logique v2.23.0 — pas d’auto AddItem, completed reste à la station).
