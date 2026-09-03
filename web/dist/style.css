@@ -5556,3 +5556,179 @@ button, input { font: inherit; color: inherit; }
 #app .nav-rarity { margin-top: 8px; }
 
 #app .rarity-filters.filters { flex-direction: row; flex-wrap: wrap; gap: 3px; }
+
+/* ============================================================
+   v2.19.1 — Craft UI: header compact ~76px (70–80px)
+   Isolated to #app .ctrl-console. Cards / lot / FABRIQUER /
+   right 4 sections / NUI callbacks untouched.
+   Old: min-height 92px (v2.2.13) then 72px floor (v2.19.0) but
+   SYS column + 3 stacked 30px buttons + 3-line identity +
+   stacked gauges actually ~120–130px. New: 76px control bar.
+   ============================================================ */
+#app {
+  --header-h: 76px;
+}
+#app .ctrl-console {
+  height: var(--header-h) !important;
+  min-height: var(--header-h) !important;
+  max-height: 80px !important;
+  flex-shrink: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+#app .ctrl-deck {
+  display: flex !important;
+  align-items: stretch;
+  min-height: 0;
+  height: 100%;
+}
+
+/* LEFT — two-line identity: TITLE / type · niveau */
+#app .ctrl-identity {
+  flex: 0 1 260px;
+  min-width: 180px;
+  align-items: stretch;
+}
+#app .ctrl-plate-mark {
+  width: 8px;
+  padding: 8px 0;
+}
+#app .ctrl-id-body {
+  padding: 8px 14px 8px 12px !important;
+  gap: 2px !important;
+  justify-content: center;
+}
+#app .ctrl-id-top {
+  display: none !important;
+}
+#app #station-title {
+  font-size: 1.05rem !important;
+  line-height: 1.15 !important;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  max-width: 100%;
+}
+#app #station-meta {
+  margin-top: 0 !important;
+  font-size: 0.68rem !important;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  color: rgba(154,154,154,0.78);
+}
+
+/* RIGHT — TYPE | NIVEAU | ÉTAT | EFFICACITÉ | ÉNERGIE on one technical line */
+#app .ctrl-instruments {
+  flex: 1 1 auto !important;
+  padding: 0 4px !important;
+  align-items: stretch;
+  min-height: 0;
+  height: 100%;
+}
+#app .instr-group {
+  align-items: stretch;
+  height: 100%;
+  min-height: 0;
+}
+#app .instr-divider {
+  width: 1px !important;
+  margin: 10px 0 !important;
+  align-self: stretch;
+}
+#app .instr-plate,
+#app .instr-primary,
+#app .instr-secondary {
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 0 10px !important;
+  gap: 6px !important;
+  min-width: 0;
+  height: 100%;
+}
+#app .instr-secondary {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: none;
+}
+#app .instr-primary {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+#app .instr-plate .t-l4 {
+  margin-bottom: 0 !important;
+  white-space: nowrap;
+  font-size: 0.48rem !important;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  flex-shrink: 0;
+}
+#app .instr-plate .t-l5,
+#app .instr-secondary .t-l5,
+#app .instr-primary .t-l5 {
+  font-size: 0.76rem !important;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+#app .state-row {
+  gap: 5px;
+  min-width: 0;
+}
+#app .instr-state .led-dot,
+#app .led-dot {
+  width: 6px;
+  height: 6px;
+}
+
+/* Thin glanceable gauges — do not set header height */
+#app .ctrl-console .seg-gauge {
+  margin-top: 0 !important;
+  height: 2px !important;
+  width: 40px;
+  flex-shrink: 0;
+  align-self: center;
+}
+#app .ctrl-console .seg-bar {
+  margin-top: 0 !important;
+  height: 4px !important;
+  width: 52px;
+  flex-shrink: 0;
+  align-self: center;
+  gap: 1px;
+}
+
+/* SYS cluster — row, buttons must not drive header height */
+#app .ctrl-actions {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center;
+  padding: 0 10px !important;
+  gap: 4px !important;
+  min-width: 0;
+  height: 100%;
+}
+#app .ctrl-actions-label {
+  font-size: 0.4rem;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  margin-right: 2px;
+}
+#app .ctrl-actions .icon-btn {
+  width: 22px !important;
+  height: 22px !important;
+  font-size: 0.68rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1100px) {
+  #app .ctrl-console {
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible;
+  }
+}
