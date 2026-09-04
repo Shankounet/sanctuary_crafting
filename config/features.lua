@@ -98,15 +98,27 @@ Config.UI = {
     Accent = '#9a8866',
     CompactDefault = false,
     Theme = 'industrial_dark',
-    -- SFX NUI (WebAudio + placeholders web/sounds/*.ogg) — désactivable
+    -- SFX NUI sparse/premium (silence default; important actions only) — v2.28.0
+    -- Legacy aliases still accepted by NUI: click→craft_start, success→craft_complete, error→ui_error
     Sounds = {
         Enabled = true,
-        Volume = 0.35,
+        Volume = 0.25,          -- global default
+        CooldownMs = 150,       -- per identical kind
         Files = {
-            click = '../sounds/click.ogg',
-            success = '../sounds/success.ogg',
-            error = '../sounds/error.ogg',
-            blueprint = '../sounds/blueprint.ogg',
+            ui_open = '../sounds/ui_open.ogg',
+            ui_close = '../sounds/ui_close.ogg',
+            craft_start = '../sounds/craft_start.ogg',
+            craft_complete = '../sounds/craft_complete.ogg',
+            craft_collect = '../sounds/craft_collect.ogg',
+            ui_error = '../sounds/ui_error.ogg',
+            book_open = '../sounds/book_open.ogg',
+            book_page = '../sounds/book_page.ogg',
+            book_close = '../sounds/book_close.ogg',
+            -- legacy keys (kept for older clients / tracker map)
+            click = '../sounds/craft_start.ogg',
+            success = '../sounds/craft_complete.ogg',
+            error = '../sounds/ui_error.ogg',
+            blueprint = '../sounds/craft_collect.ogg',
         },
     },
     -- Micro-UX craft catalogue (v2.2.22) — chaque flag est opt-in côté NUI
@@ -279,3 +291,7 @@ Config.Discord = {
     },
 }
 
+
+-- Aliases (same table as Config.UI.Sounds) — user-facing / docs names
+Config.UIAudio = Config.UI.Sounds
+Config.UIAudioVolume = Config.UI.Sounds  -- Volume lives on Config.UI.Sounds.Volume / Config.UIAudio.Volume

@@ -1,6 +1,6 @@
 --[[
     book/client/book.lua — ouverture NUI Carnet + mini HUD pins + artisans meet
-    v2.21.2: no Carnet SFX (do not PlaySound / SendNUIMessage sound / Audio).
+    v2.28.0: soft paper SFX only (open/page/close) via NUI WebAudio + ogg.
 ]]
 
 local bookOpen = false
@@ -50,6 +50,8 @@ local function bookFallbackMeta()
             modules[key] = true
         end
     end
+    local bookSnd = (Config.Book and Config.Book.Sounds) or { Enabled = true, Volume = 0.2 }
+    local uiSnd = (Config.UI and Config.UI.Sounds) or {}
     return {
         accent = (Config.Book and Config.Book.Accent) or '#9a8866',
         theme = (Config.Book and Config.Book.Theme) or 'field_manual',
@@ -57,6 +59,8 @@ local function bookFallbackMeta()
         locale = Config.Locale or 'fr',
         title = (type(_) == 'function' and _('book_title')) or 'Carnet de survie',
         subtitle = (type(_) == 'function' and _('book_subtitle')) or 'Manuel de terrain',
+        sounds = bookSnd,
+        uiSounds = uiSnd,
     }
 end
 
