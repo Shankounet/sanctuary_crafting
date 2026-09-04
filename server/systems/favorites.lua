@@ -52,5 +52,6 @@ end)
 AddEventHandler('esx:playerLoaded', function(pid) Favorites.Load(pid) end)
 
 lib.callback.register('sanctuary_crafting:toggleFavorite', function(src, recipeId)
-    return { ok = true, favored = Favorites.Toggle(src, recipeId) }
+    local favored = Favorites.Toggle(src, recipeId)
+    return { ok = true, favored = favored, favorites = Favorites.Get(src) }
 end)
