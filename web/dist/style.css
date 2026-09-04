@@ -6851,3 +6851,38 @@ button, input { font: inherit; color: inherit; }
   height: 11px;
   opacity: 0.8;
 }
+
+/* ============================================================
+   v2.27.1 — Favoris / Récents mini-cards clickable (CEF)
+   Delayed drag capture; minis receive clicks above fades.
+   ============================================================ */
+#app .recent-row-fade {
+  pointer-events: none;
+}
+#app .recent-mini {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  cursor: pointer;
+}
+#app .recent-mini:hover {
+  border-color: #9a8866;
+}
+#app .fav-mini-star {
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+  cursor: pointer;
+}
+#app .recent-mini .recent-img,
+#app .recent-mini .recent-img img,
+#app .recent-mini .recent-img .ph,
+#app .recent-mini .recent-meta,
+#app .recent-mini .fav-mini-status,
+#app .recent-mini .recent-name,
+#app .recent-mini .recent-qty {
+  pointer-events: none;
+}
+#app .recent-row:not(.is-dragging) .recent-mini {
+  cursor: pointer;
+}
