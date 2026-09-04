@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.28.0
+# sanctuary_crafting v2.29.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,9 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.29.0 — NUI perf (Craft + Carnet)
+Vanilla JS (pas React). Sélection incrémentale (`syncSelectionInList` sans rebuild catalogue), debounce recherche 200 ms, barre de craft ~10 Hz, timers idle menu fermé, images `loading=lazy` sur cartes, favoris sans `getMenu` complet, mémo `filteredRecipes`, pool Audio, CSS cards allégées. Voir `docs/PERF_NUI.md`.
 
 ### v2.28.0 — UI audio sparse / premium
 Silence par défaut. Sons uniquement sur actions importantes (plus de beep arcade sur chaque clic).

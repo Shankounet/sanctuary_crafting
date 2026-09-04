@@ -8,6 +8,7 @@
   let state = {
     benchKey: null,
     recipes: [],
+    recipesVersion: 0,
     favorites: [],
     pinned: [],
     selected: null,
@@ -16,6 +17,7 @@
     search: '',
     materialFilter: null,
     compact: false,
+    open: false,
     crafting: false,
     craftInflight: false,
     craftId: null,
@@ -254,6 +256,37 @@
     return UI_KIND_ALIAS[k] || k;
   }
 
+  /** Preload/reuse Audio nodes — avoid new Audio() per play (v2.29.0). */
+  const _audioPool = Object.create(null);
+  function playPooledSrc(src, vol, onFail) {
+    if (!src) return false;
+    try {
+      let base = _audioPool[src];
+      if (!base) {
+        base = new Audio(src);
+        base.preload = 'auto';
+        _audioPool[src] = base;
+      }
+      let a = base;
+      try {
+        if (!a.paused && a.currentTime > 0 && !a.ended) {
+          a = base.cloneNode ? base.cloneNode() : new Audio(src);
+        } else {
+          a.pause();
+          a.currentTime = 0;
+        }
+      } catch (_) {
+        a = new Audio(src);
+      }
+      a.volume = vol;
+      const p = a.play();
+      if (p && p.catch) p.catch(() => { if (typeof onFail === 'function') onFail(); });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /** Sparse premium UI SFX — silence is default; never call on hover / filters / tabs. */
   function playUi(kind) {
     const cfg = state.sounds || {};
@@ -269,15 +302,7 @@
     if (vol <= 0) return;
     const files = cfg.Files || {};
     const src = files[resolved] || files[kind];
-    if (src) {
-      try {
-        const a = new Audio(src);
-        a.volume = vol;
-        const p = a.play();
-        if (p && p.catch) p.catch(() => softWebTone(resolved, vol));
-        return;
-      } catch (_) { /* fall through */ }
-    }
+    if (src && playPooledSrc(src, vol, () => softWebTone(resolved, vol))) return;
     softWebTone(resolved, vol);
   }
 
@@ -328,9 +353,10 @@
     return `${IMG_BASE}${encodeURIComponent(String(item))}.png`;
   }
 
-  function bindItemImg(img, item, fallbackEl) {
+  function bindItemImg(img, item, fallbackEl, opts) {
     if (!img) return;
     const url = itemImageUrl(item);
+    const lazy = !!(opts && opts.lazy);
     img.classList.remove('is-fallback');
     img.removeAttribute('hidden');
     if (fallbackEl) fallbackEl.style.display = '';
@@ -338,6 +364,13 @@
       img.classList.add('is-fallback');
       img.removeAttribute('src');
       return;
+    }
+    if (lazy) {
+      img.loading = 'lazy';
+      img.decoding = 'async';
+    } else {
+      img.loading = 'eager';
+      try { img.decoding = 'async'; } catch (_) { /* ignore */ }
     }
     img.onload = () => {
       if (fallbackEl) fallbackEl.style.display = 'none';
@@ -711,8 +744,33 @@
     return arr;
   }
 
+  let _filterCache = { key: '', list: null };
+
+  function invalidateFilterCache() {
+    _filterCache = { key: '', list: null };
+  }
+
+  function filterCacheKey() {
+    const fav = (state.favorites || []).slice().sort().join(',');
+    return [
+      state.filter || 'all',
+      state.search || '',
+      state.category || 'all',
+      state.sort || 'name',
+      state.rarityFilter || 'all',
+      state.materialFilter || '',
+      state.recipesVersion || 0,
+      fav,
+      !!(state.recentStripExpanded),
+    ].join('\x1f');
+  }
+
   function filteredRecipes() {
-    return sortedRecipes(state.recipes.filter(matchesFilter));
+    const key = filterCacheKey();
+    if (_filterCache.key === key && _filterCache.list) return _filterCache.list;
+    const list = sortedRecipes(state.recipes.filter(matchesFilter));
+    _filterCache = { key, list };
+    return list;
   }
 
   function setEmpty(el, show) {
@@ -908,7 +966,7 @@
         if (img) { img.hidden = true; img.classList.add('is-fallback'); }
         if (ph) ph.style.display = '';
       } else {
-        bindItemImg(img, resultItem, ph);
+        bindItemImg(img, resultItem, ph, { lazy: true });
       }
 
       card.addEventListener('click', (e) => {
@@ -919,10 +977,7 @@
       if (favBtn) {
         favBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          const was = isFavorite(r.id);
-          await post('favorite', { recipeId: r.id });
-          showToast(was ? 'Retiré des favoris' : 'Ajouté aux favoris', 'ok');
-          await refresh();
+          await toggleFavoriteLocal(r.id);
         });
       }
       return card;
@@ -1377,6 +1432,7 @@
     const grid = $('#recipe-grid');
     const esc = (window.CSS && CSS.escape) ? CSS.escape(String(full.id)) : String(full.id).replace(/"/g, '\"');
     const cardMissing = !!(grid && full.id && !grid.querySelector(`.recipe-card[data-id="${esc}"]`));
+    let needFullList = false;
     if (filteredOut || (cardMissing && (state.filter !== 'all' || state.search))) {
       state.filter = 'all';
       state.search = '';
@@ -1387,6 +1443,12 @@
       const allBtn = document.querySelector('#filters [data-filter="all"]');
       if (allBtn) allBtn.classList.add('active');
       if (typeof syncFiltersMore === 'function') syncFiltersMore();
+      needFullList = true;
+    }
+    if (needFullList) {
+      state.selected = full;
+      invalidateFilterCache();
+      renderList();
     }
     selectRecipe(full);
   }
@@ -1412,7 +1474,7 @@
     `;
     const img = btn.querySelector('img');
     const ph = btn.querySelector('.ph');
-    bindItemImg(img, resultItem, ph);
+    bindItemImg(img, resultItem, ph, { lazy: true });
     btn.addEventListener('click', () => selectRecipeFromShortcut(r));
     return btn;
   }
@@ -1443,7 +1505,7 @@
     `;
     const img = btn.querySelector('img');
     const ph = btn.querySelector('.ph');
-    bindItemImg(img, resultItem, ph);
+    bindItemImg(img, resultItem, ph, { lazy: true });
     btn.addEventListener('click', (e) => {
       if (e.target.closest('[data-fav]')) return;
       selectRecipeFromShortcut(r);
@@ -1452,10 +1514,7 @@
     if (star) {
       star.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const was = isFavorite(r.id);
-        await post('favorite', { recipeId: r.id });
-        showToast(was ? 'Retiré des favoris' : 'Ajouté aux favoris', 'ok');
-        await refresh();
+        await toggleFavoriteLocal(r.id);
       });
     }
     return btn;
@@ -1471,6 +1530,61 @@
   function toggleRow(el, show) {
     if (!el) return;
     el.classList.toggle('hidden', !show);
+  }
+
+  function syncSelectionInList(id) {
+    const grid = $('#recipe-grid');
+    if (!grid) return;
+    grid.querySelectorAll('.recipe-card.selected, .recent-mini.selected').forEach((el) => {
+      el.classList.remove('selected');
+    });
+    if (!id) return;
+    const esc = (window.CSS && CSS.escape) ? CSS.escape(String(id)) : String(id).replace(/"/g, '\"');
+    grid.querySelectorAll(`.recipe-card[data-id="${esc}"], .recent-mini[data-id="${esc}"]`).forEach((el) => {
+      el.classList.add('selected');
+    });
+  }
+
+  function patchFavoriteStars(recipeId) {
+    const on = isFavorite(recipeId);
+    const esc = (window.CSS && CSS.escape) ? CSS.escape(String(recipeId)) : String(recipeId).replace(/"/g, '\"');
+    document.querySelectorAll(`[data-fav="${esc}"]`).forEach((btn) => {
+      btn.classList.toggle('on', on);
+      const ico = btn.querySelector('i');
+      if (ico) ico.className = `fa-${on ? 'solid' : 'regular'} fa-star`;
+    });
+    const favBtn = $('#btn-fav');
+    if (favBtn && state.selected && state.selected.id === recipeId) {
+      favBtn.classList.toggle('on', on);
+      favBtn.innerHTML = `<i class="fa-${on ? 'solid' : 'regular'} fa-star" aria-hidden="true"></i>`;
+    }
+  }
+
+  async function toggleFavoriteLocal(recipeId) {
+    if (!recipeId) return;
+    const was = isFavorite(recipeId);
+    const res = await post('favorite', { recipeId });
+    if (!res || res.ok === false) {
+      showToast('Favori indisponible', 'err');
+      return;
+    }
+    if (Array.isArray(res.favorites)) {
+      state.favorites = res.favorites;
+    } else {
+      const on = (typeof res.favored === 'boolean') ? res.favored : !was;
+      if (on) {
+        if (!state.favorites.includes(recipeId)) state.favorites = state.favorites.concat([recipeId]);
+      } else {
+        state.favorites = (state.favorites || []).filter((id) => id !== recipeId);
+      }
+    }
+    invalidateFilterCache();
+    showToast(was ? 'Retiré des favoris' : 'Ajouté aux favoris', 'ok');
+    /* Avoid getMenu refresh — patch stars; rebuild list only when fav strip / favorites filter needs it */
+    const needList = state.filter === 'favorites'
+      || (state.filter === 'all' && !state.search);
+    if (needList) renderList();
+    else patchFavoriteStars(recipeId);
   }
 
   function selectRecipe(r) {
@@ -1741,7 +1855,7 @@
     syncTeachButton(r);
 
     renderRightRecent();
-    renderList();
+    syncSelectionInList(r && r.id);
     const rid = r && r.id;
     if (rid) {
       requestAnimationFrame(() => {
@@ -2396,7 +2510,28 @@
     `;
   }
 
+  let progressRaf = null;
+  let progressEndTimer = null;
+  const PROGRESS_HZ_MS = 100; /* ~10 Hz DOM writes */
+
+  function cancelProgressLoop() {
+    state.progressGen = (state.progressGen || 0) + 1;
+    if (progressRaf != null) {
+      try { cancelAnimationFrame(progressRaf); } catch (_) { /* ignore */ }
+      progressRaf = null;
+    }
+    if (progressEndTimer != null) {
+      clearTimeout(progressEndTimer);
+      progressEndTimer = null;
+    }
+  }
+
+  function isCraftMenuOpen() {
+    return !!(state.open && app && !app.classList.contains('hidden'));
+  }
+
   function runProgress(duration, onDone) {
+    cancelProgressLoop();
     state.progressGen = (state.progressGen || 0) + 1;
     const gen = state.progressGen;
     const remaining = Math.max(0, Number(duration) || 0);
@@ -2405,6 +2540,8 @@
     const start = performance.now() - elapsed;
     const recipe = state.progressRecipe || state.selected;
     const fill = $('#progress-fill');
+    let lastPaint = 0;
+    let doneFired = false;
     const paint = (now) => {
       const p = original > 0 ? Math.min(1, Math.max(0, (now - start) / original)) : 1;
       if (fill) fill.style.width = `${p * 100}%`;
@@ -2419,15 +2556,37 @@
       setFabCancelVisible(p < 1);
       return p;
     };
+    const finish = () => {
+      if (doneFired || gen !== state.progressGen) return;
+      doneFired = true;
+      paint(performance.now());
+      progressRaf = null;
+      if (progressEndTimer != null) {
+        clearTimeout(progressEndTimer);
+        progressEndTimer = null;
+      }
+      if (typeof onDone === 'function') onDone();
+    };
     paint(performance.now());
+    if (remaining > 0) {
+      progressEndTimer = setTimeout(finish, remaining + 16);
+    }
     const tick = (now) => {
+      progressRaf = null;
       if (gen !== state.progressGen) return;
       if (!state.crafting) return;
+      /* Idle when craft menu closed — tracker owns visible progress */
+      if (!isCraftMenuOpen()) return;
+      if (now - lastPaint < PROGRESS_HZ_MS) {
+        progressRaf = requestAnimationFrame(tick);
+        return;
+      }
+      lastPaint = now;
       const p = paint(now);
-      if (p < 1) requestAnimationFrame(tick);
-      else if (typeof onDone === 'function') onDone();
+      if (p < 1) progressRaf = requestAnimationFrame(tick);
+      else finish();
     };
-    requestAnimationFrame(tick);
+    if (isCraftMenuOpen()) progressRaf = requestAnimationFrame(tick);
   }
 
   function recipeFromSession(active) {
@@ -2653,7 +2812,7 @@
   async function cancelCraft() {
     if (!state.craftId || state.finishLock) return;
     await post('cancel', { craftId: state.craftId });
-    state.progressGen = (state.progressGen || 0) + 1;
+    cancelProgressLoop();
     state.crafting = false;
     state.craftId = null;
     state.craftDurationMs = null;
@@ -2868,6 +3027,8 @@
   function applyMenu(data) {
     state.benchKey = data.benchKey;
     state.recipes = data.recipes || [];
+    state.recipesVersion = (state.recipesVersion || 0) + 1;
+    invalidateFilterCache();
     if (data.itemLabels) state.itemLabels = data.itemLabels;
     state.favorites = data.favorites || [];
     state.pinned = data.pinned || [];
@@ -3326,10 +3487,26 @@
     state.compact = !state.compact;
     app.dataset.compact = state.compact ? '1' : '0';
   });
+  let searchDebounceTimer = null;
   bindUi('#search', 'input', (e) => {
-    state.search = e.target.value;
-    if (!state.search) state.materialFilter = null;
-    renderList();
+    const val = e.target.value;
+    state.search = val;
+    if (!val) {
+      state.materialFilter = null;
+      if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = null;
+      }
+      invalidateFilterCache();
+      renderList();
+      return;
+    }
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      searchDebounceTimer = null;
+      invalidateFilterCache();
+      renderList();
+    }, 200);
   });
 
   function syncFiltersMore() {
@@ -3438,10 +3615,7 @@
   });
   bindUi('#btn-fav', 'click', async () => {
     if (!state.selected) return;
-    const was = isFavorite(state.selected.id);
-    await post('favorite', { recipeId: state.selected.id });
-    showToast(was ? 'Retiré des favoris' : 'Ajouté aux favoris', 'ok');
-    await refresh();
+    await toggleFavoriteLocal(state.selected.id);
   });
   bindUi('#btn-queue', 'click', async () => {
     openTab('queue');
@@ -3648,6 +3822,12 @@
       if (r && typeof selectRecipe === 'function') selectRecipe(r);
     } else if (msg.action === 'open') {
       app.classList.remove('hidden');
+      state.open = true;
+      startFilePanelTimer();
+      /* Resume fab progress paint if a craft is still running */
+      if (state.crafting && state.craftDurationMs != null && state.craftId) {
+        /* remaining unknown here — hydrateSession / craftAdvanced will drive runProgress */
+      }
       playUi('ui_open');
       try { state.lastCraft = localStorage.getItem(LAST_CRAFT_KEY); } catch (_) { /* ignore */ }
       applyMenu(msg.data || {});
@@ -3688,6 +3868,17 @@
       // Tracker (sibling #craft-tracker) keeps progress + completion ownership when pinned.
       const wasVisible = app && !app.classList.contains('hidden');
       app.classList.add('hidden');
+      state.open = false;
+      stopFilePanelTimer();
+      /* Stop craft-menu progress rAF (DOM hidden); keep end timer so finishCraft still fires */
+      if (progressRaf != null) {
+        try { cancelAnimationFrame(progressRaf); } catch (_) { /* ignore */ }
+        progressRaf = null;
+      }
+      if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = null;
+      }
       if (wasVisible) playUi('ui_close');
     } else if (msg.action === 'queue') {
       state.queue = msg.queue || [];
@@ -3725,7 +3916,7 @@
       }
     } else if (msg.action === 'craftFinished') {
       const same = !msg.craftId || !state.craftId || msg.craftId === state.craftId;
-      state.progressGen = (state.progressGen || 0) + 1;
+      cancelProgressLoop();
       state.crafting = false;
       if (same) {
         state.craftId = null;
@@ -3775,7 +3966,9 @@
   });
 
   let filePollAt = 0;
+  let filePanelTimer = null;
   function tickFilePanel() {
+    if (!state.open || !isCraftMenuOpen()) return;
     const jobs = fileJobs();
     if (!jobs.length) return;
     const now = Date.now();
@@ -3785,6 +3978,15 @@
       loadQueue();
     }
   }
-  setInterval(tickFilePanel, 500);
+  function startFilePanelTimer() {
+    if (filePanelTimer != null) return;
+    filePanelTimer = setInterval(tickFilePanel, 500);
+  }
+  function stopFilePanelTimer() {
+    if (filePanelTimer != null) {
+      clearInterval(filePanelTimer);
+      filePanelTimer = null;
+    }
+  }
 
 })();

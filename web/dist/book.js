@@ -78,7 +78,37 @@
     return bookAudioCtx;
   }
 
-  /** Soft paper-like SFX — open / page / close only. */
+  /** Soft paper-like SFX — open / page / close only. Pooled Audio (v2.29.0). */
+  const _bookAudioPool = Object.create(null);
+  function playBookPooled(src, vol, onFail) {
+    if (!src) return false;
+    try {
+      let base = _bookAudioPool[src];
+      if (!base) {
+        base = new Audio(src);
+        base.preload = 'auto';
+        _bookAudioPool[src] = base;
+      }
+      let a = base;
+      try {
+        if (!a.paused && a.currentTime > 0 && !a.ended) {
+          a = base.cloneNode ? base.cloneNode() : new Audio(src);
+        } else {
+          a.pause();
+          a.currentTime = 0;
+        }
+      } catch (_) {
+        a = new Audio(src);
+      }
+      a.volume = vol;
+      const p = a.play();
+      if (p && p.catch) p.catch(() => { if (typeof onFail === 'function') onFail(); });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function playBookSound(kind) {
     const snd = (state.meta && state.meta.sounds) || {};
     const ui = (state.meta && state.meta.uiSounds) || {};
@@ -96,15 +126,7 @@
     if (vol <= 0) return;
     const files = Object.assign({}, ui.Files || {}, snd.Files || {});
     const src = files[resolved];
-    if (src) {
-      try {
-        const a = new Audio(src);
-        a.volume = vol;
-        const p = a.play();
-        if (p && p.catch) p.catch(() => softPaperTone(resolved, vol));
-        return;
-      } catch (_) { /* fall through */ }
-    }
+    if (src && playBookPooled(src, vol, () => softPaperTone(resolved, vol))) return;
     softPaperTone(resolved, vol);
   }
 
@@ -614,7 +636,11 @@
   function leftEl() { return $('#book-left'); }
   function rightEl() { return $('#book-right'); }
 
+  let bookPaintGen = 0;
+
   function setPages(leftHtml, rightHtml) {
+    /* Idle when closed — drop late async page paints (v2.29.0). Textures stay CSS vars (not reassigned here). */
+    if (!state.open) return;
     const L = leftEl();
     const R = rightEl();
     if (L) {
@@ -725,7 +751,9 @@
   async function navigate(page) {
     const prev = state.page;
     state.page = page;
+    bookPaintGen += 1;
     if (prev && page && prev !== page && state.open) playBookSound('page');
+    if (!state.open) return;
     renderTabs();
     setContext();
     /* Keep boot skeleton / last content. Never wipe to a blank Chargement spread. */
@@ -2339,6 +2367,7 @@
   function closeBook() {
     const was = state.open;
     state.open = false;
+    bookPaintGen += 1;
     closeIndex();
     hideBookShell();
     if (was) playBookSound('close');
@@ -2360,7 +2389,8 @@
     if (data.action === 'bookClose') {
       const was = state.open;
       state.open = false;
-      closeIndex();
+      bookPaintGen += 1;
+        closeIndex();
       hideBookShell();
       if (was) playBookSound('close');
     }
