@@ -3776,3 +3776,46 @@
   animation: none !important;
   transform: none !important;
 }
+
+/* ============================================================
+   v2.27.0 — Specialty pictograms (Carnet compétences)
+   ============================================================ */
+#book-app .spec-ico {
+  --spec-tint: #9a8866;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 1.1em;
+  height: 1.1em;
+  min-width: 12px;
+  min-height: 12px;
+  margin: 0 0.4em 0 0;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--spec-tint);
+  opacity: 0.78;
+  vertical-align: -0.1em;
+  flex: 0 0 auto;
+  filter: none;
+  text-shadow: none;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+#book-app .ms-line .ms-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+#book-app .ms-line .ms-name .spec-ico {
+  font-size: 12px;
+  opacity: 0.8;
+}
+#book-app .stamp-specialisation .spec-ico {
+  font-size: 11px;
+  margin-right: 0.35em;
+  opacity: 0.85;
+  vertical-align: -0.08em;
+}

@@ -2504,6 +2504,7 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
         recipes = out, favorites = favorites, pinned = pinned,
         knownArtisans = artisanBook,
         playerSpec = (Specializations and Specializations.Resolve and Specializations.Resolve(src)) or nil,
+        specialtyIcons = (SpecialtyIcon and SpecialtyIcon.BuildNuiMap and SpecialtyIcon.BuildNuiMap()) or {},
         skillSnapshot = skillSnap and {
             available = skillSnap.available == true,
             categories = (function()

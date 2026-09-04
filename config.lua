@@ -46,7 +46,7 @@ Config = {}
 
 Config.Locale = 'fr'
 Config.Debug = false
-Config.Version = '2.26.1'
+Config.Version = '2.27.0'
 
 --------------------------------------------------------------------------------
 -- Feature flags (Phase 2–7) — stubs uniquement, aucun comportement Phase 1
@@ -124,10 +124,10 @@ Config.WorldBenchCommand = 'placeworldbench'
 Config.SkillSystem = 'devhub'
 
 Config.SkillCategories = {
-    survival = { categoryUid = 'survie', label = 'Survie' },
-    medic    = { categoryUid = 'medecin', label = 'Médecin' },
-    engineer = { categoryUid = 'ingenieur', label = 'Ingénieur' },
-    gunsmith = { categoryUid = 'armurier', label = 'Armurier' },
+    survival = { categoryUid = 'survie', label = 'Survie', icon = 'fa-fire', tint = '#b08a62' },
+    medic    = { categoryUid = 'medecin', label = 'Médecin', icon = 'fa-kit-medical', tint = '#8a9a7a' },
+    engineer = { categoryUid = 'ingenieur', label = 'Ingénieur', icon = 'fa-gears', tint = '#9a8866' },
+    gunsmith = { categoryUid = 'armurier', label = 'Armurier', icon = 'fa-crosshairs', tint = '#8a867a' },
 }
 
 -- station id → SkillCategories KEY (jamais d'UID brut)
@@ -151,9 +151,38 @@ Config.SkillLegacyMap = {
     ingenieur = 'engineer', ingenieurs = 'engineer', engineer = 'engineer',
     engineering = 'engineer', crafting = 'engineer',
     armurier = 'gunsmith', gunsmith = 'gunsmith', weapons = 'gunsmith',
-    agriculture = 'survival',
-    forgeron = 'engineer',
-    mechanic = 'engineer', mecano = 'engineer',
+    agriculture = 'survival', cuisine = 'survival',
+    forgeron = 'engineer', blacksmith = 'engineer',
+    mechanic = 'engineer', mecano = 'engineer', mecanique = 'engineer',
+    electricite = 'engineer', electricity = 'engineer', electric = 'engineer',
+    chimie = 'medic', chemistry = 'medic', labo = 'medic',
+}
+
+-- Pictogrammes spécialité (NUI) — clés SkillCategories + alias station/spec
+-- icon = classe FA sans fa-solid ; tint = couleur CSS désaturée
+Config.SpecialtyIcons = {
+    survival     = { label = 'Survie',      icon = 'fa-fire',             tint = '#b08a62', skillCategory = 'survival' },
+    survie       = { label = 'Survie',      icon = 'fa-fire',             tint = '#b08a62', skillCategory = 'survival' },
+    medic        = { label = 'Médecin',     icon = 'fa-kit-medical',      tint = '#8a9a7a', skillCategory = 'medic' },
+    medecin      = { label = 'Médecin',     icon = 'fa-kit-medical',      tint = '#8a9a7a', skillCategory = 'medic' },
+    medical      = { label = 'Médecin',     icon = 'fa-kit-medical',      tint = '#8a9a7a', skillCategory = 'medic' },
+    engineer     = { label = 'Ingénieur',   icon = 'fa-gears',            tint = '#9a8866', skillCategory = 'engineer' },
+    ingenieur    = { label = 'Ingénieur',   icon = 'fa-gears',            tint = '#9a8866', skillCategory = 'engineer' },
+    gunsmith     = { label = 'Armurier',    icon = 'fa-crosshairs',       tint = '#8a867a', skillCategory = 'gunsmith' },
+    armurier     = { label = 'Armurier',    icon = 'fa-crosshairs',       tint = '#8a867a', skillCategory = 'gunsmith' },
+    forgeron     = { label = 'Forgeron',    icon = 'fa-hammer',           tint = '#8a8070', skillCategory = 'engineer' },
+    blacksmith   = { label = 'Forgeron',    icon = 'fa-hammer',           tint = '#8a8070', skillCategory = 'engineer' },
+    agriculture  = { label = 'Agriculture', icon = 'fa-seedling',         tint = '#7a8a6a', skillCategory = 'survival' },
+    cuisine      = { label = 'Cuisine',     icon = 'fa-utensils',         tint = '#c4b89a', skillCategory = 'survival' },
+    electricite  = { label = 'Électricité', icon = 'fa-bolt',             tint = '#b89a5a', skillCategory = 'engineer' },
+    electricity  = { label = 'Électricité', icon = 'fa-bolt',         tint = '#b89a5a', skillCategory = 'engineer' },
+    electric     = { label = 'Électricité', icon = 'fa-bolt',             tint = '#b89a5a', skillCategory = 'engineer' },
+    chimie       = { label = 'Chimie',      icon = 'fa-flask',            tint = '#6a8a82', skillCategory = 'medic' },
+    chemistry    = { label = 'Chimie',      icon = 'fa-flask',            tint = '#6a8a82', skillCategory = 'medic' },
+    labo         = { label = 'Chimie',      icon = 'fa-flask',            tint = '#6a8a82', skillCategory = 'medic' },
+    mecanique    = { label = 'Mécanique',   icon = 'fa-wrench',           tint = '#8a8478', skillCategory = 'engineer' },
+    mecano       = { label = 'Mécanique',   icon = 'fa-wrench',           tint = '#8a8478', skillCategory = 'engineer' },
+    mechanic     = { label = 'Mécanique',   icon = 'fa-wrench',           tint = '#8a8478', skillCategory = 'engineer' },
 }
 
 Config.Skills = {

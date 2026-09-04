@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.26.1
+# sanctuary_crafting v2.27.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,14 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.27.0 — Pictogrammes spécialité (fiche / cartes / Carnet)
+Icônes gravées discrètes (Font Awesome `fa-solid`, ~11–13px, laiton terni `#9a8866` + teinte douce) pour chaque spécialité / branche.
+
+- Config : `icon` + `tint` sur `Config.SkillCategories` ; table `Config.SpecialtyIcons` (alias station/spec) ; helper `SpecialtyIcon.Resolve` / `BuildNuiMap`.
+- NUI craft : `.spec-ico` à côté du nom dans **PROFIL REQUIS** ; pastille discrète `.card-spec` en coin carte si catégorie mappable.
+- Carnet : icône devant les lignes Compétences (`msSkillLines`) et sur le tampon SPÉCIALISATION.
+- Payload : `specialtyIcons` via `getMenu` + meta Carnet. Pas de SQL, pas d’UID DevHub joueur.
 
 ### v2.26.1 — Craft: header sans plaque métal (séparateur subtil)
 Retrait de la plaque industrielle rivetée (`.ctrl-plate-mark` / `.ctrl-screw`) à gauche de l’identité station. Remplacée par un filet gauche fin `rgba(154,136,102,0.35)` sur `.ctrl-identity`. Reste du header inchangé.
