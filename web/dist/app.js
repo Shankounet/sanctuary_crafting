@@ -38,6 +38,7 @@
     searchIndex: {},
     sort: 'name',
     rarityFilter: 'all',
+    specialtyIcons: {},
     playerSpec: null,
     skillSnapshot: null,
     recentlyCrafted: [],
@@ -802,6 +803,18 @@
       }
       const titleText = kn === 'unknown' ? '???' : r.label;
       const veilImg = (kn === 'unknown' || kn === 'partial');
+      const hasSpecSignal = !!(
+        (r.skillTree && r.skillTree.category)
+        || r.skillCategory
+        || r.requireSpec
+        || r.station
+        || (r.xp && r.xp.category)
+      );
+      const specKey = recipeSpecialtyKey(r);
+      const specDef = hasSpecSignal ? resolveSpecialty(specKey) : null;
+      const cardSpecHtml = (specDef && specDef.icon)
+        ? `<span class="card-spec${showNouveau ? ' with-nouveau' : ''}" title="${escapeHtml(specDef.label || '')}">${specialtyIconHtml(specKey, { size: 'sm' })}</span>`
+        : '';
 
       card.innerHTML = `
         <button type="button" class="card-fav${favOn ? ' on' : ''}" data-fav="${escapeHtml(r.id)}" title="Favori" aria-label="Favori">
@@ -811,6 +824,7 @@
           <span class="ph" aria-hidden="true"><i class="fa-solid ${kn === 'unknown' ? 'fa-question' : 'fa-cube'}"></i></span>
           <img alt="" />
           ${nouveauHtml}
+          ${cardSpecHtml}
           ${cornerHtml}
           <span class="card-state-badge ${status.cls}" title="${escapeHtml(tip)}">${status.text}</span>
         </div>
@@ -970,6 +984,43 @@
     return out;
   }
 
+
+  function resolveSpecialty(key) {
+    if (key == null || key === '') return null;
+    const map = state.specialtyIcons
+      || (typeof window !== 'undefined' && window.__SANCTUARY_SPECIALTY_ICONS__)
+      || {};
+    const raw = String(key);
+    if (map[raw]) return map[raw];
+    const lower = raw.toLowerCase();
+    if (map[lower]) return map[lower];
+    return null;
+  }
+
+  function specialtyIconHtml(key, opts) {
+    const def = resolveSpecialty(key);
+    if (!def || !def.icon) return '';
+    const tint = def.tint || '#9a8866';
+    let ico = String(def.icon).trim();
+    if (ico.indexOf('fa-') !== 0 && ico.indexOf('fa ') !== 0) ico = 'fa-' + ico;
+    ico = ico.replace(/^fa-solid\s+/, '').replace(/^fa\s+/, '');
+    const size = opts && opts.size ? String(opts.size) : '';
+    const sizeCls = size ? ` size-${size}` : '';
+    return `<i class="spec-ico fa-solid ${escapeHtml(ico)}${sizeCls}" style="--spec-tint:${escapeHtml(tint)}" aria-hidden="true"></i>`;
+  }
+
+  function recipeSpecialtyKey(r) {
+    if (!r) return 'survival';
+    const st = r.skillTree || {};
+    const key = st.category
+      || r.skillCategory
+      || r.requireSpec
+      || r.station
+      || (r.xp && r.xp.category)
+      || 'survival';
+    return key;
+  }
+
   const SPEC_FR = {
     survie: 'Survie', survival: 'Survie',
     medecin: 'Médecin', medic: 'Médecin', medical: 'Médecin',
@@ -1098,8 +1149,13 @@
       body.appendChild(row);
     };
 
+    const branchKey = recipeSpecialtyKey(r);
+    const branchIco = specialtyIconHtml(branchKey)
+      || specialtyIconHtml(r.requireSpec)
+      || specialtyIconHtml('survival');
+
     if (!extra) {
-      addLine(null, escapeHtml(branch || specLab || 'Survie'), 'profil-branch');
+      addLine(null, `${branchIco}<span class="profil-branch-txt">${escapeHtml(branch || specLab || 'Survie')}</span>`, 'profil-branch');
       addLine(null, 'Aucun prérequis supplémentaire', 'profil-none');
       block.classList.remove('hidden');
       return;
@@ -1107,7 +1163,7 @@
 
     const branchTxt = branch || specLab || 'Survie';
     const branchCls = lacksSpec ? 'bad' : 'ok';
-    addLine('Branche', `${escapeHtml(branchTxt)} <span class="profil-mark ${branchCls}">${markOk(!lacksSpec)}</span>`, branchCls);
+    addLine('Branche', `${branchIco}<span class="profil-branch-txt">${escapeHtml(branchTxt)}</span> <span class="profil-mark ${branchCls}">${markOk(!lacksSpec)}</span>`, branchCls);
 
     if (hasLevel) {
       const ok = curLvl != null ? Number(curLvl) >= Number(reqLvl) : r.lockReason !== 'craft_level_required';
@@ -2710,6 +2766,10 @@
     state.pinned = data.pinned || [];
     state.knownArtisans = data.knownArtisans || [];
     state.playerSpec = data.playerSpec || null;
+    if (data.specialtyIcons) {
+      state.specialtyIcons = data.specialtyIcons;
+      if (typeof window !== 'undefined') window.__SANCTUARY_SPECIALTY_ICONS__ = data.specialtyIcons;
+    }
     if (data.skillSnapshot) state.skillSnapshot = data.skillSnapshot;
     state.recentlyCrafted = data.recentlyCrafted || [];
     state.newlyLearned = data.newlyLearned || [];

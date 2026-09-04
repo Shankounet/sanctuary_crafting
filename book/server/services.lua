@@ -579,6 +579,7 @@ function SurvivalBook.ShellMeta(src)
         itemLabels = (OxItemCatalog and OxItemCatalog.UsedLabels and OxItemCatalog.UsedLabels()) or {},
         playerSpec = spec,
         specialization = spec and spec.label or nil,
+        specialtyIcons = (SpecialtyIcon and SpecialtyIcon.BuildNuiMap and SpecialtyIcon.BuildNuiMap()) or {},
         characterName = charName,
         playerName = charName,
     }

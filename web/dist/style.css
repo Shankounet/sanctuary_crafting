@@ -6762,3 +6762,92 @@ button, input { font: inherit; color: inherit; }
 #app .ctrl-identity {
   border-left: 1px solid rgba(154, 136, 102, 0.35);
 }
+
+/* ============================================================
+   v2.27.0 — Specialty pictograms (engraved / discrete)
+   ============================================================ */
+.spec-ico {
+  --spec-tint: #9a8866;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 1.15em;
+  height: 1.15em;
+  min-width: 12px;
+  min-height: 12px;
+  margin: 0 0.35em 0 0;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--spec-tint);
+  opacity: 0.78;
+  vertical-align: -0.12em;
+  flex: 0 0 auto;
+  filter: none;
+  text-shadow: none;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  pointer-events: none;
+}
+.spec-ico.size-sm {
+  font-size: 11px;
+  width: 11px;
+  height: 11px;
+  min-width: 11px;
+  min-height: 11px;
+  margin-right: 0;
+  opacity: 0.72;
+}
+#app .profil-branch .spec-ico,
+#app .profil-line .spec-ico {
+  font-size: 12px;
+  opacity: 0.82;
+  margin-right: 0.4em;
+  vertical-align: -0.1em;
+}
+#app .profil-line.profil-branch .profil-bare {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+#app .profil-v .spec-ico {
+  margin-right: 0.35em;
+}
+#app .profil-line .profil-v {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0;
+}
+#app .profil-branch-txt {
+  vertical-align: baseline;
+}
+#app .card-spec {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  color: var(--spec-tint, #9a8866);
+  opacity: 0.78;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+#app .card-spec.with-nouveau {
+  top: 24px;
+}
+#app .card-spec .spec-ico {
+  margin: 0;
+  font-size: 11px;
+  width: 11px;
+  height: 11px;
+  opacity: 0.8;
+}

@@ -196,6 +196,31 @@
       .replace(/"/g, '&quot;');
   }
 
+
+  function resolveSpecialty(key) {
+    if (key == null || key === '') return null;
+    const map = (state.meta && state.meta.specialtyIcons)
+      || (typeof window !== 'undefined' && window.__SANCTUARY_SPECIALTY_ICONS__)
+      || {};
+    const raw = String(key);
+    if (map[raw]) return map[raw];
+    const lower = raw.toLowerCase();
+    if (map[lower]) return map[lower];
+    return null;
+  }
+
+  function specialtyIconHtml(key, opts) {
+    const def = resolveSpecialty(key);
+    if (!def || !def.icon) return '';
+    const tint = def.tint || '#9a8866';
+    let ico = String(def.icon).trim();
+    ico = ico.replace(/^fa-solid\s+/, '').replace(/^fa\s+/, '');
+    if (ico.indexOf('fa-') !== 0) ico = 'fa-' + ico;
+    const size = opts && opts.size ? String(opts.size) : '';
+    const sizeCls = size ? ` size-${size}` : '';
+    return `<i class="spec-ico fa-solid ${esc(ico)}${sizeCls}" style="--spec-tint:${esc(tint)}" aria-hidden="true"></i>`;
+  }
+
   function prettySkill(k) {
     const map = {
       crafting: 'Artisanat', survival: 'Survie', survie: 'Survie',
@@ -372,6 +397,24 @@
     return null;
   }
 
+  function pickSpecializationKey() {
+    const meta = state.meta || {};
+    if (meta.playerSpec && (meta.playerSpec.id || meta.playerSpec.mainId || meta.playerSpec.skillCategory)) {
+      return meta.playerSpec.id || meta.playerSpec.mainId || meta.playerSpec.skillCategory;
+    }
+    if (meta.specialization && typeof meta.specialization === 'object') {
+      return meta.specialization.id || meta.specialization.key || null;
+    }
+    if (typeof meta.specialization === 'string') return meta.specialization;
+    return null;
+  }
+
+  function specializationStampHtml(specLabel) {
+    if (!specLabel) return '';
+    const ico = specialtyIconHtml(pickSpecializationKey()) || specialtyIconHtml(specLabel);
+    return `<span class="stamp stamp-specialisation">${ico} SPÉCIALISATION · ${esc(specLabel)}</span>`;
+  }
+
   function characterName() {
     return (state.meta && (state.meta.characterName || state.meta.playerName || state.meta.name)) || null;
   }
@@ -392,8 +435,9 @@
       const talentNote = talents.length
         ? `<p class="ms-bonus hand-note">Talents : ${esc(talents.join(', '))}</p>`
         : '';
+      const ico = specialtyIconHtml(k) || specialtyIconHtml(lv.category) || specialtyIconHtml(lv.key);
       return `<div class="ms-line">
-        <span class="ms-name">${esc(name)}</span>
+        <span class="ms-name">${ico}<span class="ms-name-txt">${esc(name)}</span></span>
         <span class="ms-lvl hand-note">Niveau ${esc(level)}</span>
         ${xpNote}
         ${talentNote}
@@ -725,7 +769,7 @@
         </div>
         <h2 class="accueil-title">${esc(String(title))}</h2>
         <div class="accueil-seal-row">
-          ${spec ? `<span class="stamp stamp-specialisation">SPÉCIALISATION · ${esc(spec)}</span>` : `<span class="stamp">Terrain</span>`}
+          ${spec ? specializationStampHtml(spec) : `<span class="stamp">Terrain</span>`}
           <span class="stamp seal">SC<br/>OK</span>
           <span class="ink-sketch gear" aria-hidden="true"></span>
         </div>
@@ -851,7 +895,7 @@
       <h2 class="book-page-title">Compétences</h2>
       <p class="hand-note">Lignes de manuscrit — expérience actuelle.</p>
       <hr class="ink-rule" />
-      ${spec ? `<span class="stamp stamp-specialisation">SPÉCIALISATION · ${esc(spec)}</span>` : ''}
+      ${spec ? specializationStampHtml(spec) : ''}
       <span class="ink-sketch tool" aria-hidden="true"></span>
       ${msSkillLines(levels)}
       ${folio('12')}`;
@@ -2097,6 +2141,9 @@
 
   function applyBookMeta(msg) {
     if (msg && msg.meta) state.meta = msg.meta;
+    if (state.meta && state.meta.specialtyIcons && typeof window !== 'undefined') {
+      window.__SANCTUARY_SPECIALTY_ICONS__ = state.meta.specialtyIcons;
+    }
     state.modules = (state.meta && state.meta.modules) || state.modules || {};
     if (state.meta && state.meta.accent) {
       try {
