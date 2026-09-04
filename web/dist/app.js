@@ -1229,37 +1229,62 @@
 
     let dragging = false;
     let moved = false;
+    let captured = false;
     let startX = 0;
     let startScroll = 0;
-    const THRESH = 6;
+    let activePointerId = null;
+    const THRESH = 5;
 
     row.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
+      // Record only — do NOT capture yet (CEF steals child button clicks).
       dragging = true;
       moved = false;
+      captured = false;
       startX = e.clientX;
       startScroll = row.scrollLeft;
-      try { row.setPointerCapture(e.pointerId); } catch (_) {}
+      activePointerId = e.pointerId;
     });
 
     row.addEventListener('pointermove', (e) => {
       if (!dragging) return;
+      if (activePointerId != null && e.pointerId !== activePointerId) return;
       const dx = e.clientX - startX;
-      if (!moved && Math.abs(dx) < THRESH) return;
-      moved = true;
-      row.classList.add('is-dragging');
+      if (!moved) {
+        if (Math.abs(dx) < THRESH) return;
+        moved = true;
+        row.classList.add('is-dragging');
+        if (!captured) {
+          captured = true;
+          try { row.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+      }
       row.scrollLeft = startScroll - dx;
       updateFades();
     });
 
-    const endDrag = () => {
+    const endDrag = (e) => {
       if (!dragging) return;
+      if (e && activePointerId != null && e.pointerId != null && e.pointerId !== activePointerId) return;
+      const wasMoved = moved;
+      const pid = activePointerId;
       dragging = false;
+      moved = false;
+      activePointerId = null;
       row.classList.remove('is-dragging');
-      if (moved) {
+      if (captured && pid != null) {
+        captured = false;
+        try {
+          if (row.hasPointerCapture && row.hasPointerCapture(pid)) row.releasePointerCapture(pid);
+        } catch (_) {}
+      } else {
+        captured = false;
+      }
+      if (wasMoved) {
         row.dataset.suppressClick = '1';
         setTimeout(() => { delete row.dataset.suppressClick; }, 40);
       }
+      // If !wasMoved, do not suppress — native click on .recent-mini selects.
     };
     row.addEventListener('pointerup', endDrag);
     row.addEventListener('pointercancel', endDrag);
@@ -1279,6 +1304,28 @@
         ro.observe(row);
       } catch (_) {}
     }
+  }
+
+  function selectRecipeFromShortcut(r) {
+    if (!r) return;
+    const id = r.id;
+    const full = (state.recipes || []).find((x) => x && x.id === id) || r;
+    const filteredOut = typeof matchesFilter === 'function' ? !matchesFilter(full) : false;
+    const grid = $('#recipe-grid');
+    const esc = (window.CSS && CSS.escape) ? CSS.escape(String(full.id)) : String(full.id).replace(/"/g, '\"');
+    const cardMissing = !!(grid && full.id && !grid.querySelector(`.recipe-card[data-id="${esc}"]`));
+    if (filteredOut || (cardMissing && (state.filter !== 'all' || state.search))) {
+      state.filter = 'all';
+      state.search = '';
+      state.materialFilter = null;
+      const searchEl = $('#search');
+      if (searchEl) searchEl.value = '';
+      $$('#filters [data-filter]').forEach((b) => b.classList.remove('active'));
+      const allBtn = document.querySelector('#filters [data-filter="all"]');
+      if (allBtn) allBtn.classList.add('active');
+      if (typeof syncFiltersMore === 'function') syncFiltersMore();
+    }
+    selectRecipe(full);
   }
 
   function makeRecentMini(r) {
@@ -1303,7 +1350,7 @@
     const img = btn.querySelector('img');
     const ph = btn.querySelector('.ph');
     bindItemImg(img, resultItem, ph);
-    btn.addEventListener('click', () => selectRecipe(r));
+    btn.addEventListener('click', () => selectRecipeFromShortcut(r));
     return btn;
   }
 
@@ -1336,7 +1383,7 @@
     bindItemImg(img, resultItem, ph);
     btn.addEventListener('click', (e) => {
       if (e.target.closest('[data-fav]')) return;
-      selectRecipe(r);
+      selectRecipeFromShortcut(r);
     });
     const star = btn.querySelector('[data-fav]');
     if (star) {

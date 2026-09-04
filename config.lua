@@ -46,7 +46,7 @@ Config = {}
 
 Config.Locale = 'fr'
 Config.Debug = false
-Config.Version = '2.27.0'
+Config.Version = '2.27.1'
 
 --------------------------------------------------------------------------------
 -- Feature flags (Phase 2–7) — stubs uniquement, aucun comportement Phase 1

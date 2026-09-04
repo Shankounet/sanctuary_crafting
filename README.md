@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.27.0
+# sanctuary_crafting v2.27.1
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,13 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.27.1 — Favoris / Récents : mini-cards cliquables (CEF)
+Les pastilles Favoris / Récemment fabriqués n’ouvraient plus la fiche : `enhanceMiniStrip` capturait le pointeur trop tôt (`setPointerCapture` dès `pointerdown`), ce qui volait les clics aux boutons `.recent-mini` sous FiveM CEF.
+
+- Drag strip : seuil 5 px — capture + `is-dragging` seulement après mouvement réel ; clic stationnaire sélectionne.
+- `selectRecipeFromShortcut` : résout la recette, reset filtre/recherche si hors catalogue, puis `selectRecipe`.
+- CSS : `pointer-events` / `cursor:pointer` / hover `#9a8866` renforcés sur les minis (au-dessus des fades).
 
 ### v2.27.0 — Pictogrammes spécialité (fiche / cartes / Carnet)
 Icônes gravées discrètes (Font Awesome `fa-solid`, ~11–13px, laiton terni `#9a8866` + teinte douce) pour chaque spécialité / branche.
