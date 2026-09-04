@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.27.1
+# sanctuary_crafting v2.28.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,17 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.28.0 — UI audio sparse / premium
+Silence par défaut. Sons uniquement sur actions importantes (plus de beep arcade sur chaque clic).
+
+- `playUi(kind)` remplace `beep` / `playTick` : cooldown 150 ms, volume défaut **0.25**, soft WebAudio (sine/triangle bas, **pas** square 880 Hz).
+- Conservés : `ui_open` / `ui_close`, `craft_start` (lancer + file), `craft_complete`, `craft_collect`, `ui_error`.
+- Retirés : sélection recette, catégories, filtres, rareté, tri, onglets, compare, favoris, lot, matériaux, avancement d’étape pipeline.
+- Carnet : réactive **uniquement** papier `book_open` / `book_page` / `book_close` (`Config.Book.Sounds.Enabled`, volume 0.2).
+- HUD Paramètres : case **Sons UI** + curseur **Volume UI** (`localStorage` `sanctuary_crafting:uiAudio` / `uiAudioVolume`).
+- Config : `Config.UI.Sounds` (nouveaux fichiers + alias legacy) ; `Config.UIAudio` / `Config.UIAudioVolume` pointent la même table.
+- Assets : `web/sounds/{ui_open,ui_close,craft_start,craft_complete,craft_collect,ui_error,book_*}.ogg` (copies des ogg existants).
 
 ### v2.27.1 — Favoris / Récents : mini-cards cliquables (CEF)
 Les pastilles Favoris / Récemment fabriqués n’ouvraient plus la fiche : `enhanceMiniStrip` capturait le pointeur trop tôt (`setPointerCapture` dès `pointerdown`), ce qui volait les clics aux boutons `.recent-mini` sous FiveM CEF.
@@ -428,7 +439,7 @@ Tous les modules sont **implémentés**. Les flags activent/désactivent le comp
 | `Config.Power.Enabled` | pont énergie + `ExternalBridge` (sinon always-on ; fallback `power_cell`) |
 | `Config.Noise.Enabled` | event bruit |
 | `Config.UI.UseNui` | NUI (sinon menu ox_lib) |
-| `Config.UI.Sounds` | SFX NUI (WebAudio + `.ogg`), `Enabled` / `Volume` / `Files` |
+| `Config.UI.Sounds` / `Config.UIAudio` | SFX NUI sparse (WebAudio + `.ogg`), `Enabled` / `Volume` 0.25 / `CooldownMs` / `Files` (open/close/craft_*/error/book_*) |
 
 ---
 
@@ -530,7 +541,7 @@ Pas de spawn prop : zone `ox_target` au point. Les autres bancs spawnent `model`
 - Mode compact, Escape pour fermer.
 - Perf : CSS léger, pas de libs lourdes, callbacks NUI ciblés.
 - **SFX** (optionnels) : WebAudio beep + placeholders `web/sounds/{click,success,error,blueprint}.ogg`.
-  Désactiver : `Config.UI.Sounds.Enabled = false`.
+  Désactiver : `Config.UI.Sounds.Enabled = false` ou HUD « Sons UI ». Volume défaut 0.25.
 
 Désactiver NUI : `Config.UI.UseNui = false` → menu ox_lib.
 

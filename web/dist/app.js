@@ -32,7 +32,7 @@
     lastCraft: null,
     menuMeta: {},
     itemLabels: {},
-    sounds: { Enabled: true, Volume: 0.35, Files: {} },
+    sounds: { Enabled: true, Volume: 0.25, CooldownMs: 150, Files: {} },
     audioCtx: null,
     sideTab: 'queue',
     searchIndex: {},
@@ -201,6 +201,18 @@
     }).then((r) => r.json()).catch(() => ({}));
   }
 
+  const UI_AUDIO_KEY = 'sanctuary_crafting:uiAudio';
+  const UI_AUDIO_VOL_KEY = 'sanctuary_crafting:uiAudioVolume';
+  const UI_KIND_ALIAS = {
+    click: 'craft_start',
+    success: 'craft_complete',
+    error: 'ui_error',
+    blueprint: 'craft_collect',
+    start: 'craft_start',
+    complete: 'craft_complete',
+  };
+  const _uiCooldown = (window.__sanctuaryUiCooldown = window.__sanctuaryUiCooldown || {});
+
   function ensureAudio() {
     if (!state.audioCtx) {
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -209,25 +221,67 @@
     return state.audioCtx;
   }
 
-  function beep(kind) {
+  function readUiAudioEnabled() {
+    try {
+      const v = localStorage.getItem(UI_AUDIO_KEY);
+      if (v === '0' || v === 'false' || v === 'off') return false;
+      if (v === '1' || v === 'true' || v === 'on') return true;
+    } catch (_) { /* ignore */ }
+    if (window.__sanctuaryUiAudio === false) return false;
+    return true;
+  }
+
+  function readUiAudioVolume(cfgVol) {
+    const cfg = typeof cfgVol === 'number' ? cfgVol : 0.25;
+    let local = null;
+    try {
+      const raw = localStorage.getItem(UI_AUDIO_VOL_KEY);
+      if (raw != null && raw !== '') {
+        const n = Number(raw);
+        if (Number.isFinite(n)) local = n > 1 ? n / 100 : n;
+      }
+    } catch (_) { /* ignore */ }
+    if (local == null && typeof window.__sanctuaryUiAudioVolume === 'number') {
+      const w = window.__sanctuaryUiAudioVolume;
+      local = w > 1 ? w / 100 : w;
+    }
+    const v = local == null ? cfg : Math.min(cfg, Math.max(0, Math.min(1, local)));
+    return Math.max(0, Math.min(1, v));
+  }
+
+  function resolveUiKind(kind) {
+    const k = String(kind || '');
+    return UI_KIND_ALIAS[k] || k;
+  }
+
+  /** Sparse premium UI SFX — silence is default; never call on hover / filters / tabs. */
+  function playUi(kind) {
     const cfg = state.sounds || {};
     if (cfg.Enabled === false) return;
-    const vol = typeof cfg.Volume === 'number' ? cfg.Volume : 0.35;
+    if (!readUiAudioEnabled()) return;
+    const resolved = resolveUiKind(kind);
+    if (!resolved) return;
+    const cd = typeof cfg.CooldownMs === 'number' ? cfg.CooldownMs : 150;
+    const nowMs = Date.now();
+    if (cd > 0 && _uiCooldown[resolved] && (nowMs - _uiCooldown[resolved]) < cd) return;
+    _uiCooldown[resolved] = nowMs;
+    const vol = readUiAudioVolume(typeof cfg.Volume === 'number' ? cfg.Volume : 0.25);
+    if (vol <= 0) return;
     const files = cfg.Files || {};
-    const src = files[kind];
+    const src = files[resolved] || files[kind];
     if (src) {
       try {
         const a = new Audio(src);
-        a.volume = Math.max(0, Math.min(1, vol));
+        a.volume = vol;
         const p = a.play();
-        if (p && p.catch) p.catch(() => webBeep(kind, vol));
+        if (p && p.catch) p.catch(() => softWebTone(resolved, vol));
         return;
       } catch (_) { /* fall through */ }
     }
-    webBeep(kind, vol);
+    softWebTone(resolved, vol);
   }
 
-  function webBeep(kind, vol) {
+  function softWebTone(kind, vol) {
     try {
       const ctx = ensureAudio();
       if (!ctx) return;
@@ -236,22 +290,32 @@
       const g = ctx.createGain();
       o.connect(g); g.connect(ctx.destination);
       const now = ctx.currentTime;
+      // Soft sine/triangle, low freq, short decay — NO square 880 arcade beep
       const map = {
-        click: { f: 880, d: 0.04, type: 'square' },
-        success: { f: 660, d: 0.1, type: 'sine' },
-        error: { f: 220, d: 0.12, type: 'sawtooth' },
-        blueprint: { f: 520, d: 0.14, type: 'triangle' },
+        ui_open: { f: 320, d: 0.08, type: 'sine', peak: 0.7 },
+        ui_close: { f: 240, d: 0.09, type: 'triangle', peak: 0.55 },
+        craft_start: { f: 280, d: 0.07, type: 'sine', peak: 0.65 },
+        craft_complete: { f: 360, d: 0.12, type: 'sine', peak: 0.75 },
+        craft_collect: { f: 300, d: 0.1, type: 'triangle', peak: 0.6 },
+        ui_error: { f: 180, d: 0.14, type: 'triangle', peak: 0.55 },
       };
-      const m = map[kind] || map.click;
-      o.type = m.type; o.frequency.value = m.f;
+      const m = map[kind] || { f: 260, d: 0.06, type: 'sine', peak: 0.5 };
+      o.type = m.type;
+      o.frequency.setValueAtTime(m.f, now);
+      if (kind === 'craft_complete') {
+        o.frequency.linearRampToValueAtTime(m.f * 1.15, now + m.d * 0.6);
+      }
+      const peak = Math.max(0.001, vol * (m.peak || 0.6));
       g.gain.setValueAtTime(0.0001, now);
-      g.gain.exponentialRampToValueAtTime(Math.max(0.001, vol), now + 0.01);
+      g.gain.exponentialRampToValueAtTime(peak, now + 0.012);
       g.gain.exponentialRampToValueAtTime(0.0001, now + m.d);
-      o.start(now); o.stop(now + m.d + 0.02);
+      o.start(now); o.stop(now + m.d + 0.03);
     } catch (_) { /* ignore */ }
   }
 
-  function playTick() { beep('click'); }
+  /** @deprecated no-op — ticks removed in v2.28.0 sparse audio */
+  function playTick() { /* silence */ }
+  function beep(kind) { playUi(kind); }
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
@@ -712,7 +776,6 @@
     nav.querySelectorAll('.cat-item').forEach((btn) => {
       btn.addEventListener('click', () => {
         state.category = btn.dataset.cat || 'all';
-        playTick();
         renderCategories();
         renderList();
       });
@@ -1412,7 +1475,6 @@
 
   function selectRecipe(r) {
     state.selected = r;
-    playTick();
     if (r.unread || isNewRecipe(r)) {
       post('newlyConsult', { recipeId: r.id }).then(() => {
         r.unread = false;
@@ -2430,10 +2492,10 @@
   async function startCraft() {
     if (!state.selected || state.craftInflight) return;
     if (fileIsFull()) {
+      playUi('ui_error');
       showToast('File de production pleine', 'err');
       return;
     }
-    playTick();
     const batch = parseInt($('#batch').value, 10) || 1;
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     state.craftInflight = true;
@@ -2446,7 +2508,7 @@
       state.craftInflight = false;
     }
     if (!data || !data.ok) {
-      beep('error');
+      playUi('ui_error');
       const reason = (data && data.reason) || 'craft_failed';
       showToast(reason === 'queue_full' ? 'File de production pleine' : 'Craft impossible', 'err');
       await post('notify', { type: 'error', reason });
@@ -2455,7 +2517,7 @@
     }
     if (data.queued) {
       showToast('Ajouté à la file', 'ok');
-      beep('click');
+      playUi('craft_start');
       await loadQueue();
       // Keep right panel on the processing job — never flash the queued recipe as active
       syncFabActiveFromQueue();
@@ -2471,7 +2533,7 @@
       setFabState('active');
       if (state.craftDurationMs > 0) runProgress(state.craftDurationMs, null);
     }
-    beep('click');
+    playUi('craft_start');
     await loadQueue();
     if (state.selected) updateActionBar(state.selected);
   }
@@ -2535,7 +2597,6 @@
     clearTimeout(watchdogUi);
 
     if (data && data.ok && data.advanced) {
-      beep('click');
       await post('notify', {
         type: 'inform',
         reason: 'craft_step_advance',
@@ -2564,11 +2625,10 @@
     const alreadyDone = !!(data && (data.already || data.reason === 'craft_invalid' || data.reason === 'craft_too_far'));
     const success = !!(data && data.ok) || alreadyDone || !data;
     if (success) {
-      beep('success');
-      if (data && data.chainNext) beep('blueprint');
+      playUi('craft_complete');
       showFabTerminated(data && data.label);
     } else {
-      beep('error');
+      playUi('ui_error');
       setFabState('ready');
     }
     if (!alreadyDone && data && !data.timeout) {
@@ -2940,8 +3000,13 @@
       btn.addEventListener('click', async (ev) => {
         ev.stopPropagation();
         const r = await post('collectCraft', { craftId: e.craftId, benchKey: state.benchKey });
-        if (r && r.ok) showToast('Récupéré', 'ok');
-        else showToast((r && r.reason === 'craft_inventory_insufficient') ? 'Inventaire insuffisant.' : 'Récupération impossible', 'err');
+        if (r && r.ok) {
+          playUi('craft_collect');
+          showToast('Récupéré', 'ok');
+        } else {
+          playUi('ui_error');
+          showToast((r && r.reason === 'craft_inventory_insufficient') ? 'Inventaire insuffisant.' : 'Récupération impossible', 'err');
+        }
         await loadQueue();
         await refresh();
       });
@@ -3293,7 +3358,6 @@
       $$('#filters [data-filter]').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       state.filter = btn.dataset.filter;
-      playTick();
       syncFiltersMore();
       renderList();
     });
@@ -3308,7 +3372,6 @@
         rarityNav.querySelectorAll('.chip').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
         state.rarityFilter = btn.dataset.rarity || 'all';
-        playTick();
         syncFiltersMore();
         renderList();
       });
@@ -3320,7 +3383,6 @@
     sortEl.value = state.sort || 'name';
     sortEl.addEventListener('change', () => {
       state.sort = sortEl.value || 'name';
-      playTick();
       renderList();
     });
   }
@@ -3328,7 +3390,6 @@
   $$('.tab').forEach((btn) => {
     btn.addEventListener('click', () => {
       openTab(btn.dataset.tab);
-      playTick();
     });
   });
 
@@ -3390,9 +3451,16 @@
     const r = await post('collectAll', { benchKey: state.benchKey });
     if (r && r.ok) {
       const n = r.collected || 0;
-      if (n > 0) showToast('Récupéré ×' + n, 'ok');
-      if (r.reason === 'craft_inventory_insufficient') showToast('Inventaire insuffisant.', 'err');
+      if (n > 0) {
+        playUi('craft_collect');
+        showToast('Récupéré ×' + n, 'ok');
+      }
+      if (r.reason === 'craft_inventory_insufficient') {
+        playUi('ui_error');
+        showToast('Inventaire insuffisant.', 'err');
+      }
     } else {
+      playUi('ui_error');
       showToast('Récupération impossible', 'err');
     }
     await loadQueue();
@@ -3457,7 +3525,6 @@
     const found = state.recipes.find((r) => r.id === target);
     if (found) {
       selectRecipe(found);
-      playTick();
     } else {
       showToast('Recette liée introuvable', 'warn');
     }
@@ -3567,6 +3634,13 @@
     else showToast('Enseignement lancé', 'ok');
   });
 
+
+  window.addEventListener('sanctuary-hud:change', (ev) => {
+    const d = (ev && ev.detail) || {};
+    if (typeof d.uiAudio === 'boolean') window.__sanctuaryUiAudio = d.uiAudio;
+    if (typeof d.uiAudioVolume === 'number') window.__sanctuaryUiAudioVolume = d.uiAudioVolume;
+  });
+
   window.addEventListener('message', (event) => {
     const msg = event.data || {};
     if (msg.action === 'selectRecipe' && msg.recipeId) {
@@ -3574,6 +3648,7 @@
       if (r && typeof selectRecipe === 'function') selectRecipe(r);
     } else if (msg.action === 'open') {
       app.classList.remove('hidden');
+      playUi('ui_open');
       try { state.lastCraft = localStorage.getItem(LAST_CRAFT_KEY); } catch (_) { /* ignore */ }
       applyMenu(msg.data || {});
       // Session last: do not let applyMenu/selectRecipe overwrite fab-active
@@ -3611,7 +3686,9 @@
     } else if (msg.action === 'close' || msg.action === 'craftUiClose') {
       // Close craft catalogue only — do NOT cancel active craft / clear craftId.
       // Tracker (sibling #craft-tracker) keeps progress + completion ownership when pinned.
+      const wasVisible = app && !app.classList.contains('hidden');
       app.classList.add('hidden');
+      if (wasVisible) playUi('ui_close');
     } else if (msg.action === 'queue') {
       state.queue = msg.queue || [];
       renderQueue();

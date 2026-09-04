@@ -50,7 +50,7 @@
       default: ['Préparation', 'Assemblage', 'Finition'],
     },
     sounds: { Enabled: true, OnStart: true, OnComplete: true, OnError: true },
-    uiSounds: { Enabled: true, Volume: 0.35, Files: {} },
+    uiSounds: { Enabled: true, Volume: 0.25, Files: {} },
   };
 
   const jobs = new Map(); // craftId -> entry (+ local timing)
@@ -129,38 +129,81 @@
     return audioCtx;
   }
 
+  function trackerUiOn() {
+    try {
+      const v = localStorage.getItem('sanctuary_crafting:uiAudio');
+      if (v === '0' || v === 'false' || v === 'off') return false;
+    } catch (_) { /* ignore */ }
+    if (window.__sanctuaryUiAudio === false) return false;
+    return true;
+  }
+
+  function trackerVol(ui) {
+    let base = typeof ui.Volume === 'number' ? ui.Volume : 0.25;
+    try {
+      const raw = localStorage.getItem('sanctuary_crafting:uiAudioVolume');
+      if (raw != null && raw !== '') {
+        const n = Number(raw);
+        if (Number.isFinite(n)) {
+          const local = n > 1 ? n / 100 : n;
+          base = Math.min(base, Math.max(0, Math.min(1, local)));
+        }
+      }
+    } catch (_) { /* ignore */ }
+    return Math.max(0, Math.min(1, base));
+  }
+
   function beep(kind) {
     const snd = config.sounds || {};
     const ui = config.uiSounds || {};
     if (snd.Enabled === false || ui.Enabled === false) return;
+    if (!trackerUiOn()) return;
     if (kind === 'start' && snd.OnStart === false) return;
     if (kind === 'complete' && snd.OnComplete === false) return;
     if (kind === 'error' && snd.OnError === false) return;
 
+    const kindMap = { start: 'craft_start', complete: 'craft_complete', error: 'ui_error', click: 'craft_start' };
+    const cdKey = kindMap[kind] || kind;
+    const cdStore = (window.__sanctuaryUiCooldown = window.__sanctuaryUiCooldown || {});
+    const nowMs = Date.now();
+    if (cdStore[cdKey] && (nowMs - cdStore[cdKey]) < 150) return;
+    cdStore[cdKey] = nowMs;
+
     const files = ui.Files || {};
-    const map = { start: 'click', complete: 'success', error: 'error', click: 'click' };
-    const fileKey = map[kind] || 'click';
-    const path = files[fileKey];
+    // Align to sparse playUi kinds (legacy keys still accepted)
+    const fileKey = cdKey;
+    const path = files[fileKey] || files[{ craft_start: 'click', craft_complete: 'success', ui_error: 'error' }[fileKey]];
+    const vol = trackerVol(ui);
+    if (vol <= 0) return;
     if (path) {
       try {
         const a = new Audio(path);
-        a.volume = typeof ui.Volume === 'number' ? ui.Volume : 0.35;
-        a.play().catch(() => { /* ignore */ });
+        a.volume = vol;
+        a.play().catch(() => softTrackerTone(kind, vol));
         return;
       } catch (_) { /* fall through */ }
     }
+    softTrackerTone(kind, vol);
+  }
+
+  function softTrackerTone(kind, vol) {
     try {
       const ctx = ensureAudio();
       if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
       const o = ctx.createOscillator();
       const g = ctx.createGain();
-      o.type = 'square';
-      const freq = kind === 'error' ? 180 : (kind === 'complete' ? 520 : 340);
-      o.frequency.value = freq;
-      g.gain.value = 0.03;
       o.connect(g); g.connect(ctx.destination);
-      o.start();
-      o.stop(ctx.currentTime + 0.07);
+      const now = ctx.currentTime;
+      // Soft sine/triangle — no square arcade beep
+      o.type = kind === 'error' ? 'triangle' : 'sine';
+      o.frequency.value = kind === 'error' ? 180 : (kind === 'complete' ? 360 : 280);
+      const peak = Math.max(0.001, vol * 0.55);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(peak, now + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + (kind === 'complete' ? 0.12 : 0.07));
+      o.start(now);
+      o.stop(now + 0.15);
     } catch (_) { /* ignore */ }
   }
 

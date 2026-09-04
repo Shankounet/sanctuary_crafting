@@ -10,8 +10,11 @@ Config.Book = {
     ItemName = 'survival_book',
     Accent = '#9a8866',
     Theme = 'field_manual', -- industrial dark personal dossier (not rusty)
-    -- Carnet SFX muted (open/close/page/tab/stamp/write/whoosh)
-    Sounds = { Enabled = false },
+    -- Carnet SFX: soft paper open/page/close only (no electronic beeps) — v2.28.0
+    Sounds = {
+        Enabled = true,
+        Volume = 0.2,  -- softer than UI default; inherits Files from Config.UI.Sounds when absent
+    },
     LazyLoad = true,
     MaxPins = 8,
     MaxNotes = 64,

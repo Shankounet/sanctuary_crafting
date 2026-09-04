@@ -9,6 +9,8 @@
   const OLD_MODE = 'sc_tracker_mode';
   const OLD_POS = 'sc_tracker_pos';
   const OLD_COLLAPSE = 'sanctuary_crafting:pinsHudCollapsed';
+  const KEY_UI_AUDIO = 'sanctuary_crafting:uiAudio';
+  const KEY_UI_AUDIO_VOL = 'sanctuary_crafting:uiAudioVolume';
   const MODES = ['expanded', 'compact', 'minimal', 'hidden'];
   const DEFAULT_POS = { top: 24, right: 24 };
 
@@ -96,9 +98,15 @@
       trackerMode: readMode(),
       pinsVisible: readPinsVisible(),
       trackerPos: readPos(),
+      uiAudio: readUiAudio(),
+      uiAudioVolume: readUiAudioVolume() / 100,
     }, extra || {});
+    window.__sanctuaryUiAudio = detail.uiAudio;
+    window.__sanctuaryUiAudioVolume = detail.uiAudioVolume;
     window.dispatchEvent(new CustomEvent('sanctuary-hud:change', { detail }));
-    refreshPanel();
+    window.__sanctuaryUiAudio = readUiAudio();
+  window.__sanctuaryUiAudioVolume = readUiAudioVolume() / 100;
+  refreshPanel();
   }
 
   function readMode() {
@@ -109,6 +117,37 @@
   }
   function readPos() {
     return parsePos(lsGet(KEY_POS));
+  }
+
+  function parseUiAudio(raw) {
+    if (raw == null || raw === '') return true;
+    if (raw === '0' || raw === 'false' || raw === 'off') return false;
+    return true;
+  }
+  function readUiAudio() {
+    return parseUiAudio(lsGet(KEY_UI_AUDIO));
+  }
+  function readUiAudioVolume() {
+    const raw = lsGet(KEY_UI_AUDIO_VOL);
+    if (raw == null || raw === '') return 25;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return 25;
+    if (n <= 1) return Math.round(Math.max(0, Math.min(1, n)) * 100);
+    return Math.round(Math.max(0, Math.min(100, n)));
+  }
+  function writeUiAudio(on, opts) {
+    const v = !!on;
+    lsSet(KEY_UI_AUDIO, v ? '1' : '0');
+    window.__sanctuaryUiAudio = v;
+    if (!(opts && opts.silent)) emit({ uiAudio: v, source: (opts && opts.source) || 'store' });
+    return v;
+  }
+  function writeUiAudioVolume(pct, opts) {
+    const n = Math.round(Math.max(0, Math.min(100, Number(pct) || 0)));
+    lsSet(KEY_UI_AUDIO_VOL, String(n));
+    window.__sanctuaryUiAudioVolume = n / 100;
+    if (!(opts && opts.silent)) emit({ uiAudioVolume: n / 100, source: (opts && opts.source) || 'store' });
+    return n;
   }
 
   function writeMode(next, opts) {
@@ -160,6 +199,8 @@
     lsSet(KEY_MODE, 'expanded');
     lsSet(KEY_PINS, '1');
     lsSet(KEY_POS, JSON.stringify(DEFAULT_POS));
+    lsSet(KEY_UI_AUDIO, '1');
+    lsSet(KEY_UI_AUDIO_VOL, '25');
     {
       const w = 292;
       const x = Math.round((window.innerWidth || 800) - (DEFAULT_POS.right || 24) - w);
@@ -171,7 +212,7 @@
     post('trackerMode', { mode: 'expanded' });
     post('hudSettingsTracker', { mode: 'expanded' });
     post('trackerResetPosition', {});
-    emit({ reset: true, trackerMode: 'expanded', pinsVisible: true, trackerPos: DEFAULT_POS, source: 'reset' });
+    emit({ reset: true, trackerMode: 'expanded', pinsVisible: true, trackerPos: DEFAULT_POS, uiAudio: true, uiAudioVolume: 0.25, source: 'reset' });
   }
 
   const overlay = document.getElementById('hud-settings');
@@ -179,6 +220,8 @@
     pins: document.getElementById('hud-set-pins'),
     tracker: document.getElementById('hud-set-tracker'),
     mode: document.getElementById('hud-set-tracker-mode'),
+    uiAudio: document.getElementById('hud-set-ui-audio'),
+    uiAudioVol: document.getElementById('hud-set-ui-audio-vol'),
     reset: document.getElementById('hud-set-reset'),
     close: document.getElementById('hud-settings-close'),
   };
@@ -191,6 +234,11 @@
     if (els.mode) {
       els.mode.value = mode === 'hidden' ? 'expanded' : mode;
       els.mode.disabled = mode === 'hidden';
+    }
+    if (els.uiAudio) els.uiAudio.checked = readUiAudio();
+    if (els.uiAudioVol) {
+      els.uiAudioVol.value = String(readUiAudioVolume());
+      els.uiAudioVol.disabled = !readUiAudio();
     }
   }
 
@@ -223,6 +271,13 @@
       writeMode(els.mode.value, { source: 'settings' });
     });
   }
+  if (els.uiAudio) {
+    els.uiAudio.addEventListener('change', () => writeUiAudio(els.uiAudio.checked, { source: 'settings' }));
+  }
+  if (els.uiAudioVol) {
+    els.uiAudioVol.addEventListener('input', () => writeUiAudioVolume(els.uiAudioVol.value, { source: 'settings' }));
+    els.uiAudioVol.addEventListener('change', () => writeUiAudioVolume(els.uiAudioVol.value, { source: 'settings' }));
+  }
   if (els.reset) els.reset.addEventListener('click', () => reset());
   if (els.close) els.close.addEventListener('click', close);
   if (overlay) {
@@ -240,7 +295,7 @@
   }
 
   window.SanctuaryHud = {
-    KEYS: { mode: KEY_MODE, pins: KEY_PINS, pos: KEY_POS, trackerXY: KEY_XY, pinsXY: KEY_PIN_XY },
+    KEYS: { mode: KEY_MODE, pins: KEY_PINS, pos: KEY_POS, trackerXY: KEY_XY, pinsXY: KEY_PIN_XY, uiAudio: KEY_UI_AUDIO, uiAudioVol: KEY_UI_AUDIO_VOL },
     MODES,
     DEFAULT_POS,
     normalizeMode,
@@ -250,6 +305,10 @@
     writePinsVisible,
     readPos,
     writePos,
+    readUiAudio,
+    writeUiAudio,
+    readUiAudioVolume,
+    writeUiAudioVolume,
     reset,
     open,
     close,

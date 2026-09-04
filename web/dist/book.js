@@ -23,11 +23,13 @@
 
   const OX_IMG_BASE = 'nui://ox_inventory/web/images/';
 
-  /* v2.21.2 — never paint a partial book; mute all Carnet audio */
+  /* v2.28.0 — never paint a partial book; soft paper SFX only (open/page/close) */
   let journalReady = false;
   let assetsReady = false;
   let firstPaintDone = false;
   let preloadPromise = null;
+  let bookAudioCtx = null;
+  const _bookCd = {};
   const JOURNAL_PRELOAD = [
     'tex/paper_page.png',
     'tex/paper_sheet_tan.png',
@@ -41,7 +43,106 @@
     'tex/postit_pink.png',
   ];
 
-  function playBookSound() { /* muted: no Howler / Audio / PlaySound */ }
+  function bookUiAudioOn() {
+    try {
+      const v = localStorage.getItem('sanctuary_crafting:uiAudio');
+      if (v === '0' || v === 'false' || v === 'off') return false;
+    } catch (_) { /* ignore */ }
+    if (window.__sanctuaryUiAudio === false) return false;
+    return true;
+  }
+
+  function bookVolume() {
+    const snd = (state.meta && state.meta.sounds) || {};
+    const ui = (state.meta && state.meta.uiSounds) || {};
+    let base = typeof snd.Volume === 'number' ? snd.Volume
+      : (typeof ui.Volume === 'number' ? ui.Volume : 0.2);
+    try {
+      const raw = localStorage.getItem('sanctuary_crafting:uiAudioVolume');
+      if (raw != null && raw !== '') {
+        const n = Number(raw);
+        if (Number.isFinite(n)) {
+          const local = n > 1 ? n / 100 : n;
+          base = Math.min(base, Math.max(0, Math.min(1, local)));
+        }
+      }
+    } catch (_) { /* ignore */ }
+    return Math.max(0, Math.min(1, base));
+  }
+
+  function ensureBookAudio() {
+    if (!bookAudioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) bookAudioCtx = new AC();
+    }
+    return bookAudioCtx;
+  }
+
+  /** Soft paper-like SFX — open / page / close only. */
+  function playBookSound(kind) {
+    const snd = (state.meta && state.meta.sounds) || {};
+    const ui = (state.meta && state.meta.uiSounds) || {};
+    if (snd.Enabled === false) return;
+    if (ui.Enabled === false) return;
+    if (!bookUiAudioOn()) return;
+    const mapKind = { open: 'book_open', page: 'book_page', close: 'book_close' };
+    const resolved = mapKind[kind] || (String(kind || '').startsWith('book_') ? kind : null);
+    if (!resolved) return;
+    const cd = resolved === 'book_page' ? 180 : 120;
+    const nowMs = Date.now();
+    if (_bookCd[resolved] && (nowMs - _bookCd[resolved]) < cd) return;
+    _bookCd[resolved] = nowMs;
+    const vol = bookVolume();
+    if (vol <= 0) return;
+    const files = Object.assign({}, ui.Files || {}, snd.Files || {});
+    const src = files[resolved];
+    if (src) {
+      try {
+        const a = new Audio(src);
+        a.volume = vol;
+        const p = a.play();
+        if (p && p.catch) p.catch(() => softPaperTone(resolved, vol));
+        return;
+      } catch (_) { /* fall through */ }
+    }
+    softPaperTone(resolved, vol);
+  }
+
+  function softPaperTone(kind, vol) {
+    try {
+      const ctx = ensureBookAudio();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+      const now = ctx.currentTime;
+      const g = ctx.createGain();
+      g.connect(ctx.destination);
+      const peak = Math.max(0.001, vol * 0.45);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(peak, now + 0.015);
+      // Filtered noise burst (paper) + low triangle
+      const bufLen = Math.floor(ctx.sampleRate * 0.08);
+      const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufLen);
+      const noise = ctx.createBufferSource();
+      noise.buffer = buf;
+      const filt = ctx.createBiquadFilter();
+      filt.type = 'bandpass';
+      filt.frequency.value = kind === 'book_page' ? 1400 : (kind === 'book_close' ? 700 : 900);
+      filt.Q.value = 0.7;
+      noise.connect(filt); filt.connect(g);
+      noise.start(now);
+      const o = ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = kind === 'book_open' ? 220 : (kind === 'book_close' ? 160 : 190);
+      o.connect(g);
+      o.start(now);
+      const dur = kind === 'book_page' ? 0.06 : 0.11;
+      g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+      o.stop(now + dur + 0.02);
+      noise.stop(now + dur + 0.02);
+    } catch (_) { /* ignore */ }
+  }
 
   function preloadImage(src) {
     return new Promise((resolve) => {
@@ -622,7 +723,9 @@
   }
 
   async function navigate(page) {
+    const prev = state.page;
     state.page = page;
+    if (prev && page && prev !== page && state.open) playBookSound('page');
     renderTabs();
     setContext();
     /* Keep boot skeleton / last content. Never wipe to a blank Chargement spread. */
@@ -2179,9 +2282,9 @@
   }
 
   function openBook(msg) {
-    playBookSound(); /* no-op */
     const wasOpen = state.open;
     applyBookMeta(msg);
+    if (!wasOpen) playBookSound('open');
     closeIndex();
     renderTabs();
     const page = (msg && msg.page) || state.page || 'dashboard';
@@ -2234,22 +2337,32 @@
   }
 
   function closeBook() {
+    const was = state.open;
     state.open = false;
     closeIndex();
     hideBookShell();
+    if (was) playBookSound('close');
     post('bookClose', {});
   }
 
   // Register open/close handlers BEFORE optional DOM binds — never throw so page dies
+  window.addEventListener('sanctuary-hud:change', (ev) => {
+    const d = (ev && ev.detail) || {};
+    if (typeof d.uiAudio === 'boolean') window.__sanctuaryUiAudio = d.uiAudio;
+    if (typeof d.uiAudioVolume === 'number') window.__sanctuaryUiAudioVolume = d.uiAudioVolume;
+  });
+
   window.addEventListener('message', (ev) => {
     const data = ev.data || {};
     if (data.action === 'bookOpen') {
       try { openBook(data); } catch (err) { console.error('[sanctuary_crafting bookOpen]', err); }
     }
     if (data.action === 'bookClose') {
+      const was = state.open;
       state.open = false;
       closeIndex();
       hideBookShell();
+      if (was) playBookSound('close');
     }
     if (data.action === 'bookPins') {
       /* HUD is #book-pins-hud via pinsHud */
