@@ -4,8 +4,8 @@ lua54 'yes'
 
 name 'sanctuary_crafting'
 author 'Shankounet / Sanctuary'
-description 'Plateforme de craft post-apo + Carnet de survie — ESX, ox_*, devhub_skillTree, NUI industrielle'
-version '2.29.1'
+description 'Plateforme de craft post-apo + Carnet de survie — ESX, ox_*, sanctuary_skilltree, NUI industrielle'
+version '2.30.0'
 
 ui_page 'web/dist/index.html'
 
@@ -58,7 +58,7 @@ client_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     -- integrations
-    'server/integrations/devhub_skillTree.lua',
+    'server/integrations/crafting_skills.lua',
     'server/integrations/permissions.lua',
     'server/integrations/ox_items.lua',
     'server/integrations/power.lua',
@@ -116,8 +116,10 @@ dependencies {
     'ox_inventory',
     'ox_target',
     'oxmysql',
-    'devhub_skillTree',
+    -- sanctuary_skilltree: soft runtime prefer (see Config.SkillSystem). Not hard-dep so
+    -- servers can boot craft while skilltree is ensure'd just before it.
 }
 
--- devhub_lib typically pulled in by the skill tree itself (not a hard dep here)
--- skill tree down: print [CRAFT] devhub_skillTree is not started. Gates fail closed; ungated crafts still work.
+-- Ensure order (server.cfg): oxmysql → ox_lib → es_extended → sanctuary_skilltree → sanctuary_crafting
+-- DevHub no longer required at runtime once sanctuary_skilltree is started.
+-- Skill tree down: [CRAFT] sanctuary_skilltree is not started… Gates fail closed; ungated crafts still work.

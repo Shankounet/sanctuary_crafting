@@ -72,7 +72,7 @@ Config.Dismantling = {
 }
 
 Config.Mastery = {
-    Enabled = true, -- maîtrise locale par recette — PAS d'XP global parallèle à devhub_skillTree
+    Enabled = true, -- maîtrise locale par recette — PAS d'XP global parallèle à sanctuary_skilltree
     XpPerCraft = 1,
     MaxMastery = 100,
     MasteredThreshold = 100, -- mastery >= threshold → état « maîtrisé »

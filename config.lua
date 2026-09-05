@@ -5,8 +5,10 @@ Config = {}
   sanctuary_crafting — configuration (v2.0.0-phase1)
   Thème : post-apo (ferraille, médical de fortune, pièces d'armes, survie)
 
-  devhub_skillTree est la SEULE source de skill / XP / niveaux.
-  Ne créez JAMAIS de XP/niveaux craft parallèles. UIDs uniquement dans Config.SkillCategories.
+  sanctuary_skilltree est la SEULE source de skill / XP / niveaux (Phase 4).
+  DevHub n'est plus requis au runtime une fois skilltree ensure'd.
+  Ne créez JAMAIS de XP/niveaux craft parallèles. UIDs uniquement dans Config.SkillCategories
+  (categoryUid = UID publié dans sanctuary_skilltree — aligner après migration Phase 3).
 
 --------------------------------------------------------------------------------
   Schéma d'une recette (Config.Recipes) — Phase 1
@@ -46,7 +48,7 @@ Config = {}
 
 Config.Locale = 'fr'
 Config.Debug = false
-Config.Version = '2.29.1'
+Config.Version = '2.30.0'
 
 --------------------------------------------------------------------------------
 -- Feature flags (Phase 2–7) — stubs uniquement, aucun comportement Phase 1
@@ -115,15 +117,18 @@ Config.EnableWorldBenchCommand = true
 Config.WorldBenchCommand = 'placeworldbench'
 
 --------------------------------------------------------------------------------
--- devhub_skillTree — soft-fail via CraftingSkills
--- UIDs DevHub UNIQUEMENT ici (SkillCategories.categoryUid). Recettes / stations
--- utilisent les KEYS (survival/medic/engineer/gunsmith).
+-- sanctuary_skilltree — soft-fail via CraftingSkills (Phase 4)
+-- categoryUid = UID catégorie PUBLIÉ dans sanctuary_skilltree (après Phase 3
+-- migration /skillsadmin). Recettes / stations utilisent les KEYS
+-- (survival/medic/engineer/gunsmith), jamais l'UID brut.
+-- SkillSystem: 'sanctuary' | 'devhub' | 'auto' (auto = sanctuary si started).
 -- Si skillTree.requiredLevel / requiredSkill et ressource down → refuse
 -- (sauf BypassRequirements / ACE). Crafts sans gate skillTree restent OK.
 --------------------------------------------------------------------------------
-Config.SkillSystem = 'devhub'
+Config.SkillSystem = 'sanctuary' -- Phase 4 default; 'auto' allows DevHub fallback
 
 Config.SkillCategories = {
+    -- categoryUid MUST match sanctuary_skilltree published UIDs (migrate/map in Phase 3).
     survival = { categoryUid = 'survie', label = 'Survie', icon = 'fa-fire', tint = '#b08a62' },
     medic    = { categoryUid = 'medecin', label = 'Médecin', icon = 'fa-kit-medical', tint = '#8a9a7a' },
     engineer = { categoryUid = 'ingenieur', label = 'Ingénieur', icon = 'fa-gears', tint = '#9a8866' },
@@ -187,12 +192,13 @@ Config.SpecialtyIcons = {
 
 Config.Skills = {
     enabled = true,
-    resource = 'devhub_skillTree',
+    resource = 'sanctuary_skilltree', -- preferred backend
+    fallbackResource = 'devhub_skillTree', -- only if SkillSystem = auto|devhub
     defaultCategory = 'engineer',
     craftingCategory = 'engineer', -- KEY (ex-UID ingenieur)
     survivalCategory = 'survival',
     AwardPoints = false, -- addPoints depuis un craft : non par défaut
-    craftTimeBonus = true, -- no-op : DevHub n'expose pas GetTotalCategoryBonus
+    craftTimeBonus = true, -- no-op : pas de GetTotalCategoryBonus côté skilltree
     maxCraftTimeReduction = 0.40,
 
     --[[ Bypass (LIVE : actuellement true — ne PAS désactiver silencieusement)
