@@ -11,6 +11,7 @@ Locales['fr'] = {
     ['craft_rate_limited'] = 'Ralentissez…',
     ['craft_level_required'] = 'Niveau %s requis (actuel : %s)',
     ['craft_skill_required'] = 'Compétence requise : %s',
+    ['craft_recipe_locked'] = 'Recette verrouillée — débloque le talent dans l\'arbre',
     ['craft_blueprint_required'] = 'Schéma requis : %s',
     ['craft_skills_unavailable'] = 'Système de compétences indisponible — craft refusé',
     ['craft_skills_bypass_active'] = '[TEST] Bypass compétences actif — gates level/skill ignorées',

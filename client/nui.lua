@@ -551,3 +551,21 @@ RegisterNetEvent('sanctuary_crafting:client:craftResumed', function(payload)
         })
     end
 end)
+
+--------------------------------------------------------------------------------
+-- Tech progression: open skilltree focused on recipe unlock
+--------------------------------------------------------------------------------
+RegisterNUICallback('openSkilltreeForRecipe', function(data, cb)
+    local recipeId = data and data.recipeId
+    SetNuiFocus(false, false)
+    SendNUIMessage({ action = 'close' })
+    if type(recipeId) == 'string' and recipeId ~= '' then
+        if GetResourceState('sanctuary_skilltree') == 'started' then
+            pcall(function()
+                exports.sanctuary_skilltree:openSkillForRecipe(recipeId)
+            end)
+            TriggerEvent('sanctuary_skilltree:openSkillForRecipe', recipeId)
+        end
+    end
+    cb({ ok = true })
+end)

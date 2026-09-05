@@ -625,6 +625,44 @@ function CraftingSkills.AddCraftXp(src, catKey, amount)
     return true
 end
 
+
+--------------------------------------------------------------------------------
+-- Recipe unlocks (skilltree tech progression)
+--------------------------------------------------------------------------------
+
+function CraftingSkills.HasUnlockedRecipe(src, recipeId)
+    if type(recipeId) ~= 'string' or recipeId == '' then return true end
+    if CraftingSkills.ShouldBypassRequirements(src) then return true end
+    local resource, prov = resolveProvider()
+    if prov ~= 'sanctuary' or not resource then
+        return true -- no skilltree map → do not hard-lock
+    end
+    local ok, has = pexport(resource, 'hasUnlockedRecipe', src, recipeId)
+    if not ok then return true end
+    return has == true
+end
+
+function CraftingSkills.CanAccessRecipe(src, recipeId)
+    if type(recipeId) ~= 'string' or recipeId == '' then return true end
+    if CraftingSkills.ShouldBypassRequirements(src) then return true end
+    local resource, prov = resolveProvider()
+    if prov ~= 'sanctuary' or not resource then
+        return true
+    end
+    local ok, can = pexport(resource, 'canAccessRecipe', src, recipeId)
+    if not ok then return true end
+    return can == true
+end
+
+function CraftingSkills.GetSkillForRecipe(recipeId)
+    if type(recipeId) ~= 'string' or recipeId == '' then return nil end
+    local resource, prov = resolveProvider()
+    if prov ~= 'sanctuary' or not resource then return nil end
+    local ok, link = pexport(resource, 'getSkillForRecipe', recipeId)
+    if not ok or type(link) ~= 'table' then return nil end
+    return link
+end
+
 function CraftingSkills.CheckRecipeGates(src, recipe)
     if not SkillTree.NeedsGate(recipe) then
         return true
@@ -658,6 +696,19 @@ function CraftingSkills.CheckRecipeGates(src, recipe)
             return false, 'craft_skill_required'
         end
     end
+
+    -- Tech progression: recipe gated by skilltree recipeIds map
+    local recipeId = recipe.id or recipe.recipeId
+    if type(recipeId) == 'string' and recipeId ~= '' then
+        local link = CraftingSkills.GetSkillForRecipe(recipeId)
+        if link and not CraftingSkills.CanAccessRecipe(src, recipeId) then
+            local label = link.skillLabel or CraftingSkills.SkillLabel(link.skillUid, catKey)
+            if label then
+                return false, 'craft_recipe_locked', { label, link.skillUid, link.categoryUid }
+            end
+            return false, 'craft_recipe_locked', { nil, link.skillUid, link.categoryUid }
+        end
+    end
     return true
 end
 
@@ -671,16 +722,38 @@ function CraftingSkills.FacingSkill(src, recipe, snap)
     if g.requiredSkill then
         hasRequiredSkill = CraftingSkills.HasSkill(src, catKey, g.requiredSkill)
     end
+    local recipeId = recipe.id or recipe.recipeId
+    local skillLink = type(recipeId) == 'string' and CraftingSkills.GetSkillForRecipe(recipeId) or nil
+    local canAccessRecipe = true
+    local recipeLocked = false
+    local skilltreeSkillLabel = nil
+    if skillLink then
+        canAccessRecipe = CraftingSkills.CanAccessRecipe(src, recipeId)
+        recipeLocked = not canAccessRecipe
+        skilltreeSkillLabel = skillLink.skillLabel or CraftingSkills.SkillLabel(skillLink.skillUid, catKey)
+        if not talentLabel and skilltreeSkillLabel then
+            talentLabel = skilltreeSkillLabel
+        end
+        if hasRequiredSkill == nil then
+            hasRequiredSkill = canAccessRecipe
+        end
+    end
     return {
         category = catKey,
         categoryLabel = CraftingSkills.CategoryLabel(catKey),
         requireLevel = g.requiredLevel,
-        requireSkill = g.requiredSkill,
+        requireSkill = g.requiredSkill or (skillLink and skillLink.skillUid) or nil,
         requiredSkillLabel = talentLabel,
         hasRequiredSkill = hasRequiredSkill,
         playerSkillLevel = cat.level or 0,
         playerSkillXp = cat.xp or 0,
         playerTotalXp = cat.totalXp or 0,
+        recipeLocked = recipeLocked,
+        canAccessRecipe = canAccessRecipe,
+        skilltreeSkillUid = skillLink and skillLink.skillUid or nil,
+        skilltreeCategoryUid = skillLink and skillLink.categoryUid or nil,
+        skilltreeSkillLabel = skilltreeSkillLabel,
+        openSkillHint = recipeLocked == true,
     }
 end
 
