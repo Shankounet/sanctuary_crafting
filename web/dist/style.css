@@ -6932,3 +6932,10 @@ button, input { font: inherit; color: inherit; }
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+
+.skilltree-cta-wrap { margin-top: 8px; }
+.skilltree-cta-wrap .btn-skilltree-open {
+  width: 100%;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}

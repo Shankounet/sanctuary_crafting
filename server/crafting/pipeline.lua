@@ -2018,6 +2018,7 @@ local function buildRecipeEntry(src, r, ctx)
         or lockReason == 'craft_blueprint_required'
         or lockReason == 'craft_knowledge_required'
         or lockReason == 'craft_skills_unavailable'
+        or lockReason == 'craft_recipe_locked'
     local farLevel = (levelGap ~= nil and levelGap > 2)
     local stationGap = nil
     if lockReason == 'craft_station_level' and r.stationLevel and bench then
@@ -2093,6 +2094,15 @@ local function buildRecipeEntry(src, r, ctx)
         skillCategoryLabel = facing and facing.categoryLabel or (SkillTree and SkillTree.CategoryLabel and SkillTree.CategoryLabel(skillCategory)) or nil,
         requiredSkillLabel = facing and facing.requiredSkillLabel or nil,
         hasRequiredSkill = facing and facing.hasRequiredSkill,
+        recipeLocked = facing and facing.recipeLocked or false,
+        canAccessRecipe = facing and facing.canAccessRecipe,
+        skilltreeSkillUid = facing and facing.skilltreeSkillUid or nil,
+        skilltreeCategoryUid = facing and facing.skilltreeCategoryUid or nil,
+        skilltreeSkillLabel = facing and facing.skilltreeSkillLabel or nil,
+        lockKind = (lockReason == 'craft_recipe_locked' and 'skilltree_recipe')
+            or (lockReason == 'craft_skill_required' and 'skilltree_talent')
+            or nil,
+        openSkilltree = (facing and facing.openSkillHint) or (lockReason == 'craft_recipe_locked') or false,
         requireSpecLabel = requireSpecLabel,
         playerSkillXp = facing and facing.playerSkillXp or nil,
         playerTotalXp = facing and facing.playerTotalXp or nil,

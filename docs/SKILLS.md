@@ -60,3 +60,18 @@ Progression is **read-only**: French labels + **Niveau** + **XP actuel** (+ tota
 - `categoryUid` mismatch after Phase 3 if Sanctuary trees use different UIDs than `Config.SkillCategories` — fix config or remap publish UIDs.
 - Until Phase 3 migration runs, players may have empty Sanctuary progress (gates fail closed unless `BypassRequirements`).
 - DevHub fallback arg-order path remains for labs only; do not dual-write XP.
+
+
+## Recipe unlocks (tech progression)
+
+When a published skilltree node lists `meta.recipeIds`, that recipe is **gated**.
+
+`CraftingSkills.CheckRecipeGates` calls `exports.sanctuary_skilltree:canAccessRecipe` after level/talent gates:
+
+- Ungated recipes (not in skilltree map) → accessible (other gates still apply).
+- Gated + skill unlocked → accessible.
+- Gated + skill locked → `craft_recipe_locked` (NUI: **VOIR DANS L'ARBRE**).
+
+Facing payload adds `lockKind=skilltree_recipe`, `skilltreeSkillLabel`, `openSkilltree`.
+
+Ensure `sanctuary_skilltree` starts **before** `sanctuary_crafting`.

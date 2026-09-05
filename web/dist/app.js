@@ -566,6 +566,11 @@
       if (sk && !looksLikeUid(sk)) return `Talent requis ${sk}`;
       return 'Talent requis';
     },
+    craft_recipe_locked: (r) => {
+      const sk = (r.lockArgs && r.lockArgs[0]) || r.skilltreeSkillLabel || r.requiredSkillLabel;
+      if (sk && !looksLikeUid(sk)) return `Débloque dans l'arbre : ${sk}`;
+      return 'Recette verrouillée — arbre de talents';
+    },
     craft_blueprint_required: (r) => {
       const bp = (r.lockArgs && r.lockArgs[0]) || r.requireBlueprint;
       return bp ? `Plan requis : ${humanize(bp)}` : 'Plan requis';
@@ -593,10 +598,35 @@
     let tag = 'VERROUILLÉ';
     if (r.lockReason === 'craft_blueprint_required') tag = 'PLAN REQUIS';
     else if (r.lockReason === 'craft_level_required' || r.lockReason === 'craft_station_level') tag = 'NIVEAU REQUIS';
-    else if (r.lockReason === 'craft_skill_required') tag = 'VERROUILLÉ';
+    else if (r.lockReason === 'craft_skill_required' || r.lockReason === 'craft_recipe_locked') tag = 'ARBRE REQUIS';
     return { text, cls: 'warn', tag };
   }
 
+
+
+
+  document.addEventListener('click', (ev) => {
+    const btn = ev.target && ev.target.closest && ev.target.closest('.btn-skilltree-open');
+    if (!btn) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const recipeId = btn.getAttribute('data-recipe-id');
+    const skillUid = btn.getAttribute('data-skill-uid');
+    fetch(`https://${GetParentResourceName()}/openSkilltreeForRecipe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify({ recipeId, skillUid }),
+    }).catch(() => {});
+  }, true);
+
+  function skilltreeCtaHtml(r) {
+    if (!r || r.canCraft) return '';
+    const lockedByTree = r.lockReason === 'craft_recipe_locked' || r.lockKind === 'skilltree_recipe' || r.openSkilltree;
+    if (!lockedByTree && r.lockReason !== 'craft_skill_required') return '';
+    const recipeId = r.id;
+    const skillUid = r.skilltreeSkillUid || (r.lockArgs && r.lockArgs[1]) || '';
+    return `<button type="button" class="btn ghost btn-skilltree-open" data-recipe-id="${recipeId || ''}" data-skill-uid="${skillUid || ''}">VOIR DANS L'ARBRE</button>`;
+  }
 
   function knowledgeMarkHtml(kn) {
     if (!kn || kn === 'learned') return '';
@@ -1654,6 +1684,18 @@
     locksEl.textContent = lock.tag || lock.text;
     locksEl.title = lock.text;
     locksEl.className = `status-tag ${lock.cls}`;
+
+    // Tech progression CTA → skilltree
+    let cta = $('#d-skilltree-cta');
+    if (!cta && locksEl && locksEl.parentElement) {
+      cta = document.createElement('div');
+      cta.id = 'd-skilltree-cta';
+      cta.className = 'skilltree-cta-wrap';
+      locksEl.parentElement.appendChild(cta);
+    }
+    if (cta) {
+      cta.innerHTML = skilltreeCtaHtml(r);
+    }
 
     const qh = qualityHint(r);
     $('#d-quality').textContent = qh || '—';
