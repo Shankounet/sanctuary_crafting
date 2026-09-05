@@ -2,7 +2,7 @@
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
-**devhub_skillTree** est la **seule** source de compétences / XP / niveaux. Aucun XP craft parallèle.
+**sanctuary_skilltree** est la **seule** source de compétences / XP / niveaux (Phase 4). DevHub n'est plus requis au runtime. Aucun XP craft parallèle.
 
 UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton terni `#9a8866`, pas Fallout / pas cyberpunk). **Craft** = banc de production 3 colonnes (polish densité PC). **Carnet** = journal / dossier de terrain (identité séparée). Micro-interactions 100–180 ms. **Callbacks NUI inchangés.**
 
@@ -10,6 +10,13 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.30.0 — Phase 4: sanctuary_skilltree sole skill/XP source
+- `CraftingSkills` → `sanctuary_skilltree` exports (level / XP / totalXp / points / unlocked / hasUnlockedSkill / addXp).
+- `Config.SkillSystem = 'sanctuary'` (auto/devhub fallback optional). DevHub **not** a hard fxmanifest dependency.
+- Carnet progression read-only: labels FR + Niveau + XP + talents connus (pas d’UID, pas de % inventé).
+- Ensure order: `sanctuary_skilltree` **before** `sanctuary_crafting`. Phase 3 migration (`/skillsadmin`) reste séparée.
+- Voir `docs/SKILLS.md`. SORTIE / queue / NUI callbacks inchangés. Pas de ml_skills.
 
 ### v2.29.1 — Restore Survie + Médical world benches
 - Survie: coords + prop `diamond_tiertwo` (pre point-only)
@@ -366,21 +373,23 @@ Ordre de chargement serveur (fxmanifest) : **shared → integrations → core �
 
 ---
 
-## CraftingSkills / devhub_skillTree
+## CraftingSkills / sanctuary_skilltree (Phase 4)
 
-Fichier : `server/integrations/devhub_skillTree.lua`.
+Fichier : `server/integrations/crafting_skills.lua`. Doc détaillée : [`docs/SKILLS.md`](docs/SKILLS.md).
 
-| Wrapper | API réelle |
-|---------|------------|
-| `CraftingSkills.AddCraftXp(src, catKey, amount)` | `addXp(categoryUid, amount, source)` — SERVER, amount recette |
-| `CraftingSkills.GetLevel(src, catKey)` | `getPlayerLevel(categoryUid, source)` |
+| Wrapper | API sanctuary_skilltree |
+|---------|-------------------------|
+| `CraftingSkills.AddCraftXp(src, catKey, amount)` | `addXp(source, categoryUid, amount)` — SERVER, amount recette |
+| `CraftingSkills.GetLevel(src, catKey)` | `getPlayerLevel(source, categoryUid)` |
 | `CraftingSkills.HasRequiredLevel` | level ≥ requis (ou bypass test) |
-| `CraftingSkills.HasSkill(src, catKey, skillUid)` | `hasUnlockedSkill(categoryUid, skillUid, source)` |
+| `CraftingSkills.HasSkill(src, catKey, skillUid)` | `hasUnlockedSkill(source, categoryUid, skillUid)` |
 | `CraftingSkills.Snapshot(src)` | cache levels/xp/totalXp/unlocked — 0 spam export par carte |
 | `CraftingSkills.ShouldBypassRequirements` | mode test (voir ci-dessous) |
 
-Soft-fail : `pcall` + `GetResourceState`.  
-**Si la recette a `skillTree.requiredLevel` / `requiredSkill` et `devhub_skillTree` est down → craft refusé** (`craft_skills_unavailable`), **sauf** mode test (bypass). Crafts sans gate skillTree restent possibles.
+`Config.SkillSystem = 'sanctuary'` (défaut). `'auto'` préfère sanctuary si started, sinon DevHub. DevHub **non requis** au runtime.
+
+Ensure : `sanctuary_skilltree` **avant** `sanctuary_crafting`. Soft-fail : `pcall` + `GetResourceState`.  
+**Si la recette a `skillTree.requiredLevel` / `requiredSkill` et skilltree down → craft refusé** (`craft_skills_unavailable`), **sauf** mode test (bypass). Crafts sans gate skillTree restent possibles.
 
 La **maîtrise de recette** (`Config.Mastery`) est locale (SQL) et **n’est pas** un XP global : le skill tree reste la seule source d’XP de compétences.
 
@@ -405,7 +414,7 @@ Comportement :
 |-----------|--------|
 | `BypassRequirements = true` | **Tous** les joueurs sautent `requireLevel` / `requireSkill` (pipeline + book « can craft ») |
 | `BypassRequirements = false` + ACE `BypassAce` (ou `Config.AdminGroups` / `AdminAce` via `Validation.IsAdmin`) | Ces joueurs seulement sautent les gates |
-| Bonus durée craft | no-op (DevHub n'expose pas de bonus catégorie) |
+| Bonus durée craft | no-op (pas de bonus catégorie exposé) |
 | XP | Toujours via `CraftingSkills.AddCraftXp` → addXp serveur ; pas d'XP parallèle. Si `BypassAlsoSkipXP = true`, n'appelle pas addXp sous bypass |
 | Sécurité | Ingrédients, station, distance, rate-limit, `craftId` : **inchangés** |
 
@@ -517,9 +526,9 @@ Conversion **non 1:1** depuis `Shared.Categories` / `Shared.Crafts` / `Shared.Cr
 
 Une recette a `category` (filtre UI) **et** `station` (banc). Le pipeline matche `recipe.station` (ou `category` pour les exemples) avec `bench.category`.
 
-### Skills devhub_skillTree (KEYS, UIDs uniquement dans Config.SkillCategories)
+### Skills sanctuary_skilltree (KEYS, UIDs uniquement dans Config.SkillCategories)
 
-KEYS : `survival`, `medic`, `engineer`, `gunsmith` → UIDs `survie`, `medecin`, `ingenieur`, `armurier`.
+KEYS : `survival`, `medic`, `engineer`, `gunsmith` → `categoryUid` publiés dans sanctuary_skilltree (`survie`, `medecin`, `ingenieur`, `armurier` par défaut — aligner après migration Phase 3).
 
 Recette : `skillTree = { category = 'medic', requiredLevel = 10, requiredSkill = nil }`. XP = `xp.category` (KEY) + `xp.amount`. Mapping one-time des anciens champs au load.
 
@@ -657,7 +666,7 @@ Config.Power = {
 - [x] README items exemples + gaps documentés
 - [x] Nil-guards pipeline + `fxmanifest` fichiers `web/sounds/*.ogg`
 
-**devhub_skillTree** reste la seule source XP via `CraftingSkills` (pas d'XP craft parallèle).
+**sanctuary_skilltree** reste la seule source XP via `CraftingSkills` (pas d'XP craft parallèle).
 
 
 ---
@@ -668,7 +677,7 @@ Manuel de terrain **personnel** (dossier technique sombre, accent `#9a8866`) —
 
 ### Principes
 
-- **devhub_skillTree** = seule vérité XP/niveaux via `CraftingSkills` (**lecture seule** dans le carnet). Aucune table XP parallèle. Carnet : Niveau + XP actuel (pas de barre %).
+- **sanctuary_skilltree** = seule vérité XP/niveaux via `CraftingSkills` (**lecture seule** dans le carnet). Aucune table XP parallèle. Carnet : Niveau + XP actuel (pas de barre %).
 - Réutilise recettes / stations / blueprints / file / projets du craft — **pas** de duplication `Config.Recipes`.
 - Connaissance **par découverte** : ressources inconnues → `???`. **Pas de GPS**. Pas de niveaux/licences/inventaires exacts des autres joueurs (tiers artisans qualitatifs seulement).
 - Serveur valide : découvertes, contacts, objectifs, pins, notes, commandes.

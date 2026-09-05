@@ -1,5 +1,5 @@
 --[[
-    mastery/mastery.lua — maîtrise PAR RECETTE (locale), PAS d'XP global parallèle à devhub_skillTree
+    mastery/mastery.lua — maîtrise PAR RECETTE (locale), PAS d'XP global parallèle à sanctuary_skilltree
 ]]
 
 Mastery = Mastery or {}

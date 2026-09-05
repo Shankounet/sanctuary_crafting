@@ -141,7 +141,7 @@ function SurvivalBook.CraftTreeMasked(src, recipeId, depth)
     return nodeFor(recipeId, depth)
 end
 
---- Progression READ-ONLY from CraftingSkills.Snapshot (devhub_skillTree)
+--- Progression READ-ONLY from CraftingSkills.Snapshot (sanctuary_skilltree)
 function SurvivalBook.GetProgression(src)
     if not BookDB.Mod('Progression') then return { available = false } end
     local keys = {}
@@ -180,7 +180,7 @@ function SurvivalBook.GetProgression(src)
     return {
         available = available and true or false,
         levels = levels,
-        note = 'devhub_readonly',
+        note = 'skilltree_readonly',
     }
 end
 

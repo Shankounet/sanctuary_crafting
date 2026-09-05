@@ -1,6 +1,6 @@
 --[[
     shared/skill_tree.lua — category KEY resolution + one-time recipe migration.
-    No DevHub exports here. UIDs live only in Config.SkillCategories (+ legacy map).
+    No skilltree exports here. UIDs live only in Config.SkillCategories (+ legacy map).
 ]]
 
 SkillTree = SkillTree or {}

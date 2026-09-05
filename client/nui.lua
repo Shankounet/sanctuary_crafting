@@ -468,6 +468,19 @@ local function refreshSkillsIfOpen()
     end
 end
 
+-- Sanctuary (Phase 4) + optional DevHub fallback — refresh only, never grant XP.
+RegisterNetEvent('sanctuary_skilltree:xpChanged', function(_categoryUid, _result)
+    refreshSkillsIfOpen()
+end)
+
+RegisterNetEvent('sanctuary_skilltree:levelUp', function(_categoryUid, _result)
+    refreshSkillsIfOpen()
+end)
+
+RegisterNetEvent('sanctuary_skilltree:skillUnlocked', function(_payload)
+    refreshSkillsIfOpen()
+end)
+
 RegisterNetEvent('devhub_skillTree:client:listener:newXp', function(_categoryUid, _amount)
     refreshSkillsIfOpen()
 end)

@@ -49,7 +49,7 @@ function NewlyLearned.Load(src)
     for i = 1, #rows do
         cache[id][rows[i].recipe_id] = rows[i].source
     end
-    -- last-seen levels: RAM only (devhub_skillTree is the sole XP source).
+    -- last-seen levels: RAM only (sanctuary_skilltree is the sole XP source).
     -- Restart may miss unread level-unlock badges until the first post-restart craft.
     levelSnap[id] = currentLevels(src)
 end

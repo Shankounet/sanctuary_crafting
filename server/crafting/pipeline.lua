@@ -2176,7 +2176,7 @@ local function buildRecipeEntry(src, r, ctx)
             local cur = (lockArgs and lockArgs[2]) or playerSkillLevel
             almostReason = ('Niveau %s %s / %s'):format(catLab or 'Survie', tostring(cur or '—'), tostring(need or '—'))
         elseif lockReason == 'craft_skill_required' then
-            almostReason = talentLab and ('Talent requis : %s'):format(talentLab) or 'Talent DevHub non débloqué'
+            almostReason = talentLab and ('Talent requis : %s'):format(talentLab) or 'Talent non débloqué'
         elseif lockReason == 'craft_station_level' then
             almostReason = ('Station niveau %s requise'):format(tostring(r.stationLevel or 2))
         elseif lockReason == 'craft_tool_required' then
@@ -2196,7 +2196,7 @@ local function buildRecipeEntry(src, r, ctx)
     elseif lockReason == 'craft_spec_required' then
         blockReason = specLab and ('Spécialisation %s requise'):format(specLab) or 'Spécialisation requise'
     elseif lockReason == 'craft_skill_required' then
-        blockReason = talentLab and ('Talent DevHub non débloqué : %s'):format(talentLab) or 'Talent DevHub non débloqué'
+        blockReason = talentLab and ('Talent non débloqué : %s'):format(talentLab) or 'Talent non débloqué'
     elseif lockReason == 'craft_level_required' then
         local need = (lockArgs and lockArgs[1]) or (r.skillTree and r.skillTree.requiredLevel) or r.requireLevel
         local cur = (lockArgs and lockArgs[2]) or playerSkillLevel
