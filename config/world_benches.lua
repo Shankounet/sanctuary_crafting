@@ -46,9 +46,10 @@ Config.WorldBenches = {
         label = 'Table de Survie',
         station = 'survie',
         category = 'survie', -- craftsId / station
-        coords = vec3(-1149.496948, 4944.349609, 222.219696),
+        coords = vec3(-454.9021606445313, 1143.5489501953125, 324.99871826171875),
         heading = 74.37775421142578,
-        type = 'coords', -- table MLO/monde déjà là: point d'interaction seul, pas de spawn prop
+        model = 'diamond_tiertwo', -- prop name (joaat côté client si besoin)
+        prop = 'diamond_tiertwo',
         queueSize = 6,
         blip = { name = 'Table de Survie', sprite = 566, size = 0.8, color = 5 },
         -- camera skipped: camera = {              x = -453.82940673828,              y = 1143.0400390625,              z = 326.64797973632,       
@@ -94,9 +95,10 @@ Config.WorldBenches = {
         label = 'Table Medicale',
         station = 'medical',
         category = 'medical', -- craftsId / station
-        coords = vec3(-1124.239624, 4890.592285, 219.350479),
+        coords = vec3(-449.9554748535156, 1101.87646484375, 326.6813049316406),
         heading = 40.57464981079101,
-        type = 'coords', -- table MLO/monde déjà là: point d'interaction seul, pas de spawn prop
+        model = 'marimonstore_bancada_medica', -- prop name (joaat côté client si besoin)
+        prop = 'marimonstore_bancada_medica',
         queueSize = 6,
         -- camera skipped: camera = {              x = -451.73944091796,              y = 1102.3679199218,              z = 328.29345703125,       
     },
