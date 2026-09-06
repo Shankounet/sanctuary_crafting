@@ -625,7 +625,7 @@
     if (!lockedByTree && r.lockReason !== 'craft_skill_required') return '';
     const recipeId = r.id;
     const skillUid = r.skilltreeSkillUid || (r.lockArgs && r.lockArgs[1]) || '';
-    return `<button type="button" class="btn ghost btn-skilltree-open" data-recipe-id="${recipeId || ''}" data-skill-uid="${skillUid || ''}">VOIR DANS L'ARBRE</button>`;
+    return `<button type="button" class="btn ghost btn-skilltree-open" title="Ouvrir l'arbre de compétences" data-recipe-id="${recipeId || ''}" data-skill-uid="${skillUid || ''}">VOIR DANS L'ARBRE</button>`;
   }
 
   function knowledgeMarkHtml(kn) {
