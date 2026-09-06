@@ -185,11 +185,34 @@ function SurvivalBook.GetProgression(src)
 end
 
 --- Next unlocks from recipes (level/skill gates the player is close to)
+--- Prefers sanctuary_skilltree follow hint for « Prochain déblocage » (recipe-oriented).
 function SurvivalBook.NextUnlocks(src, limit)
     if not BookDB.Mod('NextUnlocks') then return {} end
     limit = limit or 12
     local progression = SurvivalBook.GetProgression(src)
     local out = {}
+
+    if GetResourceState('sanctuary_skilltree') == 'started' then
+        local ok, hint = pcall(function()
+            return exports.sanctuary_skilltree:getNextUnlockHint(src)
+        end)
+        if ok and type(hint) == 'table' and (hint.label or hint.recipeId) then
+            out[#out + 1] = {
+                recipeId = hint.recipeId,
+                label = hint.label,
+                requireLevel = hint.requireLevel,
+                requiredSkillLabel = hint.requiredSkillLabel or hint.skillLabel,
+                requireSkill = hint.requireSkill,
+                category = hint.categoryUid,
+                station = hint.station,
+                kind = 'skilltree_follow',
+                delta = hint.requireLevel and 0 or 1,
+                need = hint.need,
+                openSkilltree = true,
+                skillUid = hint.skillUid,
+            }
+        end
+    end
     for id, r in pairs(Config.RecipeById or {}) do
         local g = SkillTree and SkillTree.RecipeGate and SkillTree.RecipeGate(r) or {}
         local req = g.requiredLevel

@@ -75,3 +75,9 @@ When a published skilltree node lists `meta.recipeIds`, that recipe is **gated**
 Facing payload adds `lockKind=skilltree_recipe`, `skilltreeSkillLabel`, `openSkilltree`.
 
 Ensure `sanctuary_skilltree` starts **before** `sanctuary_crafting`.
+
+
+## Carnet « Prochain déblocage » (v2.30.1)
+
+When the player follows a talent in `/skills`, `SurvivalBook.NextUnlocks` prepends
+`exports.sanctuary_skilltree:getNextUnlockHint(src)` (recipe-oriented label + need line).
