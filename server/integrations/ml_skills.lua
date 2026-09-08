@@ -530,27 +530,56 @@ function Skills.ParseRecipeRequirement(recipe)
 
     local skills = {}
 
+    --- Dedupe key: resolved categoryKey + uid (NormalizeRecipe mirrors requiredSkill↔skillTree).
+    local function skillDedupeKey(cat, uid)
+        local ckey = cat or (skillsCfg().defaultCategory or 'survival')
+        if SkillTree and SkillTree.ResolveKey then
+            ckey = SkillTree.ResolveKey(ckey) or ckey
+        end
+        local u = (type(uid) == 'string' and uid ~= '') and uid or ''
+        return tostring(ckey) .. '\0' .. u
+    end
+
     local function pushSkill(obj, defaultCat)
         if obj == nil then return end
+        local cat, uid, level
         if type(obj) == 'string' then
-            skills[#skills + 1] = {
-                category = defaultCat or (skillsCfg().defaultCategory or 'survival'),
-                uid = obj,
-                level = nil,
-            }
+            cat = defaultCat or (skillsCfg().defaultCategory or 'survival')
+            uid = obj
+            level = nil
+        elseif type(obj) == 'table' then
+            cat = obj.category or obj.cat or obj.categoryUid or defaultCat
+            uid = obj.uid or obj.skillUid or obj.skill or obj.requiredSkill
+            level = obj.level or obj.requiredLevel or obj.requireLevel
+            if type(uid) ~= 'string' then uid = nil end
+            level = level and tonumber(level) or nil
+            if uid == nil and level == nil then return end
+        else
             return
         end
-        if type(obj) ~= 'table' then return end
-        local cat = obj.category or obj.cat or obj.categoryUid or defaultCat
-        local uid = obj.uid or obj.skillUid or obj.skill or obj.requiredSkill
-        local level = obj.level or obj.requiredLevel or obj.requireLevel
-        if type(uid) == 'string' or level ~= nil then
-            skills[#skills + 1] = {
-                category = cat,
-                uid = type(uid) == 'string' and uid or nil,
-                level = level and tonumber(level) or nil,
-            }
+
+        local entry = {
+            category = cat,
+            uid = type(uid) == 'string' and uid or nil,
+            level = level,
+        }
+        local key = skillDedupeKey(entry.category, entry.uid)
+        for i = 1, #skills do
+            if skillDedupeKey(skills[i].category, skills[i].uid) == key then
+                -- merge: keep existing, fill missing level / category / uid
+                if entry.level and not skills[i].level then
+                    skills[i].level = entry.level
+                end
+                if entry.uid and not skills[i].uid then
+                    skills[i].uid = entry.uid
+                end
+                if entry.category and not skills[i].category then
+                    skills[i].category = entry.category
+                end
+                return
+            end
         end
+        skills[#skills + 1] = entry
     end
 
     if recipe.requiredSkills and type(recipe.requiredSkills) == 'table' then
@@ -618,14 +647,8 @@ function Skills.ParseRecipeRequirement(recipe)
         local level = recipe.requireLevel or recipe.requiredLevel
         local sk = recipe.requireSkill
         if type(sk) == 'string' or level then
-            -- avoid duplicate if already pushed from skillTree
-            local dup = false
-            for i = 1, #skills do
-                if skills[i].uid == sk and skills[i].level == tonumber(level) then dup = true end
-            end
-            if not dup then
-                pushSkill({ category = cat, uid = type(sk) == 'string' and sk or nil, level = level }, cat)
-            end
+            -- pushSkill dedupes by categoryKey+uid (merges level)
+            pushSkill({ category = cat, uid = type(sk) == 'string' and sk or nil, level = level }, cat)
         end
     elseif type(recipe.requireSkill) == 'string' and #skills == 0 then
         pushSkill(recipe.requireSkill, recipe.requireSkillCategory or recipe.skillCategory)
@@ -741,6 +764,7 @@ function Skills.FacingSkill(src, recipe, _snap)
     -- Display-only enrichment for NUI (labels / per-skill unlocked). Does not affect gates.
     local mode = (req and req.mode == 'any') and 'any' or 'all'
     local skillsDisplay = {}
+    local seenDisplay = {}
     if req and type(req.skills) == 'table' then
         for i = 1, #req.skills do
             local sk = req.skills[i]
@@ -750,20 +774,30 @@ function Skills.FacingSkill(src, recipe, _snap)
                     ckey = SkillTree.ResolveKey(ckey) or ckey
                 end
                 local uid = sk.uid
-                local unlocked = nil
-                if type(uid) == 'string' and uid ~= '' then
-                    unlocked = Skills.HasUnlockedSkill(src, ckey, uid) == true
+                local dkey = tostring(ckey) .. '\0' .. ((type(uid) == 'string' and uid) or '')
+                local existing = seenDisplay[dkey]
+                if existing then
+                    if sk.level and not existing.requireLevel then
+                        existing.requireLevel = tonumber(sk.level)
+                    end
+                else
+                    local unlocked = nil
+                    if type(uid) == 'string' and uid ~= '' then
+                        unlocked = Skills.HasUnlockedSkill(src, ckey, uid) == true
+                    end
+                    local row = {
+                        category = ckey,
+                        categoryLabel = Skills.CategoryLabel(ckey),
+                        categoryUid = resolveCategoryUid(ckey),
+                        skillUid = uid,
+                        skillLabel = (type(uid) == 'string' and uid ~= '') and Skills.SkillLabel(uid, ckey) or nil,
+                        unlocked = unlocked,
+                        requireLevel = sk.level and tonumber(sk.level) or nil,
+                        level = Skills.GetLevel(src, ckey),
+                    }
+                    skillsDisplay[#skillsDisplay + 1] = row
+                    seenDisplay[dkey] = row
                 end
-                skillsDisplay[#skillsDisplay + 1] = {
-                    category = ckey,
-                    categoryLabel = Skills.CategoryLabel(ckey),
-                    categoryUid = resolveCategoryUid(ckey),
-                    skillUid = uid,
-                    skillLabel = (type(uid) == 'string' and uid ~= '') and Skills.SkillLabel(uid, ckey) or nil,
-                    unlocked = unlocked,
-                    requireLevel = sk.level and tonumber(sk.level) or nil,
-                    level = Skills.GetLevel(src, ckey),
-                }
             end
         end
     end

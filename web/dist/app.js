@@ -1406,6 +1406,27 @@ function skilltreeCtaHtml(r) {
       categoryLabel: sk.categoryLabel && !looksLikeUid(sk.categoryLabel) ? sk.categoryLabel : (frLabel(sk.categoryKey, null) || ''),
     }));
 
+    // Dedupe identical skills (categoryKey + uid, else label) — merge level if present
+    {
+      const seen = new Map();
+      const deduped = [];
+      skills.forEach((sk) => {
+        const key = `${sk.categoryKey || ''}::${sk.skillUid || sk.skillLabel || ''}`;
+        const prev = seen.get(key);
+        if (prev) {
+          if (sk.requireLevel != null && prev.requireLevel == null) prev.requireLevel = sk.requireLevel;
+          if (sk.level != null && prev.level == null) prev.level = sk.level;
+          if (sk.unlocked === true) prev.unlocked = true;
+          else if (prev.unlocked == null && sk.unlocked != null) prev.unlocked = sk.unlocked;
+          if (!prev.skillLabel && sk.skillLabel) prev.skillLabel = sk.skillLabel;
+          return;
+        }
+        seen.set(key, sk);
+        deduped.push(sk);
+      });
+      skills = deduped;
+    }
+
     const skillLines = skills.filter((sk) => sk.skillLabel);
     const levelLines = [];
     const seenLvl = new Set();

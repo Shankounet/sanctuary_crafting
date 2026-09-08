@@ -5864,7 +5864,7 @@ button, input { font: inherit; color: inherit; }
 #app .savoir-skill,
 #app .savoir-level {
   display: grid;
-  grid-template-columns: 1.1em 1fr;
+  grid-template-columns: 1.1em minmax(0, 1fr);
   column-gap: 6px;
   row-gap: 1px;
   align-items: start;
@@ -5874,6 +5874,9 @@ button, input { font: inherit; color: inherit; }
   padding: 2px 4px;
   border-radius: 2px;
   border: 1px solid transparent;
+  white-space: normal;
+  overflow: visible;
+  min-width: 0;
 }
 #app .savoir-skill .savoir-mark,
 #app .savoir-level .savoir-mark,
@@ -5894,8 +5897,14 @@ button, input { font: inherit; color: inherit; }
 #app .savoir-level.bad .savoir-level-label { color: #c4b8a4; }
 #app .savoir-skill-label,
 #app .savoir-level-label {
-  overflow-wrap: anywhere;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: break-word;
   word-break: break-word;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.35;
 }
 #app .savoir-sub {
   grid-column: 2;
