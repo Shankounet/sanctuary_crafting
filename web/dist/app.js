@@ -613,18 +613,27 @@
 
 
   document.addEventListener('click', (ev) => {
-    const btn = ev.target && ev.target.closest && ev.target.closest('.btn-skilltree-open');
+    const btn = ev.target && ev.target.closest && ev.target.closest('.btn-skilltree-open, .savoir-skill.is-openable');
     if (!btn) return;
     ev.preventDefault();
     ev.stopPropagation();
     const recipeId = btn.getAttribute('data-recipe-id');
     const skillUid = btn.getAttribute('data-skill-uid');
     const categoryUid = btn.getAttribute('data-category-uid');
+    if (!categoryUid) return;
     fetch(`https://${GetParentResourceName()}/openSkilltreeForRecipe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=UTF-8' },
       body: JSON.stringify({ recipeId, skillUid, categoryUid, openSkillsCategory: categoryUid }),
     }).catch(() => {});
+  }, true);
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    const el = ev.target && ev.target.closest && ev.target.closest('.savoir-skill.is-openable');
+    if (!el) return;
+    ev.preventDefault();
+    el.click();
   }, true);
 
     function isSkillLockedRecipe(r) {
@@ -669,7 +678,7 @@ function skilltreeCtaHtml(r) {
       || (r.requiredSkill && r.requiredSkill.category)
       || r.skillCategory
       || '';
-    return `<button type="button" class="btn ghost btn-skilltree-open" title="Voir dans les savoirs" data-recipe-id="${recipeId || ''}" data-skill-uid="${skillUid || ''}" data-category-uid="${categoryUid || ''}">VOIR DANS LES SAVOIRS</button>`;
+    return `<button type="button" class="btn ghost btn-skilltree-open" title="Voir dans les savoirs" data-recipe-id="${recipeId || ''}" data-skill-uid="${skillUid || ''}" data-category-uid="${categoryUid || ''}">Voir dans les savoirs →</button>`;
   }
 
   function knowledgeMarkHtml(kn) {
@@ -774,12 +783,16 @@ function skilltreeCtaHtml(r) {
     const reasons = [];
     if (!r) return ['Sélectionnez une recette'];
     if (state.crafting && !fileProcessing()) reasons.push('Fabrication en cours…');
-    if (r.locked) reasons.push(lockText(r).text);
+    if (isSkillLockedRecipe(r)) {
+      reasons.push('Apprenez d\'abord le savoir requis.');
+    } else if (r.locked) {
+      reasons.push(lockText(r).text);
+    }
     if (r.missingItems) {
       const miss = prodMissingCause(r, batch);
       reasons.push(miss ? ('Il manque ' + miss.label + ' x' + miss.need) : 'Matériaux insuffisants pour fabriquer');
     }
-    if (!r.canCraft && !r.locked && !r.missingItems) reasons.push('Conditions non remplies');
+    if (!r.canCraft && !r.locked && !r.missingItems && !isSkillLockedRecipe(r)) reasons.push('Conditions non remplies');
     return reasons;
   }
 
@@ -1326,63 +1339,220 @@ function skilltreeCtaHtml(r) {
     return { text: 'Opérationnelle', cls: 'ok' };
   }
 
+  const savoirUnlockPrev = Object.create(null);
+
   function renderProfilRequis(r) {
+    // Player-facing SAVOIR REQUIS (presentation only — never BRANCHE/TALENT/UID)
     const block = $('#block-profil');
     const body = $('#d-profil');
+    const titleEl = $('#d-savoir-title');
     if (!block || !body) return;
-    const st = r.skillTree || {};
-    const reqLvl = st.requiredLevel != null ? st.requiredLevel : r.requireLevel;
-    const curLvl = playerLevelOf(r);
-    const talent = talentLabelOf(r);
-    const branch = branchLabelOf(r);
-    const specLab = specLabelOf(r);
-    const specNeed = r.requireSpec;
-    const survival = !specNeed || specNeed === 'survie' || specNeed === 'survival';
-    const lacksSpec = !survival && r.hasSpecialization === false;
-    const hasLevel = reqLvl != null;
-    const hasTalent = !!talent;
-    const extra = hasLevel || hasTalent || lacksSpec;
 
-    body.innerHTML = '';
-    const addLine = (k, v, cls) => {
-      const row = document.createElement('div');
-      row.className = `profil-line${cls ? ' ' + cls : ''}`;
-      if (k) {
-        row.innerHTML = `<span class="profil-k">${escapeHtml(k)}</span><span class="profil-v">${v}</span>`;
-      } else {
-        row.innerHTML = `<span class="profil-bare">${v}</span>`;
-      }
-      body.appendChild(row);
-    };
-
-    const branchKey = recipeSpecialtyKey(r);
-    const branchIco = specialtyIconHtml(branchKey)
-      || specialtyIconHtml(r.requireSpec)
-      || specialtyIconHtml('survival');
-
-    if (!extra) {
-      addLine(null, `${branchIco}<span class="profil-branch-txt">${escapeHtml(branch || specLab || 'Survie')}</span>`, 'profil-branch');
-      addLine(null, 'Aucun prérequis supplémentaire', 'profil-none');
+    const ss = r.skillState || {};
+    if (ss.loading) {
+      if (titleEl) titleEl.innerHTML = `<i class="fa-solid fa-book-open" aria-hidden="true"></i> Savoir requis`;
+      body.innerHTML = `<div class="savoir-loading">Chargement des savoirs...</div>`;
       block.classList.remove('hidden');
       return;
     }
 
-    const branchTxt = branch || specLab || 'Survie';
-    const branchCls = lacksSpec ? 'bad' : 'ok';
-    addLine('Branche', `${branchIco}<span class="profil-branch-txt">${escapeHtml(branchTxt)}</span> <span class="profil-mark ${branchCls}">${markOk(!lacksSpec)}</span>`, branchCls);
+    const skillsRaw = Array.isArray(ss.skills) && ss.skills.length
+      ? ss.skills
+      : null;
 
-    if (hasLevel) {
-      const ok = curLvl != null ? Number(curLvl) >= Number(reqLvl) : r.lockReason !== 'craft_level_required';
-      const curTxt = curLvl != null ? String(curLvl) : '—';
-      addLine('Niveau', `${escapeHtml(curTxt)} / ${escapeHtml(String(reqLvl))} <span class="profil-mark ${ok ? 'ok' : 'bad'}">${markOk(ok)}</span>`, ok ? 'ok' : 'bad');
+    const fallbackSkillLabel = (ss.skillLabel || ss.label || talentLabelOf(r) || '').trim();
+    const fallbackCatLabel = (ss.categoryLabel || branchLabelOf(r) || specLabelOf(r) || '').trim();
+    const fallbackCatUid = ss.categoryUid
+      || r.openSkillsCategory
+      || r.skilltreeCategoryUid
+      || '';
+    const fallbackUnlocked = typeof r.hasRequiredSkill === 'boolean'
+      ? r.hasRequiredSkill
+      : (typeof ss.unlocked === 'boolean' ? ss.unlocked : null);
+    const fallbackReqLvl = ss.requireLevel != null
+      ? ss.requireLevel
+      : ((r.skillTree && r.skillTree.requiredLevel != null) ? r.skillTree.requiredLevel : r.requireLevel);
+    const fallbackCurLvl = (ss.level != null) ? ss.level : playerLevelOf(r);
+
+    let skills = [];
+    if (skillsRaw) {
+      skills = skillsRaw.map((sk) => ({
+        categoryLabel: (sk.categoryLabel || fallbackCatLabel || '').trim(),
+        categoryUid: sk.categoryUid || fallbackCatUid || '',
+        categoryKey: sk.category || recipeSpecialtyKey(r),
+        skillLabel: (sk.skillLabel || sk.label || '').trim(),
+        unlocked: typeof sk.unlocked === 'boolean' ? sk.unlocked : null,
+        requireLevel: sk.requireLevel != null ? sk.requireLevel : null,
+        level: sk.level != null ? sk.level : null,
+        skillUid: sk.skillUid || '',
+      })).filter((sk) => sk.skillLabel || sk.requireLevel != null);
+    } else if (fallbackSkillLabel || fallbackReqLvl != null) {
+      skills = [{
+        categoryLabel: fallbackCatLabel,
+        categoryUid: fallbackCatUid,
+        categoryKey: recipeSpecialtyKey(r),
+        skillLabel: fallbackSkillLabel,
+        unlocked: fallbackUnlocked,
+        requireLevel: fallbackReqLvl,
+        level: fallbackCurLvl,
+        skillUid: ss.skillUid || r.skilltreeSkillUid || '',
+      }];
     }
 
-    if (hasTalent) {
-      const ok = talentUnlockedOf(r, talent);
-      addLine('Talent', `${escapeHtml(talent)} <span class="profil-mark ${ok ? 'ok' : 'bad'}">${ok ? '✓ débloqué' : '✕ manquant'}</span>`, ok ? 'ok' : 'bad');
+    // Drop UID-looking labels
+    skills = skills.map((sk) => ({
+      ...sk,
+      skillLabel: sk.skillLabel && !looksLikeUid(sk.skillLabel) ? sk.skillLabel : '',
+      categoryLabel: sk.categoryLabel && !looksLikeUid(sk.categoryLabel) ? sk.categoryLabel : (frLabel(sk.categoryKey, null) || ''),
+    }));
+
+    const skillLines = skills.filter((sk) => sk.skillLabel);
+    const levelLines = [];
+    const seenLvl = new Set();
+    skills.forEach((sk) => {
+      if (sk.requireLevel == null) return;
+      const key = `${sk.categoryLabel || ''}::${sk.requireLevel}`;
+      if (seenLvl.has(key)) return;
+      seenLvl.add(key);
+      levelLines.push(sk);
+    });
+    // If only a top-level level requirement and no per-skill level
+    if (!levelLines.length && fallbackReqLvl != null && !skillLines.length) {
+      levelLines.push({
+        categoryLabel: fallbackCatLabel || frLabel(recipeSpecialtyKey(r), 'Survie'),
+        categoryUid: fallbackCatUid,
+        categoryKey: recipeSpecialtyKey(r),
+        requireLevel: fallbackReqLvl,
+        level: fallbackCurLvl,
+        unlocked: null,
+        skillLabel: '',
+      });
     }
 
+    const mode = (ss.mode === 'any' || (r.requiredSkills && r.requiredSkills.mode === 'any')) ? 'any' : 'all';
+    const multi = skillLines.length > 1;
+    const anyMissingSkill = skillLines.some((sk) => sk.unlocked === false)
+      || (skillLines.length && isSkillLockedRecipe(r) && skillLines.every((sk) => sk.unlocked !== true));
+    const hasContent = skillLines.length > 0 || levelLines.length > 0;
+
+    if (!hasContent) {
+      block.classList.add('hidden');
+      body.innerHTML = '';
+      return;
+    }
+
+    const title = multi ? 'Savoirs requis' : 'Savoir requis';
+    if (titleEl) {
+      titleEl.innerHTML = `<i class="fa-solid fa-book-open" aria-hidden="true"></i> ${title}`;
+    }
+
+    // Group skill lines by category label
+    const groups = [];
+    const groupMap = Object.create(null);
+    skillLines.forEach((sk) => {
+      const gKey = sk.categoryLabel || sk.categoryKey || 'Savoir';
+      if (!groupMap[gKey]) {
+        groupMap[gKey] = {
+          categoryLabel: sk.categoryLabel || gKey,
+          categoryUid: sk.categoryUid,
+          categoryKey: sk.categoryKey,
+          skills: [],
+        };
+        groups.push(groupMap[gKey]);
+      }
+      groupMap[gKey].skills.push(sk);
+    });
+
+    // Levels without a skill group: attach under matching category or create level-only group
+    levelLines.forEach((lv) => {
+      const gKey = lv.categoryLabel || lv.categoryKey || 'Savoir';
+      if (!groupMap[gKey]) {
+        groupMap[gKey] = {
+          categoryLabel: lv.categoryLabel || gKey,
+          categoryUid: lv.categoryUid,
+          categoryKey: lv.categoryKey,
+          skills: [],
+          levels: [],
+        };
+        groups.push(groupMap[gKey]);
+      }
+      groupMap[gKey].levels = groupMap[gKey].levels || [];
+      groupMap[gKey].levels.push(lv);
+    });
+
+    const recipeId = r.id || '';
+    const prev = savoirUnlockPrev[recipeId];
+    let html = '';
+
+    if (multi) {
+      html += `<div class="savoir-mode">${mode === 'any' ? 'Au moins un savoir requis' : 'Tous requis'}</div>`;
+    }
+
+    groups.forEach((g) => {
+      const ico = specialtyIconHtml(g.categoryKey)
+        || specialtyIconHtml(r.requireSpec)
+        || specialtyIconHtml('survival');
+      const catName = g.categoryLabel || 'Savoir';
+      html += `<div class="savoir-cat">`;
+      html += `<div class="savoir-cat-name">${ico}<span>${escapeHtml(catName)}</span></div>`;
+
+      (g.skills || []).forEach((sk) => {
+        const ok = sk.unlocked === true;
+        const missing = sk.unlocked === false || (sk.unlocked == null && isSkillLockedRecipe(r));
+        const mark = ok ? '✓' : (missing ? '✕' : '…');
+        const cls = ok ? 'ok' : (missing ? 'bad' : '');
+        let just = '';
+        if (ok && prev && prev[sk.skillUid || sk.skillLabel] === false) just = ' just-unlocked';
+        const tip = missing
+          ? `Cette recette nécessite une connaissance de l'arbre ${catName}.`
+          : (ok ? 'Savoir acquis' : 'Savoir requis');
+        const openAttr = missing && sk.categoryUid
+          ? ` role="button" tabindex="0" data-category-uid="${escapeHtml(sk.categoryUid)}" data-recipe-id="${escapeHtml(recipeId)}" data-skill-uid="${escapeHtml(sk.skillUid || '')}"`
+          : '';
+        const clickable = missing && sk.categoryUid ? ' is-openable' : '';
+        html += `<div class="savoir-skill ${cls}${just}${clickable}" title="${escapeHtml(tip)}"${openAttr}>`;
+        html += `<span class="savoir-mark" aria-hidden="true">${mark}</span>`;
+        html += `<span class="savoir-skill-label">${escapeHtml(sk.skillLabel)}</span>`;
+        if (missing) {
+          html += `<span class="savoir-sub">Non appris</span>`;
+        }
+        html += `</div>`;
+      });
+
+      (g.levels || []).forEach((lv) => {
+        const need = Number(lv.requireLevel);
+        const cur = lv.level != null ? Number(lv.level) : null;
+        const ok = cur != null ? cur >= need : !(r.lockReason === 'craft_level_required' || r.lockReason === 'skill_level_low' || r.lockKind === 'ml_level');
+        const mark = ok ? '✓' : '✕';
+        const cls = ok ? 'ok' : 'bad';
+        const curTxt = cur != null ? String(cur) : '—';
+        html += `<div class="savoir-level ${cls}">`;
+        html += `<span class="savoir-mark" aria-hidden="true">${mark}</span>`;
+        html += `<span class="savoir-level-label">Niveau ${escapeHtml(String(need))} requis — actuel : ${escapeHtml(curTxt)}</span>`;
+        html += `</div>`;
+      });
+
+      html += `</div>`;
+    });
+
+    if (anyMissingSkill || isSkillLockedRecipe(r)) {
+      const catUid = (groups[0] && groups[0].categoryUid)
+        || fallbackCatUid
+        || '';
+      if (catUid) {
+        html += `<button type="button" class="savoir-voir btn-skilltree-open" title="Voir dans les savoirs" data-recipe-id="${escapeHtml(recipeId)}" data-skill-uid="" data-category-uid="${escapeHtml(catUid)}">Voir dans les savoirs →</button>`;
+      }
+    }
+
+    body.innerHTML = html;
     block.classList.remove('hidden');
+
+    // remember unlock flags for optional ✕→✓ transition (CSS only, no beep)
+    const next = Object.create(null);
+    skillLines.forEach((sk) => {
+      next[sk.skillUid || sk.skillLabel] = sk.unlocked === true;
+    });
+    savoirUnlockPrev[recipeId] = next;
   }
 
   function recentRecipeList() {
@@ -1752,10 +1922,9 @@ function skilltreeCtaHtml(r) {
       locksEl.parentElement.appendChild(cta);
     }
     if (cta) {
-      const savoir = savoirRequisHtml(r);
-      const ctaBtn = skilltreeCtaHtml(r);
-      const unlearned = isSkillLockedRecipe(r) ? `<div class="savoir-unlearned">Connaissance non apprise</div>` : '';
-      cta.innerHTML = `${savoir}${unlearned}${ctaBtn}`;
+      // SAVOIR REQUIS + Voir dans les savoirs live in EXIGENCES (block-profil)
+      cta.innerHTML = '';
+      cta.classList.add('hidden');
     }
 
     const qh = qualityHint(r);
@@ -1767,52 +1936,76 @@ function skilltreeCtaHtml(r) {
     $('#d-duration').textContent = durationLabel(r.duration);
     $('#d-qty').textContent = `×${resCount}`;
 
-    // —— PROFIL REQUIS (DevHub snapshot + spec, one block) ——
+    // —— SAVOIR REQUIS (ml_skills display) ——
     renderProfilRequis(r);
 
-    // —— Station compact: Station / Niveau / État ——
+    // —— ATELIER compact: "Table · Niv. X" + ✓/✕ status ——
     const stationBlock = $('#block-station');
     const meta = state.menuMeta || {};
     const stationName = meta.label || (r.station ? frLabel(r.station, humanize(r.station)) : null);
-    const stationLvl = meta.stationLevel != null ? meta.stationLevel : r.stationLevel;
-    const showStation = !!(stationName || stationLvl != null);
+    const stationLvl = meta.stationLevel != null ? meta.stationLevel : null;
+    const needStationLvl = r.stationLevel != null ? Number(r.stationLevel) : null;
+    const showStation = !!(stationName || stationLvl != null || needStationLvl != null || r.requireModule);
     toggleRow(stationBlock, showStation);
     if (showStation) {
-      const rowS = $('#row-station');
-      const rowL = $('#row-station-lvl');
-      const rowE = $('#row-station-etat');
-      if (stationName) {
-        rowS.classList.remove('hidden');
-        $('#d-station').textContent = stationName;
+      const mainEl = $('#d-atelier-main');
+      const statusEl = $('#d-atelier-status');
+      const modCompact = $('#d-atelier-mod');
+      const lvlTxt = (stationLvl != null)
+        ? `Niv. ${stationLvl}`
+        : (needStationLvl != null ? `Niv. ${needStationLvl}` : null);
+      const mainBits = [];
+      if (stationName) mainBits.push(stationName);
+      if (lvlTxt) mainBits.push(lvlTxt);
+      if (mainEl) mainEl.textContent = mainBits.length ? mainBits.join(' · ') : 'Atelier';
+
+      // Keep legacy hidden fields in sync
+      const dStation = $('#d-station');
+      if (dStation) dStation.textContent = stationName || '—';
+      const dLvl = $('#d-station-lvl');
+      if (dLvl) dLvl.textContent = stationLvl != null ? String(stationLvl) : '—';
+
+      let status = { mark: '✓', text: 'Opérationnelle', cls: 'ok' };
+      if (meta.powered === false || r.lockReason === 'craft_no_power') {
+        status = { mark: '✕', text: 'Hors tension', cls: 'bad' };
+      } else if (needStationLvl != null && stationLvl != null && Number(stationLvl) < needStationLvl) {
+        status = { mark: '✕', text: `Niveau ${needStationLvl} requis`, cls: 'bad' };
+      } else if (r.lockReason === 'craft_station_level') {
+        status = { mark: '✕', text: needStationLvl ? `Niveau ${needStationLvl} requis` : 'Atelier requis', cls: 'bad' };
+      } else if (!stationName && needStationLvl != null) {
+        status = { mark: '✕', text: 'Atelier requis', cls: 'bad' };
       } else {
-        rowS.classList.add('hidden');
-      }
-      if (stationLvl != null) {
-        rowL.classList.remove('hidden');
-        $('#d-station-lvl').textContent = String(stationLvl);
-      } else {
-        rowL.classList.add('hidden');
-      }
-      if (rowE) {
-        rowE.classList.remove('hidden');
         const etat = stationEtatLabel();
-        const etatEl = $('#d-station-etat');
-        if (etatEl) {
-          etatEl.textContent = etat.text;
-          etatEl.className = etat.cls;
-        }
+        if (etat.cls === 'bad') status = { mark: '✕', text: etat.text, cls: 'bad' };
+        else if (etat.cls === 'warn') status = { mark: '·', text: etat.text, cls: 'warn' };
+        else status = { mark: '✓', text: etat.text || 'Opérationnelle', cls: 'ok' };
       }
-      const rowMod = $('#row-station-mod');
+      if (r.powerCost != null && meta.powered === false) {
+        status = { mark: '✕', text: 'Énergie insuffisante', cls: 'bad' };
+      }
+      if (statusEl) {
+        statusEl.className = `atelier-status ${status.cls}`;
+        statusEl.innerHTML = `<span class="savoir-mark" aria-hidden="true">${status.mark}</span><span>${escapeHtml(status.text)}</span>`;
+      }
+      const etatLegacy = $('#d-station-etat');
+      if (etatLegacy) {
+        etatLegacy.textContent = status.text;
+        etatLegacy.className = status.cls;
+      }
+
       const modNeed = r.requireModuleLabel || (r.requireModule && frLabel(r.requireModule, humanize(r.requireModule)));
-      if (rowMod) {
+      if (modCompact) {
         if (modNeed) {
-          rowMod.classList.remove('hidden');
-          const modEl = $('#d-station-mod');
-          if (modEl) modEl.textContent = modNeed;
+          modCompact.classList.remove('hidden');
+          modCompact.textContent = `Module : ${modNeed}`;
         } else {
-          rowMod.classList.add('hidden');
+          modCompact.classList.add('hidden');
+          modCompact.textContent = '';
         }
       }
+      const modEl = $('#d-station-mod');
+      if (modEl) modEl.textContent = modNeed || '—';
+
       const wearEl = $('#d-station-wear');
       if (wearEl) {
         const note = meta.conditionNote;
