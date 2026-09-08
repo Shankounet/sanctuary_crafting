@@ -379,3 +379,15 @@ lib.callback.register('sanctuary_crafting:craftadminCreate', function(src, draft
     if not ok then return { ok = false, reason = version or 'craft_failed' } end
     return { ok = true, version = version, recipe = slimRecipe(recipe) }
 end)
+
+
+--- ML Skills admin: tree picker payload + health
+lib.callback.register('sanctuary_crafting:adminMlSkills', function(src)
+    if not Validation or not Validation.IsAdmin or not Validation.IsAdmin(src) then
+        return { ok = false }
+    end
+    local trees = Skills and Skills.GetSkillTrees and Skills.GetSkillTrees() or nil
+    Skills.RefreshLabels()
+    local health = Skills and Skills.HealthReport and Skills.HealthReport() or {}
+    return { ok = true, trees = trees, health = health }
+end)

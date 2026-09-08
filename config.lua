@@ -5,10 +5,10 @@ Config = {}
   sanctuary_crafting — configuration (v2.0.0-phase1)
   Thème : post-apo (ferraille, médical de fortune, pièces d'armes, survie)
 
-  sanctuary_skilltree est la SEULE source de skill / XP / niveaux (Phase 4).
-  DevHub n'est plus requis au runtime une fois skilltree ensure'd.
-  Ne créez JAMAIS de XP/niveaux craft parallèles. UIDs uniquement dans Config.SkillCategories
-  (categoryUid = UID publié dans sanctuary_skilltree — aligner après migration Phase 3).
+  ml_skills est la SEULE source de skill / XP / unlocks / niveaux.
+  sanctuary_skilltree et DevHub NE sont PAS utilisés pour les gates de recettes.
+  Ne créez JAMAIS de XP/niveaux craft parallèles. UIDs dans Config.SkillCategories
+  (categoryUid = UID publié dans ml_skills). Craft mastery / UI restent locaux.
 
 --------------------------------------------------------------------------------
   Schéma d'une recette (Config.Recipes) — Phase 1
@@ -23,9 +23,11 @@ Config = {}
       result      = { item = 'metal_plate', count = 1 },  -- requis
       duration    = 8000,                    -- ms (requis)
       xp          = { category = 'engineer', amount = 15 }, -- KEY Config.SkillCategories
-      skillTree   = { category = 'medic', requiredLevel = 10, requiredSkill = nil },
-      -- category = KEY (medic/survival/engineer/gunsmith) ; jamais l'UID brut
-      -- legacy requireLevel / requireSkill / skill migrés au load
+      requiredSkill = { category = 'medic', uid = 'bandage_basic', level = 1 }, -- nil = free
+      -- requiredSkills = { mode = 'all'|'any', skills = { { category, uid, level? }, ... } }
+      -- skillVisibility = 'visible_locked' | 'hidden_until_unlocked' | 'discovered_locked'
+      -- skillXp = { category?, amount } — defaults category to requiredSkill.category
+      -- legacy skillTree / requireLevel / requireSkill / DevHub fields migrés au load
 
       -- Multi-étapes (v2 polish) — steps[] OU chain (même craftId / craftUID) :
       -- steps = {
@@ -117,18 +119,26 @@ Config.EnableWorldBenchCommand = true
 Config.WorldBenchCommand = 'placeworldbench'
 
 --------------------------------------------------------------------------------
--- sanctuary_skilltree — soft-fail via CraftingSkills (Phase 4)
--- categoryUid = UID catégorie PUBLIÉ dans sanctuary_skilltree (après Phase 3
--- migration /skillsadmin). Recettes / stations utilisent les KEYS
--- (survival/medic/engineer/gunsmith), jamais l'UID brut.
--- SkillSystem: 'sanctuary' | 'devhub' | 'auto' (auto = sanctuary si started).
--- Si skillTree.requiredLevel / requiredSkill et ressource down → refuse
--- (sauf BypassRequirements / ACE). Crafts sans gate skillTree restent OK.
+-- ml_skills — SOLE unlock / XP / level provider via Skills bridge
+-- (server/integrations/ml_skills.lua). Soft runtime GetResourceState + failClosed.
+-- Recipes / stations use SkillCategories KEYS; categoryUid = published ml_skills UID.
+-- failClosed: if ml_skills down, skill-gated recipes stay locked; free recipes work.
 --------------------------------------------------------------------------------
-Config.SkillSystem = 'sanctuary' -- Phase 4 default; 'auto' allows DevHub fallback
+Config.SkillIntegration = {
+    enabled = true,
+    provider = 'ml_skills',
+    failClosed = true,
+    cache = true,
+    xpOn = 'collect', -- XP when player collects finished craft (not on Fabriquer click)
+    -- Optional: map craft KEY → ml_skills categoryUid when SkillCategories is not enough
+    -- CategoryMapping = { survival = 'survie', medic = 'medecin' },
+}
+
+-- Legacy alias (SkillSystem removed from unlock path; kept for older configs reading it)
+Config.SkillSystem = 'ml_skills'
 
 Config.SkillCategories = {
-    -- categoryUid MUST match sanctuary_skilltree published UIDs (migrate/map in Phase 3).
+    -- categoryUid MUST match ml_skills published category UIDs.
     survival = { categoryUid = 'survie', label = 'Survie', icon = 'fa-fire', tint = '#b08a62' },
     medic    = { categoryUid = 'medecin', label = 'Médecin', icon = 'fa-kit-medical', tint = '#8a9a7a' },
     engineer = { categoryUid = 'ingenieur', label = 'Ingénieur', icon = 'fa-gears', tint = '#9a8866' },
@@ -192,13 +202,12 @@ Config.SpecialtyIcons = {
 
 Config.Skills = {
     enabled = true,
-    resource = 'sanctuary_skilltree', -- preferred backend
-    fallbackResource = 'devhub_skillTree', -- only if SkillSystem = auto|devhub
+    resource = 'ml_skills', -- sole backend
     defaultCategory = 'engineer',
-    craftingCategory = 'engineer', -- KEY (ex-UID ingenieur)
+    craftingCategory = 'engineer',
     survivalCategory = 'survival',
-    AwardPoints = false, -- addPoints depuis un craft : non par défaut
-    craftTimeBonus = true, -- no-op : pas de GetTotalCategoryBonus côté skilltree
+    AwardPoints = false,
+    craftTimeBonus = false, -- no GetTotalCategoryBonus assumed
     maxCraftTimeReduction = 0.40,
 
     --[[ Bypass (LIVE : actuellement true — ne PAS désactiver silencieusement)
@@ -209,7 +218,7 @@ Config.Skills = {
     ]]
     BypassRequirements = true,
     BypassAce = 'sanctuary.crafting.bypassskills',
-    BypassAlsoSkipXP = false, -- false = toujours tenter addXp si skill tree up
+    BypassAlsoSkipXP = false,
     BypassNotify = true,
 }
 

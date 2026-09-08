@@ -2,7 +2,7 @@
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
-**sanctuary_skilltree** est la **seule** source de compétences / XP / niveaux (Phase 4). DevHub n'est plus requis au runtime. Aucun XP craft parallèle.
+**ml_skills** est la **seule** source de compétences / XP / unlocks / niveaux. sanctuary_skilltree et DevHub ne gate pas les recettes. Aucun XP craft parallèle. Voir `docs/SKILLS.md`.
 
 UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton terni `#9a8866`, pas Fallout / pas cyberpunk). **Craft** = banc de production 3 colonnes (polish densité PC). **Carnet** = journal / dossier de terrain (identité séparée). Micro-interactions 100–180 ms. **Callbacks NUI inchangés.**
 
@@ -316,7 +316,7 @@ ensure ox_lib
 ensure ox_inventory
 ensure ox_target
 ensure es_extended
-ensure devhub_skillTree   # skill / XP / unlock (soft-fail if down)
+ensure ml_skills   # skill / XP / unlock (soft-fail if down)
 ensure sanctuary_crafting
 ```
 

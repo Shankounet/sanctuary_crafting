@@ -6939,3 +6939,11 @@ button, input { font: inherit; color: inherit; }
   font-size: 12px;
   letter-spacing: 0.04em;
 }
+
+
+/* ml_skills savoir requis */
+.savoir-requis { margin: 0.35rem 0; font-size: 0.85rem; opacity: 0.92; letter-spacing: 0.02em; }
+.savoir-requis .mark { font-weight: 700; margin-left: 0.25rem; }
+.savoir-requis.loading { font-style: italic; opacity: 0.75; }
+.savoir-unlearned { color: #c4a070; font-size: 0.82rem; margin-bottom: 0.25rem; }
+.skilltree-cta-wrap .btn-skilltree-open { margin-top: 0.35rem; }

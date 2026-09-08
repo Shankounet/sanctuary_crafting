@@ -2019,6 +2019,10 @@ local function buildRecipeEntry(src, r, ctx)
         or lockReason == 'craft_knowledge_required'
         or lockReason == 'craft_skills_unavailable'
         or lockReason == 'craft_recipe_locked'
+        or lockReason == 'craft_skill_required'
+        or lockReason == 'skill_locked'
+        or lockReason == 'skill_level_low'
+        or lockReason == 'skills_unavailable'
     local farLevel = (levelGap ~= nil and levelGap > 2)
     local stationGap = nil
     if lockReason == 'craft_station_level' and r.stationLevel and bench then
@@ -2099,10 +2103,28 @@ local function buildRecipeEntry(src, r, ctx)
         skilltreeSkillUid = facing and facing.skilltreeSkillUid or nil,
         skilltreeCategoryUid = facing and facing.skilltreeCategoryUid or nil,
         skilltreeSkillLabel = facing and facing.skilltreeSkillLabel or nil,
-        lockKind = (lockReason == 'craft_recipe_locked' and 'skilltree_recipe')
-            or (lockReason == 'craft_skill_required' and 'skilltree_talent')
+        lockKind = ((lockReason == 'craft_skill_required' or lockReason == 'skill_locked') and 'ml_skill')
+            or ((lockReason == 'craft_level_required' or lockReason == 'skill_level_low') and 'ml_level')
+            or (lockReason == 'craft_recipe_locked' and 'ml_skill')
             or nil,
-        openSkilltree = (facing and facing.openSkillHint) or (lockReason == 'craft_recipe_locked') or false,
+        openSkilltree = (facing and facing.openSkillHint)
+            or (lockReason == 'craft_skill_required')
+            or (lockReason == 'skill_locked')
+            or (lockReason == 'craft_recipe_locked')
+            or false,
+        skillVisibility = (facing and facing.skillVisibility) or r.skillVisibility or 'visible_locked',
+        skillState = {
+            loading = facing and facing.skillsLoading or false,
+            unlocked = facing and facing.hasRequiredSkill,
+            categoryUid = facing and facing.categoryUid,
+            skillUid = facing and facing.requireSkill,
+            label = facing and facing.requiredSkillLabel,
+            level = facing and facing.playerSkillLevel,
+            requireLevel = facing and facing.requireLevel,
+            visualStatus = facing and facing.visualStatus,
+        },
+        requiredSkill = r.requiredSkill,
+        openSkillsCategory = facing and (facing.categoryUid or facing.category) or nil,
         requireSpecLabel = requireSpecLabel,
         playerSkillXp = facing and facing.playerSkillXp or nil,
         playerTotalXp = facing and facing.playerTotalXp or nil,
@@ -2365,8 +2387,24 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
     local skillSnap = (CraftingSkills and CraftingSkills.Snapshot and CraftingSkills.Snapshot(src)) or nil
     local ctx = { artisans = artisans, orders = orders, includeHints = true, bench = bench, skillSnap = skillSnap }
     local out = {}
+    local skillsLoading = skillSnap and skillSnap.loading == true and skillSnap.available ~= true
     for i = 1, #recipes do
-        out[#out + 1] = buildRecipeEntry(src, recipes[i], ctx)
+        local recipe = recipes[i]
+        local entry = buildRecipeEntry(src, recipe, ctx)
+        -- skillVisibility: hide locked until unlocked (search still finds visible_locked)
+        local vis = entry.skillVisibility or recipe.skillVisibility or 'visible_locked'
+        local lockedSkill = entry.lockReason == 'craft_skill_required'
+            or entry.lockReason == 'skill_locked'
+            or entry.lockKind == 'ml_skill'
+        if vis == 'hidden_until_unlocked' and lockedSkill and not skillsLoading then
+            -- omit from menu
+        else
+            if skillsLoading then
+                entry.skillState = entry.skillState or {}
+                entry.skillState.loading = true
+            end
+            out[#out + 1] = entry
+        end
     end
 
     local favorites = {}

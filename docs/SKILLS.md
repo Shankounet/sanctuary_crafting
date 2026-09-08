@@ -1,8 +1,13 @@
-# Skills / XP — sanctuary_skilltree (Phase 4)
+# Skills / XP — ml_skills (sole unlock provider)
 
-`sanctuary_crafting` uses **sanctuary_skilltree** as the sole runtime skill / XP / level source via `CraftingSkills` (`server/integrations/crafting_skills.lua`).
+`sanctuary_crafting` uses **ml_skills** as the **only** runtime source of unlocks, XP, and levels via the central bridge:
 
-DevHub (`devhub_skillTree`) is **not required** once skilltree is started. Phase 3 player migration (`/skillsadmin` → Migration DevHub) stays a separate operator step.
+- `server/integrations/ml_skills.lua` → `Skills.*` (pcall + cache)
+- `server/integrations/crafting_skills.lua` → thin `CraftingSkills.*` facade for existing call sites
+
+**sanctuary_skilltree** and **DevHub** are **not** used for recipe unlock checks.
+
+Craft mastery, recipes, stations, queues, energy, tools, and craft UI stay in sanctuary_crafting. Do **not** replace this craft system with ml_crafting.
 
 ## Ensure order (`server.cfg`)
 
@@ -12,72 +17,166 @@ ensure ox_lib
 ensure es_extended
 ensure ox_inventory
 ensure ox_target
-ensure sanctuary_skilltree   -- BEFORE craft
+ensure ml_skills              -- BEFORE craft
 ensure sanctuary_crafting
 ```
 
-Optional transitional fallback: keep `devhub_skillTree` started and set `Config.SkillSystem = 'auto'` (prefers sanctuary when both up).
+Soft dependency: `GetResourceState('ml_skills')` + `Config.SkillIntegration.failClosed`.
 
 ## Config
 
-| Key | Meaning |
-|-----|---------|
-| `Config.SkillSystem` | `'sanctuary'` (default Phase 4) \| `'devhub'` \| `'auto'` |
-| `Config.Skills.resource` | Preferred resource name (`sanctuary_skilltree`) |
-| `Config.Skills.fallbackResource` | DevHub name for auto/devhub modes |
-| `Config.SkillCategories.*.categoryUid` | Must match **published** Sanctuary category UIDs |
-
-Recipe gate shape unchanged:
-
 ```lua
-skillTree = { category = 'medic', requiredLevel = 10, requiredSkill = 'some_talent_uid' }
--- category = KEY (survival/medic/engineer/gunsmith); resolve via SkillCategories
-xp = { category = 'engineer', amount = 15 }
+Config.SkillIntegration = {
+  enabled = true,
+  provider = 'ml_skills',
+  failClosed = true,   -- skill-gated recipes stay locked if ml_skills down
+  cache = true,        -- per-player UnlockedCache; opening craft = local lookups
+  xpOn = 'collect',    -- XP on collect (offline-safe); not on Fabriquer click
+  -- CategoryMapping = { survival = 'survie' }, -- optional
+}
+
+Config.Skills = {
+  enabled = true,
+  resource = 'ml_skills',
+  defaultCategory = 'engineer',
+  BypassRequirements = true, -- labs only; keep false in production
+  BypassAce = 'sanctuary.crafting.bypassskills',
+}
 ```
 
-## Exports used (sanctuary_skilltree)
+`Config.StationOutput.XpOn` follows `SkillIntegration.xpOn` when set.
 
-Read: `getPlayerLevel`, `getPlayerXp`, `getPlayerTotalXp`, `getPlayerPoints`, `getPlayerGlobalStats`, `hasUnlockedSkill`, `getUnlockedSkills`, `getCategories`, `getCategory`, `getSkills`, `getSkill`
+## Official exports (DO NOT invert)
 
-Mutate (server only): `addXp` (craft complete), optional `addPoints` if `Config.Skills.AwardPoints`
+Server:
 
-Arg order on Sanctuary: `(srcOrId, categoryUid, …)` — craft adapters handle this; do not call DevHub order against Sanctuary.
+| Bridge | ml_skills |
+|--------|-----------|
+| `Skills.HasUnlockedSkill(src, cat, uid)` | `HasUnlockedSkill(categoryUid, skillUid, source)` |
+| `Skills.AddXp(src, cat, amount)` | `AddXp(categoryUid, amount, source)` |
+| `Skills.GetLevel` | `GetPlayerLevel(categoryUid, source)` (fallback `GetLevel`) |
+| `Skills.GetUnlockedSkills` | `GetUnlockedSkills(source)` / `(categoryUid, source)` |
+| Admin trees | `GetSkillTrees()` / `GetConfig()` |
 
-## Carnet
+Client:
 
-Progression is **read-only**: French labels + **Niveau** + **XP actuel** (+ total if known) + known talent labels. Never UIDs, never invented %. If next-level progress unavailable: `Niveau X` + current XP only (`web/dist/book.js` `msSkillLines`).
+- Feedback: `HasUnlockedSkill(categoryUid, skillUid)` — if `GetPlayerData()` nil → **loading/unknown**, not locked
+- Open tree: `OpenSkillTree(categoryUid)` — **no** invented focus-node export
 
-## Hard rules
+## Recipe schema
 
-- No `ml_skills`
-- No auto `AddItem` on craft complete (SORTIE manual recover)
-- `addXp` server-only via skilltree
-- No NUI redesign; queue / FIFO / SORTIE unchanged
-- Specialty icons / PRESQUE–NON FAISABLE stay accurate (labels from skilltree defs)
+```lua
+-- Free craft
+requiredSkill = nil
 
-## Residual risks
+-- Single requirement (level AND unlock when both set)
+requiredSkill = { category = 'survival', uid = 'bandage_basic', level = 1 }
 
-- `categoryUid` mismatch after Phase 3 if Sanctuary trees use different UIDs than `Config.SkillCategories` — fix config or remap publish UIDs.
-- Until Phase 3 migration runs, players may have empty Sanctuary progress (gates fail closed unless `BypassRequirements`).
-- DevHub fallback arg-order path remains for labs only; do not dual-write XP.
+-- Multi
+requiredSkills = {
+  mode = 'all', -- or 'any'
+  skills = {
+    { category = 'survival', uid = 'field_dressing' },
+    { category = 'medic', uid = 'sterile_wrap', level = 2 },
+  },
+}
 
+skillVisibility = 'visible_locked'       -- default: shown, FABRIQUER disabled
+             -- | 'hidden_until_unlocked' -- omitted from menu while locked
+             -- | 'discovered_locked'     -- visible once discovered, still locked
 
-## Recipe unlocks (tech progression)
+skillXp = { category = 'survival', amount = 10 } -- category defaults to requiredSkill.category
+-- or legacy: xp = { category = 'survival', amount = 10 }
+```
 
-When a published skilltree node lists `meta.recipeIds`, that recipe is **gated**.
+### Migration
 
-`CraftingSkills.CheckRecipeGates` calls `exports.sanctuary_skilltree:canAccessRecipe` after level/talent gates:
+On load, `SkillTree.NormalizeRecipe` maps:
 
-- Ungated recipes (not in skilltree map) → accessible (other gates still apply).
-- Gated + skill unlocked → accessible.
-- Gated + skill locked → `craft_recipe_locked` (NUI: **VOIR DANS L'ARBRE**).
+- `skillTree` / `requiredSkillTree` / `requireLevel` / `requireSkill` / `hideIfSkillLocked`
+- → `requiredSkill` + `skillVisibility`
 
-Facing payload adds `lockKind=skilltree_recipe`, `skilltreeSkillLabel`, `openSkilltree`.
+Uncertain DevHub/SST-only fields → log `UNMAPPED RECIPE SKILL`, **no** dangerous auto-rewrite.
 
-Ensure `sanctuary_skilltree` starts **before** `sanctuary_crafting`.
+### Bandage example
 
+```lua
+{
+  id = 'bandage',
+  label = 'Bandage de fortune',
+  category = 'medical',
+  station = 'medical',
+  ingredients = { { item = 'cloth', count = 2 } },
+  result = { item = 'bandage', count = 1 },
+  duration = 5000,
+  requiredSkill = { category = 'survival', uid = 'bandage_basic', level = 1 },
+  skillVisibility = 'visible_locked',
+  skillXp = { amount = 8 }, -- category → survival from requiredSkill
+}
+```
 
-## Carnet « Prochain déblocage » (v2.30.1)
+1. Publish skill `bandage_basic` under ml_skills category UID matching `Config.SkillCategories.survival.categoryUid` (default `survie`).
+2. Ensure `ml_skills` before `sanctuary_crafting`.
+3. Player without the skill sees **VERROUILLÉ** / “Connaissance non apprise” + **VOIR DANS LES SAVOIRS**.
+4. After unlock (`ml_skills:server:skillUnlocked`), cache updates and craft UI refreshes without 200 export calls.
+5. XP granted once on **collect** (`xpGranted` flag).
 
-When the player follows a talent in `/skills`, `SurvivalBook.NextUnlocks` prepends
-`exports.sanctuary_skilltree:getNextUnlockHint(src)` (recipe-oriented label + need line).
+## Cache
+
+Per-player `UnlockedCache[src]` keyed `categoryUid:skillUid` via `GetUnlockedSkills` on load.
+
+Events (**AddEventHandler**, not RegisterNetEvent — local server events):
+
+- `ml_skills:server:playerLoaded` → rebuild cache
+- `ml_skills:server:skillUnlocked` → update cache + `sanctuary_crafting:client:recipeSkillUpdated`
+- `ml_skills:server:playerUnloaded` → clear cache (character switch)
+
+Hot restart / ensure: rebuild for online players. Opening craft with ~200 recipes = **cache lookups**, not 200 exports.
+
+Levels cached; refreshed after our `AddXp`.
+
+## Gate order (`CheckRecipeGates` / pipeline)
+
+enabled → station → specialization → ML level → ML unlock → blueprint → tools → materials → queue → other
+
+Reasons: `skill_locked` / `craft_skill_required`, `skill_level_low` / `craft_level_required`, `skills_unavailable`, `missing_blueprint`, …
+
+NUI `skillState` is **display only** — server authoritative. Never trust client `unlocked=true`.
+
+Visual priority: `LOCKED_SKILL` > `LOCKED_LEVEL` > `LOCKED_BLUEPRINT` > `MISSING_TOOL` > `MISSING_MATERIALS` > `CRAFTABLE`.
+
+Missing skill → **VERROUILLÉ** (never PRESQUE).
+
+## UI
+
+- SAVOIR REQUIS / level / ✓ or ✕
+- Locked: FABRIQUER disabled + “Connaissance non apprise” + **VOIR DANS LES SAVOIRS** → `OpenSkillTree(categoryUid)`
+- Search still finds `visible_locked`
+- Favorites/follow OK
+- Carnet: objectif `Apprendre X dans Survie`
+- On open, if ML data not loaded → “Chargement des savoirs...” briefly (no flash-all-locked)
+
+## Admin
+
+- `/craftskillcheck` — ml_skills started, categories count, gated recipes, valid/invalid mappings
+- Callback `sanctuary_crafting:adminMlSkills` — GetSkillTrees + health (editor open / refresh only)
+- Button concept: **RAFRAÎCHIR ML SKILLS** → refresh labels; block save on invalid skill unless manual mode
+
+## Test checklist
+
+- [ ] Locked recipe: cannot craft; VERROUILLÉ; CTA opens OpenSkillTree
+- [ ] Unlock hot path: skillUnlocked → cache → recipeSkillUpdated → craftable
+- [ ] Level gate: skill_level_low / craft_level_required
+- [ ] Visibility: visible_locked / hidden_until_unlocked / discovered_locked
+- [ ] Reconnect: cache rebuild on playerLoaded
+- [ ] Character switch: playerUnloaded clears cache
+- [ ] Hot restart ml_skills / craft: caches rebuild
+- [ ] ml_skills stopped: failClosed locks gated; free recipes work
+- [ ] Unknown skill uid: startup log; invalid mapping in /craftskillcheck
+- [ ] XP once on collect; no double XP (xpGranted)
+- [ ] Cache perf: 200 recipes menu without per-recipe export storm
+- [ ] Anti-cheat: client unlocked=true ignored; server CheckRecipeGates
+
+## Residuals
+
+Comments/docs may mention historical SST/DevHub. Runtime unlock path is **ml_skills only** through `Skills.*`.

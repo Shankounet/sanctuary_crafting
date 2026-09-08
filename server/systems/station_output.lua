@@ -25,6 +25,10 @@ function StationOutput.Enabled()
 end
 
 function StationOutput.XpOnCollect()
+    local integ = Config.SkillIntegration
+    if type(integ) == 'table' and integ.xpOn then
+        return integ.xpOn == 'collect'
+    end
     local on = cfg().XpOn
     return on == 'collect'
 end
@@ -386,7 +390,11 @@ local function grantXp(src, recipe, batch, meta)
     if not src or src == 0 then return false end
     if not recipe then return false end
     batch = batch or 1
-    local xp = (meta and meta.xp) or recipe.xp
+    local xp = (meta and meta.xp) or recipe.skillXp or recipe.xp
+    if (not xp or not xp.category) and SkillTree and SkillTree.XpAmount then
+        local cat, amt = SkillTree.XpAmount(recipe)
+        if cat and amt then xp = { category = cat, amount = amt } end
+    end
     if xp and xp.category and xp.amount and CraftingSkills and CraftingSkills.AddCraftXp then
         CraftingSkills.AddCraftXp(src, xp.category, (xp.amount or 0) * batch)
         if NewlyLearned and NewlyLearned.ScanLevelUnlocks then
@@ -452,8 +460,11 @@ function StationOutput.BuildSnapshot(src, recipe, bench, craftId, batch)
         if quality then meta.quality = quality end
     end
     meta = meta or {}
-    if recipe and recipe.xp then
-        meta.xp = { category = recipe.xp.category, amount = recipe.xp.amount }
+    if recipe and (recipe.skillXp or recipe.xp) then
+        local xpSrc = recipe.skillXp or recipe.xp
+        local cat = xpSrc.category
+        if (not cat) and recipe.requiredSkill and type(recipe.requiredSkill) == 'table' then cat = recipe.requiredSkill.category end
+        meta.xp = { category = cat, amount = xpSrc.amount }
     end
     -- Byproducts rolled once at complete, stored (given on collect)
     local extras = {}

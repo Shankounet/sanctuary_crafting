@@ -231,7 +231,7 @@ Config.StationOutput = {
     SameStationOnly = true,
     -- XP + mastery: 'complete' (default, offline still gets XP on next login)
     --             | 'collect' (only when the player picks up the item)
-    XpOn = 'complete',
+    XpOn = 'collect', -- synced with Config.SkillIntegration.xpOn (prefer collect)
 }
 
 -- Who may collect station output.

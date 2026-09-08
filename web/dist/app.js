@@ -170,6 +170,8 @@
   }
 
   function computeAlmost(r) {
+    if (isSkillLockedRecipe(r)) return false;
+    if (r && (r.lockReason === 'craft_skills_unavailable' || r.lockReason === 'skills_unavailable')) return false;
     if (!r || r.canCraft) return false;
     if (r.almostCraftable === false) return false;
     if (r.almostCraftable === true) return true;
@@ -562,14 +564,19 @@
       return 'Niveau requis';
     },
     craft_skill_required: (r) => {
+      const sk = (r.lockArgs && r.lockArgs[0]) || r.requiredSkillLabel || (r.skillState && r.skillState.label);
+      if (sk && !looksLikeUid(sk)) return `Savoir requis : ${sk}`;
+      return 'Connaissance non apprise';
+    },
+    skill_locked: (r) => {
       const sk = (r.lockArgs && r.lockArgs[0]) || r.requiredSkillLabel;
-      if (sk && !looksLikeUid(sk)) return `Talent requis ${sk}`;
-      return 'Talent requis';
+      if (sk && !looksLikeUid(sk)) return `Savoir requis : ${sk}`;
+      return 'Connaissance non apprise';
     },
     craft_recipe_locked: (r) => {
       const sk = (r.lockArgs && r.lockArgs[0]) || r.skilltreeSkillLabel || r.requiredSkillLabel;
-      if (sk && !looksLikeUid(sk)) return `Débloque dans l'arbre : ${sk}`;
-      return 'Recette verrouillée — arbre de talents';
+      if (sk && !looksLikeUid(sk)) return `Savoir requis : ${sk}`;
+      return 'Connaissance non apprise';
     },
     craft_blueprint_required: (r) => {
       const bp = (r.lockArgs && r.lockArgs[0]) || r.requireBlueprint;
@@ -598,7 +605,7 @@
     let tag = 'VERROUILLÉ';
     if (r.lockReason === 'craft_blueprint_required') tag = 'PLAN REQUIS';
     else if (r.lockReason === 'craft_level_required' || r.lockReason === 'craft_station_level') tag = 'NIVEAU REQUIS';
-    else if (r.lockReason === 'craft_skill_required' || r.lockReason === 'craft_recipe_locked') tag = 'ARBRE REQUIS';
+    else if (r.lockReason === 'craft_skill_required' || r.lockReason === 'skill_locked' || r.lockReason === 'craft_recipe_locked') tag = 'VERROUILLÉ';
     return { text, cls: 'warn', tag };
   }
 
@@ -612,20 +619,57 @@
     ev.stopPropagation();
     const recipeId = btn.getAttribute('data-recipe-id');
     const skillUid = btn.getAttribute('data-skill-uid');
+    const categoryUid = btn.getAttribute('data-category-uid');
     fetch(`https://${GetParentResourceName()}/openSkilltreeForRecipe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=UTF-8' },
-      body: JSON.stringify({ recipeId, skillUid }),
+      body: JSON.stringify({ recipeId, skillUid, categoryUid, openSkillsCategory: categoryUid }),
     }).catch(() => {});
   }, true);
 
-  function skilltreeCtaHtml(r) {
+    function isSkillLockedRecipe(r) {
+    if (!r) return false;
+    return r.lockReason === 'craft_skill_required'
+      || r.lockReason === 'skill_locked'
+      || r.lockReason === 'craft_recipe_locked'
+      || r.lockKind === 'ml_skill'
+      || (r.skillState && r.skillState.unlocked === false && (r.requiredSkill || r.requireSkill));
+  }
+
+  function savoirRequisHtml(r) {
+    if (!r) return '';
+    if (r.skillState && r.skillState.loading) {
+      return `<div class="savoir-requis loading">Chargement des savoirs...</div>`;
+    }
+    const lab = talentLabelOf(r) || (r.skillState && r.skillState.label);
+    const needLvl = (r.skillState && r.skillState.requireLevel) || r.requireLevel || (r.skillTree && r.skillTree.requiredLevel);
+    const curLvl = playerLevelOf(r);
+    const unlocked = typeof r.hasRequiredSkill === 'boolean' ? r.hasRequiredSkill : (r.skillState && r.skillState.unlocked);
+    if (!lab && needLvl == null) return '';
+    const mark = unlocked === true ? '✓' : (unlocked === false ? '✕' : '…');
+    const lvlBit = needLvl != null ? ` · niv. ${curLvl != null ? curLvl : '—'} / ${needLvl}` : '';
+    const name = lab && !looksLikeUid(lab) ? lab : 'Savoir requis';
+    return `<div class="savoir-requis" title="Savoir requis">SAVOIR REQUIS : ${escapeHtml(name)}${lvlBit} <span class="mark">${mark}</span></div>`;
+  }
+
+function skilltreeCtaHtml(r) {
     if (!r || r.canCraft) return '';
-    const lockedByTree = r.lockReason === 'craft_recipe_locked' || r.lockKind === 'skilltree_recipe' || r.openSkilltree;
-    if (!lockedByTree && r.lockReason !== 'craft_skill_required') return '';
+    const lockedBySkill = r.lockReason === 'craft_recipe_locked'
+      || r.lockReason === 'craft_skill_required'
+      || r.lockReason === 'skill_locked'
+      || r.lockKind === 'ml_skill'
+      || r.lockKind === 'skilltree_recipe'
+      || r.openSkilltree;
+    if (!lockedBySkill) return '';
     const recipeId = r.id;
-    const skillUid = r.skilltreeSkillUid || (r.lockArgs && r.lockArgs[1]) || '';
-    return `<button type="button" class="btn ghost btn-skilltree-open" title="Ouvrir l'arbre de compétences" data-recipe-id="${recipeId || ''}" data-skill-uid="${skillUid || ''}">VOIR DANS L'ARBRE</button>`;
+    const skillUid = r.skilltreeSkillUid || (r.skillState && r.skillState.skillUid) || (r.lockArgs && r.lockArgs[1]) || '';
+    const categoryUid = r.openSkillsCategory
+      || (r.skillState && r.skillState.categoryUid)
+      || r.skilltreeCategoryUid
+      || (r.requiredSkill && r.requiredSkill.category)
+      || r.skillCategory
+      || '';
+    return `<button type="button" class="btn ghost btn-skilltree-open" title="Voir dans les savoirs" data-recipe-id="${recipeId || ''}" data-skill-uid="${skillUid || ''}" data-category-uid="${categoryUid || ''}">VOIR DANS LES SAVOIRS</button>`;
   }
 
   function knowledgeMarkHtml(kn) {
@@ -667,6 +711,20 @@
   }
 
   function cardStatus(r) {
+    if (r && r.skillState && r.skillState.loading) {
+      return { text: 'CHARGEMENT', cls: 'warn', tip: 'Chargement des savoirs...' };
+    }
+    const skillLock = r && (
+      r.lockReason === 'craft_skill_required'
+      || r.lockReason === 'skill_locked'
+      || r.lockReason === 'craft_recipe_locked'
+      || r.lockKind === 'ml_skill'
+      || (r.skillState && r.skillState.visualStatus === 'LOCKED_SKILL')
+    );
+    if (skillLock) {
+      const tip = (r.lockHint) || (typeof LOCK_LABELS.craft_skill_required === 'function' && LOCK_LABELS.craft_skill_required(r)) || 'Connaissance non apprise';
+      return { text: 'VERROUILLÉ', cls: 'bad', tip };
+    }
     if (r.canCraft) {
       const bits = ['Prêt à fabriquer'];
       if (r.duration) bits.push(`Durée ${durationLabel(r.duration)}`);
@@ -674,7 +732,7 @@
       return { text: 'FAISABLE', cls: 'ok', tip: bits.join(' · ') };
     }
     const almostEnabled = uxOn('almostCraftable', true);
-    if (almostEnabled && computeAlmost(r)) {
+    if (almostEnabled && computeAlmost(r) && !skillLock) {
       const tip = r.almostReason || almostMissingTip(r);
       return { text: 'PRESQUE', cls: 'almost', tip };
     }
@@ -1694,7 +1752,10 @@
       locksEl.parentElement.appendChild(cta);
     }
     if (cta) {
-      cta.innerHTML = skilltreeCtaHtml(r);
+      const savoir = savoirRequisHtml(r);
+      const ctaBtn = skilltreeCtaHtml(r);
+      const unlearned = isSkillLockedRecipe(r) ? `<div class="savoir-unlearned">Connaissance non apprise</div>` : '';
+      cta.innerHTML = `${savoir}${unlearned}${ctaBtn}`;
     }
 
     const qh = qualityHint(r);
@@ -2453,7 +2514,8 @@
       if (matsLine) matsLine.classList.remove('is-short');
     }
 
-    const canMats = !!(recipe && recipe.canCraft);
+    const skillLocked = !!(recipe && isSkillLockedRecipe(recipe));
+    const canMats = !!(recipe && recipe.canCraft) && !skillLocked;
     const can = canMats && !full && !state.craftInflight;
     const craftBtn = $('#btn-craft');
     if (craftBtn) {
@@ -3904,6 +3966,15 @@
           if (row.label) state.selected.skillCategoryLabel = row.label;
         }
         if (typeof selectRecipe === 'function') selectRecipe(state.selected);
+      }
+    } else if (msg.action === 'recipeSkillUpdated') {
+      // Hot unlock: refresh menu from cache (no export storm)
+      if (typeof refresh === 'function') {
+        refresh().catch(() => {});
+      } else {
+        post('refresh', { benchKey: state.benchKey }).then((menu) => {
+          if (menu && menu.ok && typeof applyMenu === 'function') applyMenu(menu);
+        });
       }
     } else if (msg.action === 'close' || msg.action === 'craftUiClose') {
       // Close craft catalogue only — do NOT cancel active craft / clear craftId.
