@@ -141,7 +141,7 @@ function SurvivalBook.CraftTreeMasked(src, recipeId, depth)
     return nodeFor(recipeId, depth)
 end
 
---- Progression READ-ONLY from CraftingSkills.Snapshot (sanctuary_skilltree)
+--- Progression READ-ONLY from CraftingSkills.Snapshot (ml_skills)
 function SurvivalBook.GetProgression(src)
     if not BookDB.Mod('Progression') then return { available = false } end
     local keys = {}
@@ -180,39 +180,19 @@ function SurvivalBook.GetProgression(src)
     return {
         available = available and true or false,
         levels = levels,
-        note = 'skilltree_readonly',
+        note = 'ml_skills_readonly',
     }
 end
 
 --- Next unlocks from recipes (level/skill gates the player is close to)
---- Prefers sanctuary_skilltree follow hint for « Prochain déblocage » (recipe-oriented).
+--- Prefers ml_skills follow hint for « Prochain déblocage » (recipe-oriented).
 function SurvivalBook.NextUnlocks(src, limit)
     if not BookDB.Mod('NextUnlocks') then return {} end
     limit = limit or 12
     local progression = SurvivalBook.GetProgression(src)
     local out = {}
 
-    if GetResourceState('sanctuary_skilltree') == 'started' then
-        local ok, hint = pcall(function()
-            return exports.sanctuary_skilltree:getNextUnlockHint(src)
-        end)
-        if ok and type(hint) == 'table' and (hint.label or hint.recipeId) then
-            out[#out + 1] = {
-                recipeId = hint.recipeId,
-                label = hint.label,
-                requireLevel = hint.requireLevel,
-                requiredSkillLabel = hint.requiredSkillLabel or hint.skillLabel,
-                requireSkill = hint.requireSkill,
-                category = hint.categoryUid,
-                station = hint.station,
-                kind = 'skilltree_follow',
-                delta = hint.requireLevel and 0 or 1,
-                need = hint.need,
-                openSkilltree = true,
-                skillUid = hint.skillUid,
-            }
-        end
-    end
+    -- ml_skills has no getNextUnlockHint export; craft-local gates below.
     for id, r in pairs(Config.RecipeById or {}) do
         local g = SkillTree and SkillTree.RecipeGate and SkillTree.RecipeGate(r) or {}
         local req = g.requiredLevel
@@ -232,11 +212,16 @@ function SurvivalBook.NextUnlocks(src, limit)
             local cat = g.category
             if not CraftingSkills.HasSkill(src, cat, g.requiredSkill) then
                 local lab = CraftingSkills.SkillLabel and CraftingSkills.SkillLabel(g.requiredSkill, cat) or nil
+                local catLab = SkillTree and SkillTree.CategoryLabel and SkillTree.CategoryLabel(cat) or cat
                 out[#out + 1] = {
                     recipeId = id, label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(r)) or r.label,
                     requireSkill = lab or nil,
                     requiredSkillLabel = lab,
                     category = r.category, kind = 'skill',
+                    need = lab and ('Apprendre %s dans %s'):format(lab, catLab or 'Survie') or 'Savoir requis',
+                    openSkilltree = true,
+                    skillUid = g.requiredSkill,
+                    categoryUid = SkillTree and SkillTree.CategoryUid and SkillTree.CategoryUid(cat) or nil,
                 }
             end
         end

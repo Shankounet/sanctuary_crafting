@@ -1,6 +1,13 @@
 --[[
-    shared/skill_tree.lua — category KEY resolution + one-time recipe migration.
-    No skilltree exports here. UIDs live only in Config.SkillCategories (+ legacy map).
+    shared/skill_tree.lua — category KEY resolution + recipe skill schema migration.
+    No ml_skills exports here. UIDs live in Config.SkillCategories (+ CategoryMapping).
+
+    Canonical recipe skill fields:
+      requiredSkill = nil | { category, uid, level? }
+      requiredSkills = { mode = 'all'|'any', skills = { ... } }
+      skillVisibility = 'visible_locked' | 'hidden_until_unlocked' | 'discovered_locked'
+      skillXp = { category?, amount }
+    Legacy skillTree / require* / hideIfSkillLocked migrated at NormalizeRecipe.
 ]]
 
 SkillTree = SkillTree or {}
@@ -18,6 +25,9 @@ function SkillTree.ResolveKey(raw)
     if cats[raw] then return raw end
     local lower = raw:lower()
     if cats[lower] then return lower end
+    local map = (Config.SkillIntegration and Config.SkillIntegration.CategoryMapping) or {}
+    if map[raw] and cats[map[raw]] then return map[raw] end
+    if map[lower] and cats[map[lower]] then return map[lower] end
     local legacy = (Config.SkillLegacyMap or {})[raw] or (Config.SkillLegacyMap or {})[lower]
     if legacy and cats[legacy] then return legacy end
     for key, def in pairs(cats) do
@@ -32,7 +42,11 @@ end
 ---@return string|nil
 function SkillTree.CategoryUid(catKey)
     local key = SkillTree.ResolveKey(catKey)
-    if not key then return nil end
+    if not key then
+        local map = Config.SkillIntegration and Config.SkillIntegration.CategoryMapping
+        if type(map) == 'table' and map[catKey] then return map[catKey] end
+        return catKey -- may already be a published UID
+    end
     local def = cfgCats()[key]
     return def and def.categoryUid or nil
 end
@@ -70,23 +84,64 @@ local function strOrNil(v)
     return v
 end
 
---- Canonical gate table from skillTree / requiredSkillTree / legacy require* / skill / xp.
+--- Canonical gate table from requiredSkill / requiredSkills / skillTree / legacy.
 ---@param recipe table
----@return table { category, requiredLevel, requiredSkill }
+---@return table { category, requiredLevel, requiredSkill, visibility }
 function SkillTree.RecipeGate(recipe)
     if type(recipe) ~= 'table' then
-        return { category = nil, requiredLevel = nil, requiredSkill = nil }
+        return { category = nil, requiredLevel = nil, requiredSkill = nil, visibility = 'visible_locked' }
     end
+
+    local visibility = recipe.skillVisibility
+        or (recipe.hideIfSkillLocked and 'hidden_until_unlocked')
+        or 'visible_locked'
+
+    -- New schema: requiredSkill table
+    if type(recipe.requiredSkill) == 'table' then
+        local rs = recipe.requiredSkill
+        return {
+            category = SkillTree.ResolveKey(rs.category or rs.cat or rs.categoryUid),
+            requiredLevel = numOrNil(rs.level or rs.requiredLevel or rs.requireLevel),
+            requiredSkill = strOrNil(rs.uid or rs.skillUid or rs.skill),
+            visibility = visibility,
+        }
+    end
+
+    -- requiredSkills multi
+    if type(recipe.requiredSkills) == 'table' then
+        local list = recipe.requiredSkills.skills or recipe.requiredSkills
+        local first = type(list) == 'table' and (list[1] or nil) or nil
+        if not first then
+            for _, v in pairs(type(list) == 'table' and list or {}) do
+                if type(v) == 'table' then first = v break end
+            end
+        end
+        if type(first) == 'table' then
+            return {
+                category = SkillTree.ResolveKey(first.category or first.cat or first.categoryUid),
+                requiredLevel = numOrNil(first.level or first.requiredLevel),
+                requiredSkill = strOrNil(first.uid or first.skillUid or first.skill),
+                visibility = visibility,
+            }
+        end
+    end
+
     local st = recipe.skillTree or recipe.requiredSkillTree
     local category, requiredLevel, requiredSkill
     if type(st) == 'table' then
         category = st.category or st.catKey or st.cat
         requiredLevel = st.requiredLevel or st.requireLevel or st.level
         requiredSkill = st.requiredSkill or st.requireSkill or st.skill
+        if type(requiredSkill) == 'table' then
+            category = requiredSkill.category or category
+            requiredLevel = requiredSkill.level or requiredLevel
+            requiredSkill = requiredSkill.uid or requiredSkill.skillUid
+        end
     end
     if not category then
         category = recipe.requireSkillCategory or recipe.skillCategory
-            or recipe.skill or (recipe.xp and recipe.xp.category)
+            or (type(recipe.requiredSkill) == 'string' and (recipe.xp and recipe.xp.category))
+            or (recipe.xp and recipe.xp.category)
             or (recipe.station and SkillTree.StationCategory(recipe.station))
     end
     if requiredLevel == nil then
@@ -103,20 +158,49 @@ function SkillTree.RecipeGate(recipe)
         category = key,
         requiredLevel = numOrNil(requiredLevel),
         requiredSkill = strOrNil(requiredSkill),
+        visibility = visibility,
     }
 end
 
 function SkillTree.NeedsGate(recipe)
     local g = SkillTree.RecipeGate(recipe)
     return (g.requiredLevel ~= nil) or (g.requiredSkill ~= nil)
+        or (type(recipe) == 'table' and type(recipe.requiredSkills) == 'table')
 end
 
---- Mutate recipe in place: skillTree KEY form + mirrored require* + xp.category KEY.
+--- Mutate recipe in place toward canonical requiredSkill (+ mirrored legacy skillTree).
 ---@param recipe table
 ---@return table
 function SkillTree.NormalizeRecipe(recipe)
     if type(recipe) ~= 'table' then return recipe end
+
+    -- Uncertain DevHub/SST-only fields without clear mapping
+    if not recipe.requiredSkill and not recipe.requiredSkills and not recipe.skillTree
+        and not recipe.requireSkill and not recipe.requireLevel then
+        if recipe.devhubSkill or recipe.sanctuary_skilltree or recipe.sstSkill then
+            print(('[CRAFT] UNMAPPED RECIPE SKILL id=%s — left free (no dangerous rewrite)'):format(
+                tostring(recipe.id or '?')))
+        end
+    end
+
     local g = SkillTree.RecipeGate(recipe)
+
+    if type(recipe.requiredSkill) == 'table' then
+        local rs = recipe.requiredSkill
+        local cat = SkillTree.ResolveKey(rs.category or rs.cat or rs.categoryUid) or rs.category
+        recipe.requiredSkill = {
+            category = cat,
+            uid = strOrNil(rs.uid or rs.skillUid or rs.skill),
+            level = numOrNil(rs.level or rs.requiredLevel or rs.requireLevel),
+        }
+    elseif g.category or g.requiredLevel or g.requiredSkill then
+        recipe.requiredSkill = {
+            category = g.category,
+            uid = g.requiredSkill,
+            level = g.requiredLevel,
+        }
+    end
+
     if g.category or g.requiredLevel or g.requiredSkill then
         recipe.skillTree = {
             category = g.category,
@@ -124,21 +208,52 @@ function SkillTree.NormalizeRecipe(recipe)
             requiredSkill = g.requiredSkill,
         }
     end
+
+    if not recipe.skillVisibility then
+        if recipe.hideIfSkillLocked then
+            recipe.skillVisibility = 'hidden_until_unlocked'
+        else
+            recipe.skillVisibility = g.visibility or 'visible_locked'
+        end
+    end
+
     recipe.requireLevel = g.requiredLevel
     recipe.requireSkill = g.requiredSkill
     recipe.requireSkillCategory = nil
-    if type(recipe.xp) == 'table' then
+
+    -- skillXp → xp (category defaults to requiredSkill.category)
+    if type(recipe.skillXp) == 'table' then
+        local cat = SkillTree.ResolveKey(recipe.skillXp.category)
+            or (recipe.requiredSkill and recipe.requiredSkill.category)
+            or g.category
+        recipe.xp = recipe.xp or {}
+        if type(recipe.xp) ~= 'table' then recipe.xp = {} end
+        recipe.xp.category = cat or recipe.xp.category
+        recipe.xp.amount = tonumber(recipe.skillXp.amount) or recipe.xp.amount
+    elseif type(recipe.xp) == 'table' then
         local xpKey = SkillTree.ResolveKey(recipe.xp.category) or g.category
         if xpKey then recipe.xp.category = xpKey end
         recipe.xp.amount = tonumber(recipe.xp.amount) or recipe.xp.amount
     end
+
     return recipe
 end
 
 function SkillTree.XpAmount(recipe)
-    if type(recipe) ~= 'table' or type(recipe.xp) ~= 'table' then return nil, nil end
-    local key = SkillTree.ResolveKey(recipe.xp.category)
-    local amt = tonumber(recipe.xp.amount)
+    if type(recipe) ~= 'table' then return nil, nil end
+    local xp = recipe.skillXp or recipe.xp
+    if type(xp) ~= 'table' then return nil, nil end
+    local key = SkillTree.ResolveKey(xp.category)
+        or (recipe.requiredSkill and type(recipe.requiredSkill) == 'table' and recipe.requiredSkill.category)
+    local amt = tonumber(xp.amount)
     if not key or not amt or amt <= 0 then return key, nil end
     return key, amt
+end
+
+function SkillTree.IsHiddenForPlayer(recipe, hasSkill)
+    local vis = recipe and (recipe.skillVisibility or (recipe.hideIfSkillLocked and 'hidden_until_unlocked'))
+    if vis == 'hidden_until_unlocked' and hasSkill == false then
+        return true
+    end
+    return false
 end

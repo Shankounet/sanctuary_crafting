@@ -4,7 +4,7 @@ lua54 'yes'
 
 name 'sanctuary_crafting'
 author 'Shankounet / Sanctuary'
-description 'Plateforme de craft post-apo + Carnet de survie — ESX, ox_*, sanctuary_skilltree, NUI industrielle'
+description 'Plateforme de craft post-apo + Carnet de survie — ESX, ox_*, ml_skills, NUI industrielle'
 version '2.30.1'
 
 ui_page 'web/dist/index.html'
@@ -58,6 +58,7 @@ client_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     -- integrations
+    'server/integrations/ml_skills.lua',
     'server/integrations/crafting_skills.lua',
     'server/integrations/permissions.lua',
     'server/integrations/ox_items.lua',
@@ -116,10 +117,10 @@ dependencies {
     'ox_inventory',
     'ox_target',
     'oxmysql',
-    -- sanctuary_skilltree: soft runtime prefer (see Config.SkillSystem). Not hard-dep so
-    -- servers can boot craft while skilltree is ensure'd just before it.
+    -- ml_skills: soft runtime (GetResourceState). Prefer ensure before craft.
+    -- failClosed: skill-gated recipes stay locked if ml_skills is down.
 }
 
--- Ensure order (server.cfg): oxmysql → ox_lib → es_extended → sanctuary_skilltree → sanctuary_crafting
--- DevHub no longer required at runtime once sanctuary_skilltree is started.
--- Skill tree down: [CRAFT] sanctuary_skilltree is not started… Gates fail closed; ungated crafts still work.
+-- Ensure order (server.cfg): oxmysql → ox_lib → es_extended → ml_skills → sanctuary_crafting
+-- sanctuary_skilltree / DevHub are NOT recipe-unlock providers.
+-- ml_skills down: [CRAFT] ml_skills is not started… Gates fail closed; free crafts still work.

@@ -468,24 +468,20 @@ local function refreshSkillsIfOpen()
     end
 end
 
--- Sanctuary (Phase 4) + optional DevHub fallback — refresh only, never grant XP.
-RegisterNetEvent('sanctuary_skilltree:xpChanged', function(_categoryUid, _result)
+-- ml_skills — refresh only, never grant XP. Client HasUnlockedSkill is feedback-only.
+RegisterNetEvent('sanctuary_crafting:client:recipeSkillUpdated', function(_payload)
+    refreshSkillsIfOpen()
+    if nuiOpen then
+        SendNUIMessage({ action = 'recipeSkillUpdated', data = _payload or {} })
+    end
+end)
+
+-- Soft listen for common ml_skills client signals if present (no invented unlock grants).
+RegisterNetEvent('ml_skills:client:skillUnlocked', function(_payload)
     refreshSkillsIfOpen()
 end)
 
-RegisterNetEvent('sanctuary_skilltree:levelUp', function(_categoryUid, _result)
-    refreshSkillsIfOpen()
-end)
-
-RegisterNetEvent('sanctuary_skilltree:skillUnlocked', function(_payload)
-    refreshSkillsIfOpen()
-end)
-
-RegisterNetEvent('devhub_skillTree:client:listener:newXp', function(_categoryUid, _amount)
-    refreshSkillsIfOpen()
-end)
-
-RegisterNetEvent('devhub_skillTree:client:listener:levelUp', function(_categoryUid, _newLevel)
+RegisterNetEvent('ml_skills:client:levelUp', function(_categoryUid, _newLevel)
     refreshSkillsIfOpen()
 end)
 
@@ -553,19 +549,47 @@ RegisterNetEvent('sanctuary_crafting:client:craftResumed', function(payload)
 end)
 
 --------------------------------------------------------------------------------
--- Tech progression: open skilltree focused on recipe unlock
+-- Open ml_skills tree (official: OpenSkillTree(categoryUid) — NO focus-node export)
 --------------------------------------------------------------------------------
+local function openMlSkillTree(categoryUid)
+    if type(categoryUid) ~= 'string' or categoryUid == '' then return false end
+    if GetResourceState('ml_skills') ~= 'started' then return false end
+    local ok = pcall(function()
+        exports.ml_skills:OpenSkillTree(categoryUid)
+    end)
+    return ok == true
+end
+
+--- Client feedback only. If GetPlayerData() nil → loading/unknown, not locked.
+function ClientHasUnlockedSkill(categoryUid, skillUid)
+    if GetResourceState('ml_skills') ~= 'started' then return nil, 'unavailable' end
+    local okData, pdata = pcall(function()
+        return exports.ml_skills:GetPlayerData()
+    end)
+    if not okData or pdata == nil then
+        return nil, 'loading'
+    end
+    local ok, has = pcall(function()
+        return exports.ml_skills:HasUnlockedSkill(categoryUid, skillUid)
+    end)
+    if not ok then return nil, 'error' end
+    return has == true, nil
+end
+
 RegisterNUICallback('openSkilltreeForRecipe', function(data, cb)
-    local recipeId = data and data.recipeId
+    local categoryUid = data and (data.categoryUid or data.openSkillsCategory)
     SetNuiFocus(false, false)
     SendNUIMessage({ action = 'close' })
-    if type(recipeId) == 'string' and recipeId ~= '' then
-        if GetResourceState('sanctuary_skilltree') == 'started' then
-            pcall(function()
-                exports.sanctuary_skilltree:openSkillForRecipe(recipeId)
-            end)
-            TriggerEvent('sanctuary_skilltree:openSkillForRecipe', recipeId)
-        end
-    end
+    nuiOpen = false
+    openMlSkillTree(categoryUid)
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('openMlSkills', function(data, cb)
+    local categoryUid = data and data.categoryUid
+    SetNuiFocus(false, false)
+    SendNUIMessage({ action = 'close' })
+    nuiOpen = false
+    openMlSkillTree(categoryUid)
     cb({ ok = true })
 end)
