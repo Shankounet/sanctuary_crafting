@@ -1406,20 +1406,39 @@ function skilltreeCtaHtml(r) {
       categoryLabel: sk.categoryLabel && !looksLikeUid(sk.categoryLabel) ? sk.categoryLabel : (frLabel(sk.categoryKey, null) || ''),
     }));
 
-    // Dedupe identical skills (categoryKey + uid, else label) — merge level if present
+    // Defensive dedupe only — server already normalizes by provider:categoryUid:skillUid.
+    // NEVER dedupe by label alone. When recipe is skill-locked, never promote unlocked→true.
     {
+      const skillLocked = isSkillLockedRecipe(r);
       const seen = new Map();
       const deduped = [];
       skills.forEach((sk) => {
-        const key = `${sk.categoryKey || ''}::${sk.skillUid || sk.skillLabel || ''}`;
+        const uid = sk.skillUid || '';
+        const key = `${sk.provider || 'ml_skills'}:${sk.categoryUid || sk.categoryKey || ''}:${uid}`;
+        // Skip label-only keys colliding across different uids
         const prev = seen.get(key);
         if (prev) {
           if (sk.requireLevel != null && prev.requireLevel == null) prev.requireLevel = sk.requireLevel;
           if (sk.level != null && prev.level == null) prev.level = sk.level;
-          if (sk.unlocked === true) prev.unlocked = true;
-          else if (prev.unlocked == null && sk.unlocked != null) prev.unlocked = sk.unlocked;
           if (!prev.skillLabel && sk.skillLabel) prev.skillLabel = sk.skillLabel;
+          // Merge unlocked conservatively: true only if both agree true; locked recipe → false wins
+          if (skillLocked) {
+            if (sk.unlocked === false || prev.unlocked === false) prev.unlocked = false;
+            else if (sk.unlocked === true && prev.unlocked === true) prev.unlocked = true;
+            else prev.unlocked = false;
+          } else if (sk.unlocked === true && prev.unlocked === true) {
+            prev.unlocked = true;
+          } else if (sk.unlocked === false || prev.unlocked === false) {
+            prev.unlocked = false;
+          } else if (prev.unlocked == null && sk.unlocked != null) {
+            prev.unlocked = sk.unlocked;
+          }
           return;
+        }
+        // Coerce: only boolean true stays ✓-eligible
+        if (sk.unlocked !== true) {
+          if (sk.unlocked === false || skillLocked) sk.unlocked = false;
+          else sk.unlocked = null;
         }
         seen.set(key, sk);
         deduped.push(sk);
@@ -1451,6 +1470,7 @@ function skilltreeCtaHtml(r) {
     }
 
     const mode = (ss.mode === 'any' || (r.requiredSkills && r.requiredSkills.mode === 'any')) ? 'any' : 'all';
+    // "Tous requis" / plural ONLY when 2+ distinct skills (not duplicate lines, not level-only).
     const multi = skillLines.length > 1;
     const anyMissingSkill = skillLines.some((sk) => sk.unlocked === false)
       || (skillLines.length && isSkillLockedRecipe(r) && skillLines.every((sk) => sk.unlocked !== true));
@@ -1518,8 +1538,9 @@ function skilltreeCtaHtml(r) {
       html += `<div class="savoir-cat-name">${ico}<span>${escapeHtml(catName)}</span></div>`;
 
       (g.skills || []).forEach((sk) => {
+        // Green check ONLY on explicit boolean true — null/undefined never ✓
         const ok = sk.unlocked === true;
-        const missing = sk.unlocked === false || (sk.unlocked == null && isSkillLockedRecipe(r));
+        const missing = !ok && (isSkillLockedRecipe(r) || sk.unlocked === false);
         const mark = ok ? '✓' : (missing ? '✕' : '…');
         const cls = ok ? 'ok' : (missing ? 'bad' : '');
         let just = '';

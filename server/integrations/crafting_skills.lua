@@ -108,6 +108,10 @@ function CraftingSkills.ParseRecipeRequirement(recipe)
     return Skills.ParseRecipeRequirement(recipe)
 end
 
+function CraftingSkills.normalizeSkillRequirements(recipe, src)
+    return Skills.normalizeSkillRequirements(recipe, src)
+end
+
 function CraftingSkills.HealthReport()
     return Skills.HealthReport()
 end

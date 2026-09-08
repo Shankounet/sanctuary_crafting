@@ -121,6 +121,23 @@ Uncertain DevHub/SST-only fields → log `UNMAPPED RECIPE SKILL`, **no** dangero
 4. After unlock (`ml_skills:server:skillUnlocked`), cache updates and craft UI refreshes without 200 export calls.
 5. XP granted once on **collect** (`xpGranted` flag).
 
+## Unlock boolean (strict)
+
+`Skills.HasUnlockedSkill` calls **only** `exports.ml_skills:HasUnlockedSkill(categoryUid, skillUid, source)`.
+
+- Success requires `pcall ok` **and** `result == true`. Anything else (error, nil, non-boolean) → **false** (fail closed).
+- Cache keys are **only** `categoryUid:skillUid` from `GetUnlockedSkills` (no bare `skillUid`, no category-wide `true`).
+- Rebuild on `playerLoaded` / clear on `playerUnloaded`. Stale positives are healed when the live export returns non-true.
+
+### FacingSkill / NUI
+
+- `normalizeSkillRequirements(recipe)` is the **data-source** unique list (dedupe key `provider:categoryUid:skillUid`, never label alone).
+- Merges `requiredSkill` + `requiredSkills` + migrated `skillTree` / `require*`; **ignores** SST/DevHub/sanctuary leftovers (admin log, not OR’d into gates).
+- `FacingSkill` sets each `skills[].unlocked` with the same strict check and **reconciles** with `CheckRecipeRequirement`: never ✓ when lockReason is `craft_skill_required` / `skill_locked`.
+- NUI shows ✓ only when `unlocked === true`. `"Tous requis"` / plural title only if **2+ distinct** skills after normalize.
+
+Debug: `Config.SkillIntegration.debug = true` and `/craftskilldebug [recipeId]`.
+
 ## Cache
 
 Per-player `UnlockedCache[src]` keyed `categoryUid:skillUid` via `GetUnlockedSkills` on load.
@@ -159,6 +176,7 @@ Missing skill → **VERROUILLÉ** (never PRESQUE).
 ## Admin
 
 - `/craftskillcheck` — ml_skills started, categories count, gated recipes, valid/invalid mappings
+- `/craftskilldebug [recipeId]` — dump categoryUid/skillUid, raw HasUnlockedSkill, normalized, cache key/value, GetUnlockedSkills membership
 - Callback `sanctuary_crafting:adminMlSkills` — GetSkillTrees + health (editor open / refresh only)
 - Button concept: **RAFRAÎCHIR ML SKILLS** → refresh labels; block save on invalid skill unless manual mode
 
