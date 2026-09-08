@@ -284,39 +284,56 @@ end
 local function ingestUnlocked(entry, categoryUid, skillUid, label)
     if type(skillUid) ~= 'string' or skillUid == '' then return end
     local catUid = categoryUid
-    if type(catUid) ~= 'string' then catUid = '' end
+    if type(catUid) ~= 'string' or catUid == '' then
+        catUid = resolveCategoryUid(categoryUid) or ''
+    else
+        -- always store under published categoryUid, never bare skillUid / category KEY
+        catUid = resolveCategoryUid(catUid) or catUid
+    end
+    if catUid == '' then return end -- refuse category-less positives (fail closed)
     local key = cacheKey(catUid, skillUid)
+    if entry.unlocked[key] then
+        return -- already recorded
+    end
     entry.unlocked[key] = true
-    entry.unlocked[skillUid] = true
-    if catUid ~= '' then
-        entry.unlocked[catUid .. ':' .. skillUid] = true
-    end
     local catKey = SkillTree and SkillTree.ResolveKey and SkillTree.ResolveKey(catUid) or nil
-    if catKey then
-        entry.unlocked[catKey .. ':' .. skillUid] = true
-    end
     local lab = label or Skills.SkillLabel(skillUid, catKey or catUid)
     entry.list[#entry.list + 1] = {
         uid = skillUid,
-        categoryUid = catUid ~= '' and catUid or nil,
+        categoryUid = catUid,
         categoryKey = catKey,
         label = lab,
     }
 end
 
+local function isExplicitlyLocked(obj)
+    if type(obj) ~= 'table' then return false end
+    if obj.unlocked == false or obj.isUnlocked == false or obj.hasUnlocked == false then return true end
+    if obj.locked == true or obj.isLocked == true or obj.verrouille == true then return true end
+    if obj.learned == false or obj.isLearned == false then return true end
+    return false
+end
+
 local function ingestUnlockedRaw(entry, raw, categoryUid)
     if raw == false or raw == nil then return end
     if type(raw) ~= 'table' then return end
+    -- GetUnlockedSkills contract: returns unlocked skills only. If an object carries an
+    -- explicit locked/unlocked=false flag, never treat it as unlocked (no category-wide true).
     if raw[1] ~= nil then
         for i = 1, #raw do
             local s = raw[i]
             if type(s) == 'table' then
-                ingestUnlocked(
-                    entry,
-                    s.categoryUid or s.category_uid or s.category or categoryUid,
-                    s.skillUid or s.skill_uid or s.uid or s.id,
-                    s.label or s.name
-                )
+                if not isExplicitlyLocked(s) then
+                    local flag = s.unlocked
+                    if flag == nil or flag == true then
+                        ingestUnlocked(
+                            entry,
+                            s.categoryUid or s.category_uid or s.category or categoryUid,
+                            s.skillUid or s.skill_uid or s.uid or s.id,
+                            s.label or s.name
+                        )
+                    end
+                end
             elseif type(s) == 'string' then
                 ingestUnlocked(entry, categoryUid, s, nil)
             end
@@ -325,12 +342,17 @@ local function ingestUnlockedRaw(entry, raw, categoryUid)
     end
     for k, v in pairs(raw) do
         if type(v) == 'table' then
-            ingestUnlocked(
-                entry,
-                v.categoryUid or v.category_uid or v.category or categoryUid,
-                v.skillUid or v.skill_uid or v.uid or (type(k) == 'string' and k) or nil,
-                v.label or v.name
-            )
+            if not isExplicitlyLocked(v) then
+                local flag = v.unlocked
+                if flag == nil or flag == true then
+                    ingestUnlocked(
+                        entry,
+                        v.categoryUid or v.category_uid or v.category or categoryUid,
+                        v.skillUid or v.skill_uid or v.uid or (type(k) == 'string' and k) or nil,
+                        v.label or v.name
+                    )
+                end
+            end
         elseif v == true and type(k) == 'string' then
             ingestUnlocked(entry, categoryUid, k, nil)
         elseif type(v) == 'number' and type(k) == 'string' and v > 0 then
@@ -437,21 +459,33 @@ function Skills.GetLevel(src, catKey)
 end
 
 function Skills.HasUnlockedSkill(src, categoryUidOrKey, skillUid)
-    if not skillUid then return true end
+    -- Fail closed: missing skillUid is NOT a free pass for gated display (callers must omit check).
+    if type(skillUid) ~= 'string' or skillUid == '' then return false end
     if Skills.ShouldBypassRequirements(src) then return true end
     if warnIfDown() then return false end
-    local cuid = resolveCategoryUid(categoryUidOrKey) or categoryUidOrKey
+    local cuid = resolveCategoryUid(categoryUidOrKey)
+    if type(cuid) ~= 'string' or cuid == '' then
+        return false
+    end
     local entry = Skills.GetCache(src)
     local key = cacheKey(cuid, skillUid)
-    if entry.unlocked[key] or entry.unlocked[skillUid] then return true end
-    local catKey = SkillTree and SkillTree.ResolveKey and SkillTree.ResolveKey(categoryUidOrKey)
-    if catKey and entry.unlocked[catKey .. ':' .. skillUid] then return true end
+    -- Cache keys are ONLY categoryUid:skillUid (never bare skillUid / category-wide).
+    if entry.unlocked[key] == true then
+        return true
+    end
 
-    -- live export (authoritative); update cache
+    -- Official export ONLY: HasUnlockedSkill(categoryUid, skillUid, source). Strict boolean.
     local ok, has = pexport('HasUnlockedSkill', cuid, skillUid, src)
-    if ok and has then
+    if not ok then
+        return false -- pcall error → fail closed
+    end
+    if has == true then
         ingestUnlocked(entry, cuid, skillUid, nil)
         return true
+    end
+    -- Heal stale positive if live says not unlocked
+    if entry.unlocked[key] then
+        entry.unlocked[key] = nil
     end
     return false
 end
@@ -482,8 +516,8 @@ function Skills.HasUnlockedRecipeSkill(src, requirement)
             return false, 'skill_level_low', { tonumber(level), cur, category }
         end
     end
-    if uid then
-        if not Skills.HasUnlockedSkill(src, category, uid) then
+    if type(uid) == 'string' and uid ~= '' then
+        if Skills.HasUnlockedSkill(src, category, uid) ~= true then
             local label = Skills.SkillLabel(uid, category)
             return false, 'skill_locked', { label or uid, uid, resolveCategoryUid(category) }
         end
@@ -515,33 +549,62 @@ function Skills.AddXp(src, categoryUidOrKey, amount)
 end
 
 --------------------------------------------------------------------------------
--- Recipe requirement parsing (canonical)
+-- Recipe requirement parsing (canonical) — normalize at DATA SOURCE
 --------------------------------------------------------------------------------
 
---- Normalize recipe skill requirement into:
----   nil | { mode='all'|'any', skills={{category,uid,level?},...}, visibility, xp }
-function Skills.ParseRecipeRequirement(recipe)
+local function skillDebugEnabled()
+    return integ().debug == true or (Config and Config.Debug == true)
+end
+
+local function skillDebugLog(...)
+    if not skillDebugEnabled() then return end
+    local parts = { '[CRAFT][SkillIntegration]' }
+    for i = 1, select('#', ...) do
+        parts[#parts + 1] = tostring(select(i, ...))
+    end
+    print(table.concat(parts, ' '))
+end
+
+--- Dedupe key: provider:categoryUid:skillUid (NEVER label alone).
+local function skillReqDedupeKey(provider, categoryUid, skillUid)
+    return tostring(provider or 'ml_skills')
+        .. ':'
+        .. tostring(categoryUid or '')
+        .. ':'
+        .. tostring(skillUid or '')
+end
+
+--- Canonical unique skill requirement list for gates + NUI.
+--- Returns nil | { mode, skills=[{provider,category,categoryUid,categoryKey,uid,skillUid,label,level,unlocked?}], visibility, xp, rawCount, normalizedCount, duplicatesRemoved }
+function Skills.normalizeSkillRequirements(recipe, src)
     if type(recipe) ~= 'table' then
         return nil
     end
+
+    local provider = 'ml_skills'
     local visibility = recipe.skillVisibility
         or (recipe.hideIfSkillLocked and 'hidden_until_unlocked')
         or 'visible_locked'
 
     local skills = {}
+    local seen = {}
+    local rawCount = 0
+    local duplicatesRemoved = 0
+    local mode = 'all'
 
-    --- Dedupe key: resolved categoryKey + uid (NormalizeRecipe mirrors requiredSkill↔skillTree).
-    local function skillDedupeKey(cat, uid)
-        local ckey = cat or (skillsCfg().defaultCategory or 'survival')
-        if SkillTree and SkillTree.ResolveKey then
-            ckey = SkillTree.ResolveKey(ckey) or ckey
+    local function resolveCatKey(cat)
+        if type(cat) ~= 'string' or cat == '' then
+            return skillsCfg().defaultCategory or 'survival'
         end
-        local u = (type(uid) == 'string' and uid ~= '') and uid or ''
-        return tostring(ckey) .. '\0' .. u
+        if SkillTree and SkillTree.ResolveKey then
+            return SkillTree.ResolveKey(cat) or cat
+        end
+        return cat
     end
 
-    local function pushSkill(obj, defaultCat)
+    local function pushSkill(obj, defaultCat, sourceTag)
         if obj == nil then return end
+        rawCount = rawCount + 1
         local cat, uid, level
         if type(obj) == 'string' then
             cat = defaultCat or (skillsCfg().defaultCategory or 'survival')
@@ -551,76 +614,95 @@ function Skills.ParseRecipeRequirement(recipe)
             cat = obj.category or obj.cat or obj.categoryUid or defaultCat
             uid = obj.uid or obj.skillUid or obj.skill or obj.requiredSkill
             level = obj.level or obj.requiredLevel or obj.requireLevel
-            if type(uid) ~= 'string' then uid = nil end
+            if type(uid) ~= 'string' or uid == '' then uid = nil end
             level = level and tonumber(level) or nil
-            if uid == nil and level == nil then return end
+            if uid == nil and level == nil then
+                rawCount = rawCount - 1
+                return
+            end
         else
+            rawCount = rawCount - 1
             return
         end
 
-        local entry = {
-            category = cat,
-            uid = type(uid) == 'string' and uid or nil,
-            level = level,
-        }
-        local key = skillDedupeKey(entry.category, entry.uid)
-        for i = 1, #skills do
-            if skillDedupeKey(skills[i].category, skills[i].uid) == key then
-                -- merge: keep existing, fill missing level / category / uid
-                if entry.level and not skills[i].level then
-                    skills[i].level = entry.level
-                end
-                if entry.uid and not skills[i].uid then
-                    skills[i].uid = entry.uid
-                end
-                if entry.category and not skills[i].category then
-                    skills[i].category = entry.category
-                end
-                return
-            end
+        local catKey = resolveCatKey(cat)
+        local catUid = resolveCategoryUid(catKey) or resolveCategoryUid(cat)
+        if type(catUid) ~= 'string' or catUid == '' then
+            catUid = (type(cat) == 'string' and cat) or catKey
         end
-        skills[#skills + 1] = entry
+        -- Level-only rows use empty skillUid in the dedupe key (distinct from real uids).
+        local skillUid = uid or ''
+        local key = skillReqDedupeKey(provider, catUid, skillUid)
+        local existing = seen[key]
+        if existing then
+            duplicatesRemoved = duplicatesRemoved + 1
+            if level and not existing.level then existing.level = level end
+            if uid and not existing.uid then
+                existing.uid = uid
+                existing.skillUid = uid
+            end
+            if catKey and not existing.category then existing.category = catKey end
+            skillDebugLog('dedupe', recipe.id or '?', sourceTag or '?', key)
+            return
+        end
+
+        local label = nil
+        if uid then
+            label = Skills.SkillLabel(uid, catKey)
+        end
+        local row = {
+            provider = provider,
+            category = catKey,
+            categoryKey = catKey,
+            categoryUid = catUid,
+            uid = uid,
+            skillUid = uid,
+            label = label,
+            level = level,
+            source = sourceTag,
+        }
+        if src and uid then
+            row.unlocked = Skills.HasUnlockedSkill(src, catUid, uid) == true
+        end
+        skills[#skills + 1] = row
+        seen[key] = row
     end
 
+    -- 1) requiredSkills (multi) — merge, do not early-return alone
     if recipe.requiredSkills and type(recipe.requiredSkills) == 'table' then
-        local mode = recipe.requiredSkills.mode or 'all'
+        if recipe.requiredSkills.mode == 'any' then mode = 'any' end
         local list = recipe.requiredSkills.skills or recipe.requiredSkills
-        if list.mode then list = recipe.requiredSkills.skills end
+        if type(list) == 'table' and list.mode then
+            list = recipe.requiredSkills.skills
+        end
         if type(list) == 'table' then
-            for i = 1, #list do pushSkill(list[i], nil) end
-            if #list == 0 then
+            if list[1] ~= nil then
+                for i = 1, #list do pushSkill(list[i], nil, 'requiredSkills') end
+            else
                 for _, v in pairs(list) do
-                    if type(v) == 'table' and (v.uid or v.skillUid or v.category) then
-                        pushSkill(v, nil)
+                    if type(v) == 'table' and (v.uid or v.skillUid or v.category or v.level) then
+                        pushSkill(v, nil, 'requiredSkills')
                     end
                 end
             end
         end
-        local xp = recipe.skillXp or recipe.xp
-        return {
-            mode = mode == 'any' and 'any' or 'all',
-            skills = skills,
-            visibility = visibility,
-            xp = xp,
-        }
     end
 
-    -- requiredSkill = nil → free
-    -- requiredSkill = { category, uid, level? }
-    -- requiredSkill = 'uid' (legacy string)
+    -- 2) requiredSkill (canonical single)
     if recipe.requiredSkill ~= nil then
         local rs = recipe.requiredSkill
         if type(rs) == 'table' then
-            pushSkill(rs, rs.category)
+            pushSkill(rs, rs.category, 'requiredSkill')
         elseif type(rs) == 'string' then
             local cat = recipe.skillCategory
                 or (recipe.skillTree and recipe.skillTree.category)
                 or (recipe.xp and recipe.xp.category)
-            pushSkill(rs, cat)
+            pushSkill(rs, cat, 'requiredSkill')
         end
     end
 
-    -- Migration: skillTree / requiredSkillTree / legacy require*
+    -- 3) skillTree / requiredSkillTree — ONLY as migrate mirror of ml fields (deduped).
+    --    When provider=ml_skills we do NOT invent gates from SST/DevHub leftovers.
     local st = recipe.skillTree or recipe.requiredSkillTree
     if type(st) == 'table' then
         local cat = st.category or st.catKey or st.cat
@@ -628,18 +710,19 @@ function Skills.ParseRecipeRequirement(recipe)
         local sk = st.requiredSkill or st.requireSkill or st.skill
         if sk or level then
             if type(sk) == 'table' then
-                pushSkill(sk, cat)
+                pushSkill(sk, cat, 'skillTree')
                 if level and skills[#skills] and not skills[#skills].level then
                     skills[#skills].level = tonumber(level)
                 end
             else
-                pushSkill({ category = cat, uid = sk, level = level }, cat)
+                pushSkill({ category = cat, uid = type(sk) == 'string' and sk or nil, level = level }, cat, 'skillTree')
             end
         elseif cat and level then
-            pushSkill({ category = cat, uid = nil, level = level }, cat)
+            pushSkill({ category = cat, uid = nil, level = level }, cat, 'skillTree')
         end
     end
 
+    -- 4) legacy requireLevel / requireSkill (post-NormalizeRecipe mirrors)
     if recipe.requireLevel or recipe.requiredLevel then
         local cat = recipe.requireSkillCategory or recipe.skillCategory
             or (recipe.xp and recipe.xp.category)
@@ -647,32 +730,59 @@ function Skills.ParseRecipeRequirement(recipe)
         local level = recipe.requireLevel or recipe.requiredLevel
         local sk = recipe.requireSkill
         if type(sk) == 'string' or level then
-            -- pushSkill dedupes by categoryKey+uid (merges level)
-            pushSkill({ category = cat, uid = type(sk) == 'string' and sk or nil, level = level }, cat)
+            pushSkill({ category = cat, uid = type(sk) == 'string' and sk or nil, level = level }, cat, 'requireLevel')
         end
-    elseif type(recipe.requireSkill) == 'string' and #skills == 0 then
-        pushSkill(recipe.requireSkill, recipe.requireSkillCategory or recipe.skillCategory)
+    elseif type(recipe.requireSkill) == 'string' then
+        pushSkill(recipe.requireSkill, recipe.requireSkillCategory or recipe.skillCategory, 'requireSkill')
     end
 
-    -- Uncertain legacy fields → log, no dangerous rewrite
+    -- 5) SST / DevHub / sanctuary leftovers — NEVER silently add as unlock OR.
+    local legacyNoise = recipe.devhubSkill or recipe.sanctuarySkill or recipe.sanctuary_skilltree
+        or recipe.sstSkill or recipe.requiredTalent or recipe.devhubTalent
+    if legacyNoise ~= nil then
+        print(('[CRAFT] IGNORE legacy skill field on recipe=%s (provider=ml_skills) — not added to gates'):format(
+            tostring(recipe.id or '?')))
+    end
+
     if #skills == 0 then
-        if recipe.devhubSkill or recipe.sanctuarySkill or recipe.skillUid then
+        if legacyNoise ~= nil or recipe.skillUid then
             print(('[CRAFT] UNMAPPED RECIPE SKILL id=%s fields present but incomplete — left unlocked/free'):format(
                 tostring(recipe.id or '?')))
         end
         return nil
     end
 
-    return {
-        mode = 'all',
+    local normalized = {
+        mode = mode,
         skills = skills,
         visibility = visibility,
         xp = recipe.skillXp or recipe.xp,
+        rawCount = rawCount,
+        normalizedCount = #skills,
+        duplicatesRemoved = duplicatesRemoved,
+        provider = provider,
     }
+
+    if skillDebugEnabled() or duplicatesRemoved > 0 then
+        skillDebugLog(
+            'normalize',
+            'recipe=' .. tostring(recipe.id or '?'),
+            'raw=' .. tostring(rawCount),
+            'normalized=' .. tostring(#skills),
+            'dupesRemoved=' .. tostring(duplicatesRemoved)
+        )
+    end
+
+    return normalized
+end
+
+--- Back-compat alias — always goes through normalizeSkillRequirements.
+function Skills.ParseRecipeRequirement(recipe)
+    return Skills.normalizeSkillRequirements(recipe, nil)
 end
 
 function Skills.CheckRecipeRequirement(src, recipe)
-    local req = Skills.ParseRecipeRequirement(recipe)
+    local req = Skills.normalizeSkillRequirements(recipe, nil)
     if not req or not req.skills or #req.skills == 0 then
         return true
     end
@@ -703,7 +813,6 @@ function Skills.CheckRecipeRequirement(src, recipe)
         else
             lastFailReason, lastFailArgs = reason, args
             if mode == 'all' then
-                -- map to locale-friendly keys used by pipeline
                 if reason == 'skill_locked' then
                     return false, 'craft_skill_required', args
                 elseif reason == 'skill_level_low' then
@@ -743,38 +852,43 @@ function Skills.LevelCategoryForRecipe(recipe)
 end
 
 function Skills.FacingSkill(src, recipe, _snap)
-    local req = Skills.ParseRecipeRequirement(recipe)
+    local req = Skills.normalizeSkillRequirements(recipe, nil)
     local catKey = Skills.LevelCategoryForRecipe(recipe)
     local entry = Skills.GetCache(src)
     local primary = req and req.skills and req.skills[1] or nil
-    local talentUid = primary and primary.uid or nil
+    local talentUid = primary and (primary.uid or primary.skillUid) or nil
     local talentLabel = talentUid and Skills.SkillLabel(talentUid, primary.category or catKey) or nil
     local requireLevel = primary and primary.level or nil
-    local hasRequiredSkill = nil
-    if talentUid then
-        hasRequiredSkill = Skills.HasUnlockedSkill(src, primary.category or catKey, talentUid)
-    end
-    local playerLevel = Skills.GetLevel(src, catKey)
-    local locked = false
-    if req then
-        local ok = select(1, Skills.CheckRecipeRequirement(src, recipe))
-        locked = not ok
-    end
 
-    -- Display-only enrichment for NUI (labels / per-skill unlocked). Does not affect gates.
+    local gateOk, gateReason, gateArgs = true, nil, nil
+    if req then
+        gateOk, gateReason, gateArgs = Skills.CheckRecipeRequirement(src, recipe)
+    end
+    local locked = req ~= nil and not gateOk
+    local skillLocked = locked and (
+        gateReason == 'craft_skill_required'
+        or gateReason == 'skill_locked'
+        or gateReason == 'craft_recipe_locked'
+    )
+    local levelLocked = locked and (
+        gateReason == 'craft_level_required' or gateReason == 'skill_level_low'
+    )
+
     local mode = (req and req.mode == 'any') and 'any' or 'all'
     local skillsDisplay = {}
     local seenDisplay = {}
+
     if req and type(req.skills) == 'table' then
         for i = 1, #req.skills do
             local sk = req.skills[i]
             if type(sk) == 'table' then
-                local ckey = sk.category or catKey
+                local ckey = sk.categoryKey or sk.category or catKey
                 if SkillTree and SkillTree.ResolveKey then
                     ckey = SkillTree.ResolveKey(ckey) or ckey
                 end
-                local uid = sk.uid
-                local dkey = tostring(ckey) .. '\0' .. ((type(uid) == 'string' and uid) or '')
+                local catUid = sk.categoryUid or resolveCategoryUid(ckey)
+                local uid = sk.uid or sk.skillUid
+                local dkey = skillReqDedupeKey(sk.provider or 'ml_skills', catUid, uid or '')
                 local existing = seenDisplay[dkey]
                 if existing then
                     if sk.level and not existing.requireLevel then
@@ -783,14 +897,18 @@ function Skills.FacingSkill(src, recipe, _snap)
                 else
                     local unlocked = nil
                     if type(uid) == 'string' and uid ~= '' then
-                        unlocked = Skills.HasUnlockedSkill(src, ckey, uid) == true
+                        -- Strict: only true when HasUnlockedSkill == true (same path as gate).
+                        unlocked = Skills.HasUnlockedSkill(src, catUid or ckey, uid) == true
                     end
                     local row = {
+                        provider = sk.provider or 'ml_skills',
                         category = ckey,
                         categoryLabel = Skills.CategoryLabel(ckey),
-                        categoryUid = resolveCategoryUid(ckey),
+                        categoryUid = catUid,
                         skillUid = uid,
-                        skillLabel = (type(uid) == 'string' and uid ~= '') and Skills.SkillLabel(uid, ckey) or nil,
+                        skillLabel = (type(uid) == 'string' and uid ~= '')
+                            and (sk.label or Skills.SkillLabel(uid, ckey))
+                            or nil,
                         unlocked = unlocked,
                         requireLevel = sk.level and tonumber(sk.level) or nil,
                         level = Skills.GetLevel(src, ckey),
@@ -801,6 +919,63 @@ function Skills.FacingSkill(src, recipe, _snap)
             end
         end
     end
+
+    -- Reconcile display with gate: recipe-level hasRequiredSkill is false when skill-locked.
+    -- Per-skill ✓ only when strict HasUnlockedSkill == true (already set above).
+    -- If skill-locked yet every skill row still claims true (stale cache / contradiction), force all false.
+    local hasRequiredSkill = nil
+    if talentUid then
+        hasRequiredSkill = Skills.HasUnlockedSkill(
+            src,
+            (primary and (primary.categoryUid or primary.category)) or catKey,
+            talentUid
+        ) == true
+    end
+
+    if skillLocked then
+        hasRequiredSkill = false
+        if mode == 'any' then
+            for i = 1, #skillsDisplay do
+                if skillsDisplay[i].skillUid then
+                    skillsDisplay[i].unlocked = false
+                end
+            end
+        else
+            local anyMissing = false
+            for i = 1, #skillsDisplay do
+                local row = skillsDisplay[i]
+                if row.skillUid then
+                    if row.unlocked == true then
+                        -- keep genuine unlocks for siblings
+                    else
+                        row.unlocked = false
+                        anyMissing = true
+                    end
+                end
+            end
+            if not anyMissing then
+                for i = 1, #skillsDisplay do
+                    if skillsDisplay[i].skillUid then
+                        skillsDisplay[i].unlocked = false
+                    end
+                end
+            end
+        end
+    end
+
+    if skillDebugEnabled() and req then
+        skillDebugLog(
+            'FacingSkill',
+            'recipe=' .. tostring(recipe and recipe.id or '?'),
+            'gateOk=' .. tostring(gateOk),
+            'reason=' .. tostring(gateReason),
+            'skills=' .. tostring(#skillsDisplay),
+            'hasRequired=' .. tostring(hasRequiredSkill),
+            'dupesRemoved=' .. tostring(req.duplicatesRemoved or 0)
+        )
+    end
+
+    local playerLevel = Skills.GetLevel(src, catKey)
 
     return {
         category = catKey,
@@ -824,6 +999,10 @@ function Skills.FacingSkill(src, recipe, _snap)
         visualStatus = locked and (talentUid and 'LOCKED_SKILL' or (requireLevel and 'LOCKED_LEVEL' or 'LOCKED_SKILL')) or nil,
         mode = mode,
         skills = skillsDisplay,
+        lockReason = locked and gateReason or nil,
+        lockArgs = locked and gateArgs or nil,
+        normalizedCount = req and req.normalizedCount or 0,
+        duplicatesRemoved = req and req.duplicatesRemoved or 0,
     }
 end
 
@@ -1074,6 +1253,86 @@ lib.addCommand('craftskillcheck', {
         print('[CRAFT] ' .. msg)
         if src and src > 0 then
             TriggerClientEvent('ox_lib:notify', src, { type = 'error', description = msg })
+        end
+    end
+end)
+
+
+lib.addCommand('craftskilldebug', {
+    help = 'Dump skill unlock path for a recipe (categoryUid/skillUid/raw/normalized/cache)',
+    params = {
+        { name = 'recipeId', type = 'string', help = 'Recipe id (e.g. craft_smallboat)' },
+    },
+    restricted = 'group.admin',
+}, function(src, args)
+    local recipeId = args and args.recipeId
+    local recipe = recipeId and Config.RecipeById and Config.RecipeById[recipeId]
+    if not recipe then
+        local msg = ('craftskilldebug: unknown recipe %s'):format(tostring(recipeId))
+        print('[CRAFT] ' .. msg)
+        if src and src > 0 then
+            TriggerClientEvent('ox_lib:notify', src, { type = 'error', description = msg })
+        end
+        return
+    end
+
+    local req = Skills.normalizeSkillRequirements(recipe, nil)
+    local lines = {
+        ('recipe=%s provider=%s'):format(tostring(recipeId), tostring(Skills.Provider())),
+        ('rawCount=%s normalizedCount=%s dupesRemoved=%s mode=%s'):format(
+            tostring(req and req.rawCount),
+            tostring(req and req.normalizedCount),
+            tostring(req and req.duplicatesRemoved),
+            tostring(req and req.mode)
+        ),
+    }
+
+    local entry = (src and src > 0) and Skills.GetCache(src) or emptyCache(src)
+    local skills = (req and req.skills) or {}
+    for i = 1, #skills do
+        local sk = skills[i]
+        local catUid = sk.categoryUid or resolveCategoryUid(sk.category)
+        local skillUid = sk.uid or sk.skillUid
+        local key = cacheKey(catUid, skillUid)
+        local cacheVal = entry.unlocked and entry.unlocked[key]
+        local rawOk, rawHas = false, nil
+        if type(skillUid) == 'string' and skillUid ~= '' and type(catUid) == 'string' then
+            rawOk, rawHas = pexport('HasUnlockedSkill', catUid, skillUid, src)
+        end
+        local normalized = Skills.HasUnlockedSkill(src, catUid or sk.category, skillUid) == true
+        local inList = false
+        for j = 1, #(entry.list or {}) do
+            local u = entry.list[j]
+            if u and u.uid == skillUid and (not catUid or u.categoryUid == catUid) then
+                inList = true
+                break
+            end
+        end
+        lines[#lines + 1] = (
+            ('[%d] catKey=%s categoryUid=%s skillUid=%s label=%s'):format(
+                i, tostring(sk.category), tostring(catUid), tostring(skillUid), tostring(sk.label)
+            )
+        )
+        lines[#lines + 1] = (
+            ('    raw HasUnlockedSkill ok=%s result=%s (%s) | normalized=%s | cache[%s]=%s | in GetUnlockedSkills list=%s'):format(
+                tostring(rawOk),
+                tostring(rawHas),
+                type(rawHas),
+                tostring(normalized),
+                tostring(key),
+                tostring(cacheVal),
+                tostring(inList)
+            )
+        )
+    end
+
+    local gateOk, gateReason = Skills.CheckRecipeRequirement(src, recipe)
+    lines[#lines + 1] = ('CheckRecipeRequirement ok=%s reason=%s'):format(tostring(gateOk), tostring(gateReason))
+
+    for i = 1, #lines do
+        print('[CRAFT][craftskilldebug] ' .. lines[i])
+        if src and src > 0 then
+            TriggerClientEvent('ox_lib:notify', src, { type = 'inform', description = lines[i]:sub(1, 120) })
         end
     end
 end)

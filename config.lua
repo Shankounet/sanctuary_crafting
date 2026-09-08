@@ -130,6 +130,7 @@ Config.SkillIntegration = {
     failClosed = true,
     cache = true,
     xpOn = 'collect', -- XP when player collects finished craft (not on Fabriquer click)
+    debug = false, -- temporary: log normalize/FacingSkill/gate for gated recipes
     -- Optional: map craft KEY → ml_skills categoryUid when SkillCategories is not enough
     -- CategoryMapping = { survival = 'survie', medic = 'medecin' },
 }

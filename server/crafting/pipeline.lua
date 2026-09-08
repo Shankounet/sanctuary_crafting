@@ -495,7 +495,8 @@ local function validateStart(src, recipeId, benchKey, batch, opts)
     if CraftingSkills and CraftingSkills.CheckRecipeGates then
         okSkill, skillReason, skillArgs = CraftingSkills.CheckRecipeGates(src, recipe)
     end
-    if not okSkill then return nil, skillReason, skillArgs end
+    -- Strict: only an explicit true opens the craft path (fail closed on nil/false).
+    if okSkill ~= true then return nil, skillReason or 'craft_skill_required', skillArgs end
 
     local okIdent, identReason, identArgs = checkIdentityGates(src, recipe, bench)
     if not okIdent then return nil, identReason, identArgs end
@@ -862,11 +863,11 @@ function CraftingPipeline.FinalizeCraft(src, craftId, opts)
         end
     end
 
-    local okSkill = CraftingSkills and CraftingSkills.CheckRecipeGates and CraftingSkills.CheckRecipeGates(src, recipe)
-    if not okSkill then
+    local okSkill = CraftingSkills and CraftingSkills.CheckRecipeGates and select(1, CraftingSkills.CheckRecipeGates(src, recipe))
+    if okSkill ~= true then
         craft.state = 'failed'
         clearActive(craftId, craft.removed)
-        return { ok = false, reason = 'craft_failed' }
+        return { ok = false, reason = 'craft_skill_required' }
     end
     local okIdent = checkIdentityGates(src, recipe, bench)
     if not okIdent then
@@ -1859,8 +1860,8 @@ local function buildRecipeEntry(src, r, ctx)
     local canCraft, lockReason, lockArgs = true, nil, nil
     if CraftingSkills and CraftingSkills.CheckRecipeGates then
         local okSkill, skillReason, skillArgs = CraftingSkills.CheckRecipeGates(src, r)
-        if not okSkill then
-            canCraft, lockReason, lockArgs = false, skillReason, skillArgs
+        if okSkill ~= true then
+            canCraft, lockReason, lockArgs = false, skillReason or 'craft_skill_required', skillArgs
         end
     end
     if r.requireBlueprint or r.blueprintId then
@@ -2097,7 +2098,7 @@ local function buildRecipeEntry(src, r, ctx)
         skillTree = r.skillTree,
         skillCategoryLabel = facing and facing.categoryLabel or (SkillTree and SkillTree.CategoryLabel and SkillTree.CategoryLabel(skillCategory)) or nil,
         requiredSkillLabel = facing and facing.requiredSkillLabel or nil,
-        hasRequiredSkill = facing and facing.hasRequiredSkill,
+        hasRequiredSkill = facing and facing.hasRequiredSkill == true,
         recipeLocked = facing and facing.recipeLocked or false,
         canAccessRecipe = facing and facing.canAccessRecipe,
         skilltreeSkillUid = facing and facing.skilltreeSkillUid or nil,
@@ -2115,7 +2116,8 @@ local function buildRecipeEntry(src, r, ctx)
         skillVisibility = (facing and facing.skillVisibility) or r.skillVisibility or 'visible_locked',
         skillState = {
             loading = facing and facing.skillsLoading or false,
-            unlocked = facing and facing.hasRequiredSkill,
+            -- Explicit true only; nil/false stay non-✓ in NUI. Reconciled with gate in FacingSkill.
+            unlocked = (facing and facing.hasRequiredSkill == true) or false,
             categoryUid = facing and facing.categoryUid,
             skillUid = facing and facing.requireSkill,
             label = facing and facing.requiredSkillLabel,
@@ -2315,6 +2317,42 @@ local function buildRecipeEntry(src, r, ctx)
     local searchHaystack = table.concat(hayParts, ' '):lower()
 
     entry.almostReason = almostReason
+
+    -- Fail-closed display: never ship ✓ when craft is skill-locked.
+    if lockReason == 'craft_skill_required' or lockReason == 'skill_locked' or lockReason == 'craft_recipe_locked'
+        or (entry.lockKind == 'ml_skill') then
+        entry.hasRequiredSkill = false
+        if entry.skillState then
+            entry.skillState.unlocked = false
+            entry.skillState.visualStatus = entry.skillState.visualStatus or 'LOCKED_SKILL'
+            local skills = entry.skillState.skills
+            if type(skills) == 'table' then
+                for i = 1, #skills do
+                    if skills[i] and skills[i].skillUid then
+                        -- mode=all: if gate failed, at least mark non-true as false; primary all false if still all-green
+                        if skills[i].unlocked ~= true then
+                            skills[i].unlocked = false
+                        end
+                    end
+                end
+                local anyMissing = false
+                for i = 1, #skills do
+                    if skills[i] and skills[i].skillUid and skills[i].unlocked == false then
+                        anyMissing = true
+                        break
+                    end
+                end
+                if not anyMissing then
+                    for i = 1, #skills do
+                        if skills[i] and skills[i].skillUid then
+                            skills[i].unlocked = false
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     entry.blockReason = blockReason
     entry.lockHint = lockHint
     entry.maxCraftable = maxCraftable
