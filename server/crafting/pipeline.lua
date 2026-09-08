@@ -2119,9 +2119,13 @@ local function buildRecipeEntry(src, r, ctx)
             categoryUid = facing and facing.categoryUid,
             skillUid = facing and facing.requireSkill,
             label = facing and facing.requiredSkillLabel,
+            skillLabel = facing and facing.requiredSkillLabel,
+            categoryLabel = facing and facing.categoryLabel,
             level = facing and facing.playerSkillLevel,
             requireLevel = facing and facing.requireLevel,
             visualStatus = facing and facing.visualStatus,
+            mode = facing and facing.mode,
+            skills = facing and facing.skills,
         },
         requiredSkill = r.requiredSkill,
         openSkillsCategory = facing and (facing.categoryUid or facing.category) or nil,
@@ -2208,7 +2212,7 @@ local function buildRecipeEntry(src, r, ctx)
             local cur = (lockArgs and lockArgs[2]) or playerSkillLevel
             almostReason = ('Niveau %s %s / %s'):format(catLab or 'Survie', tostring(cur or '—'), tostring(need or '—'))
         elseif lockReason == 'craft_skill_required' then
-            almostReason = talentLab and ('Talent requis : %s'):format(talentLab) or 'Talent non débloqué'
+            almostReason = talentLab and ('Savoir requis : %s'):format(talentLab) or 'Savoir non appris'
         elseif lockReason == 'craft_station_level' then
             almostReason = ('Station niveau %s requise'):format(tostring(r.stationLevel or 2))
         elseif lockReason == 'craft_tool_required' then
@@ -2254,7 +2258,7 @@ local function buildRecipeEntry(src, r, ctx)
     local lockHint = nil
     if not canCraft then
         if lockReason == 'craft_skill_required' then
-            lockHint = talentLab and ('Verrouillée — Talent requis : %s'):format(talentLab) or 'Verrouillée — Talent requis'
+            lockHint = talentLab and ('Verrouillée — Savoir requis : %s'):format(talentLab) or 'Verrouillée — Savoir requis'
         elseif lockReason == 'craft_blueprint_required' or lockReason == 'craft_knowledge_required' then
             lockHint = 'Verrouillée — Plan requis'
         elseif lockReason == 'craft_spec_required' then

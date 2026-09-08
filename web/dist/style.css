@@ -5807,6 +5807,170 @@ button, input { font: inherit; color: inherit; }
 #app #d-station-etat.warn { color: #a09070; }
 #app #d-station-etat.bad { color: #8a6a50; }
 
+/* ml_skills savoir requis — player EXIGENCES polish */
+.savoir-requis { margin: 0.35rem 0; font-size: 0.85rem; opacity: 0.92; letter-spacing: 0.02em; }
+.savoir-requis .mark { font-weight: 700; margin-left: 0.25rem; }
+.savoir-requis.loading { font-style: italic; opacity: 0.75; }
+.savoir-unlearned { color: #8a6a50; font-size: 0.78rem; margin-bottom: 0.25rem; }
+.skilltree-cta-wrap .btn-skilltree-open { margin-top: 0.35rem; }
+
+#app .block-savoir,
+#app .block-profil {
+  padding: 7px 10px 8px !important;
+}
+#app .block-savoir .t-l3,
+#app #d-savoir-title {
+  margin-bottom: 6px !important;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.62rem;
+  color: rgba(154,136,102,0.85);
+}
+#app .savoir-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #e8e4dc;
+}
+#app .savoir-loading {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: rgba(232,228,220,0.55);
+}
+#app .savoir-mode {
+  font-size: 0.68rem;
+  color: rgba(154,136,102,0.78);
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+#app .savoir-cat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+#app .savoir-cat-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 650;
+  color: #e8e4dc;
+  line-height: 1.3;
+}
+#app .savoir-cat-name .spec-ico {
+  color: #9a8866;
+  font-size: 0.78rem;
+}
+#app .savoir-skill,
+#app .savoir-level {
+  display: grid;
+  grid-template-columns: 1.1em 1fr;
+  column-gap: 6px;
+  row-gap: 1px;
+  align-items: start;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #e8e4dc;
+  padding: 2px 4px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+}
+#app .savoir-skill .savoir-mark,
+#app .savoir-level .savoir-mark,
+#app .atelier-status .savoir-mark {
+  font-weight: 700;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+#app .savoir-skill.ok .savoir-mark,
+#app .savoir-level.ok .savoir-mark,
+#app .atelier-status.ok .savoir-mark { color: #6f8a5c; }
+#app .savoir-skill.bad .savoir-mark,
+#app .savoir-level.bad .savoir-mark,
+#app .atelier-status.bad .savoir-mark { color: #8a6a50; }
+#app .savoir-skill.ok .savoir-skill-label,
+#app .savoir-level.ok .savoir-level-label { color: #d8d4cc; }
+#app .savoir-skill.bad .savoir-skill-label,
+#app .savoir-level.bad .savoir-level-label { color: #c4b8a4; }
+#app .savoir-skill-label,
+#app .savoir-level-label {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+#app .savoir-sub {
+  grid-column: 2;
+  font-size: 0.68rem;
+  color: #8a6a50;
+  opacity: 0.92;
+}
+#app .savoir-skill.is-openable {
+  cursor: pointer;
+}
+#app .savoir-skill.is-openable:hover,
+#app .savoir-skill.is-openable:focus-visible {
+  border-color: rgba(154,136,102,0.45);
+  outline: none;
+  background: rgba(154,136,102,0.06);
+}
+#app .savoir-voir {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: #cfc6b4;
+  background: transparent;
+  border: 1px solid rgba(154,136,102,0.55);
+  border-radius: 2px;
+  cursor: pointer;
+  width: auto;
+  font-weight: 600;
+  text-transform: none;
+}
+#app .savoir-voir:hover,
+#app .savoir-voir:focus-visible {
+  border-color: #9a8866;
+  color: #e8e4dc;
+  outline: none;
+  background: rgba(154,136,102,0.08);
+}
+#app .savoir-skill.just-unlocked .savoir-mark {
+  animation: savoirMarkUnlock 160ms ease-out;
+}
+@keyframes savoirMarkUnlock {
+  from { color: #8a6a50; opacity: 0.55; transform: scale(0.92); }
+  to { color: #6f8a5c; opacity: 1; transform: scale(1); }
+}
+
+/* ATELIER compact */
+#app .atelier-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+#app .atelier-line {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: #e8e4dc;
+  line-height: 1.3;
+}
+#app .atelier-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  color: #d8d4cc;
+}
+#app .atelier-status.ok { color: #b8c4ae; }
+#app .atelier-status.bad { color: #c4b8a4; }
+#app .atelier-status.warn { color: #a09070; }
+#app .atelier-mod {
+  font-size: 0.7rem;
+  color: rgba(154,136,102,0.85);
+  margin-top: 1px;
+}
+
+
 /* Atelier compact — 3 rows, no empty gauges / ops */
 #app .block-station {
   padding: 7px 10px !important;
@@ -6941,9 +7105,3 @@ button, input { font: inherit; color: inherit; }
 }
 
 
-/* ml_skills savoir requis */
-.savoir-requis { margin: 0.35rem 0; font-size: 0.85rem; opacity: 0.92; letter-spacing: 0.02em; }
-.savoir-requis .mark { font-weight: 700; margin-left: 0.25rem; }
-.savoir-requis.loading { font-style: italic; opacity: 0.75; }
-.savoir-unlearned { color: #c4a070; font-size: 0.82rem; margin-bottom: 0.25rem; }
-.skilltree-cta-wrap .btn-skilltree-open { margin-top: 0.35rem; }

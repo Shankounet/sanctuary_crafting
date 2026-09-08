@@ -737,6 +737,37 @@ function Skills.FacingSkill(src, recipe, _snap)
         local ok = select(1, Skills.CheckRecipeRequirement(src, recipe))
         locked = not ok
     end
+
+    -- Display-only enrichment for NUI (labels / per-skill unlocked). Does not affect gates.
+    local mode = (req and req.mode == 'any') and 'any' or 'all'
+    local skillsDisplay = {}
+    if req and type(req.skills) == 'table' then
+        for i = 1, #req.skills do
+            local sk = req.skills[i]
+            if type(sk) == 'table' then
+                local ckey = sk.category or catKey
+                if SkillTree and SkillTree.ResolveKey then
+                    ckey = SkillTree.ResolveKey(ckey) or ckey
+                end
+                local uid = sk.uid
+                local unlocked = nil
+                if type(uid) == 'string' and uid ~= '' then
+                    unlocked = Skills.HasUnlockedSkill(src, ckey, uid) == true
+                end
+                skillsDisplay[#skillsDisplay + 1] = {
+                    category = ckey,
+                    categoryLabel = Skills.CategoryLabel(ckey),
+                    categoryUid = resolveCategoryUid(ckey),
+                    skillUid = uid,
+                    skillLabel = (type(uid) == 'string' and uid ~= '') and Skills.SkillLabel(uid, ckey) or nil,
+                    unlocked = unlocked,
+                    requireLevel = sk.level and tonumber(sk.level) or nil,
+                    level = Skills.GetLevel(src, ckey),
+                }
+            end
+        end
+    end
+
     return {
         category = catKey,
         categoryLabel = Skills.CategoryLabel(catKey),
@@ -757,6 +788,8 @@ function Skills.FacingSkill(src, recipe, _snap)
         skillVisibility = req and req.visibility or 'visible_locked',
         skillsLoading = entry.loading == true and entry.available ~= true,
         visualStatus = locked and (talentUid and 'LOCKED_SKILL' or (requireLevel and 'LOCKED_LEVEL' or 'LOCKED_SKILL')) or nil,
+        mode = mode,
+        skills = skillsDisplay,
     }
 end
 

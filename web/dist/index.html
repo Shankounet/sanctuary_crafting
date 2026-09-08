@@ -184,7 +184,7 @@
             <div class="filters-secondary">
               <button type="button" class="chip" data-filter="locked"><i class="fa-solid fa-lock"></i><span>Verrouillées</span></button>
               <button type="button" class="chip" data-filter="plans"><i class="fa-solid fa-scroll"></i><span>Plans</span></button>
-              <button type="button" class="chip" data-filter="talent"><i class="fa-solid fa-key"></i><span>Talent requis</span></button>
+              <button type="button" class="chip" data-filter="talent"><i class="fa-solid fa-key"></i><span>Savoir requis</span></button>
               <button type="button" class="chip" data-filter="stationNeed"><i class="fa-solid fa-warehouse"></i><span>Station</span></button>
               <button type="button" class="chip" data-filter="unlocked"><i class="fa-solid fa-unlock"></i><span>Nouvellement débloquées</span></button>
             </div>
@@ -381,18 +381,24 @@
         <section class="fiche-sec fiche-sec-req" aria-label="Exigences">
         <p class="fiche-section-label">Exigences</p>
         <div class="fiche-req-body">
-        <div class="block block-profil" id="block-profil">
-          <h3 class="t-l3"><i class="fa-solid fa-id-card"></i> Profil requis</h3>
-          <div class="profil-lines" id="d-profil"></div>
+        <div class="block block-savoir" id="block-profil">
+          <h3 class="t-l3" id="d-savoir-title"><i class="fa-solid fa-book-open"></i> Savoir requis</h3>
+          <div class="savoir-body" id="d-profil"></div>
         </div>
 
         <div class="block block-station" id="block-station">
           <h3 class="t-l3"><i class="fa-solid fa-warehouse"></i> Atelier</h3>
-          <div class="kv-row" id="row-station"><span>Station</span><span id="d-station">—</span></div>
-          <div class="kv-row" id="row-station-lvl"><span>Niveau</span><span id="d-station-lvl">—</span></div>
-          <div class="kv-row" id="row-station-etat"><span>État</span><span id="d-station-etat">—</span></div>
-          <div class="kv-row hidden" id="row-station-mod"><span>Module requis</span><span id="d-station-mod">—</span></div>
-          <p class="station-wear t-l6 hidden" id="d-station-wear"></p>
+          <div class="atelier-compact" id="d-atelier-compact">
+            <div class="atelier-line" id="d-atelier-main">—</div>
+            <div class="atelier-status" id="d-atelier-status">—</div>
+            <div class="atelier-mod hidden" id="d-atelier-mod"></div>
+            <p class="station-wear t-l6 hidden" id="d-station-wear"></p>
+          </div>
+          <!-- legacy hooks kept hidden for any residual JS -->
+          <div class="kv-row hidden" id="row-station"><span>Station</span><span id="d-station">—</span></div>
+          <div class="kv-row hidden" id="row-station-lvl"><span>Niveau</span><span id="d-station-lvl">—</span></div>
+          <div class="kv-row hidden" id="row-station-etat"><span>État</span><span id="d-station-etat">—</span></div>
+          <div class="kv-row hidden" id="row-station-mod"><span>Module</span><span id="d-station-mod">—</span></div>
           <div id="station-ops" class="station-ops hidden">
             <div class="station-ops-row">
               <button type="button" id="btn-maintain" class="ghost compact" title="Entretenir la station">MAINTENIR</button>
@@ -403,14 +409,14 @@
           </div>
         </div>
 
-        <div class="block block-ings" id="block-ings">
-          <h3 class="t-l3"><i class="fa-solid fa-cubes"></i> Matériaux <span class="ing-summary" id="d-ings-summary"></span></h3>
-          <ul id="d-ings" class="ing-list"></ul>
-        </div>
-
         <div class="block block-tools" id="block-tools">
           <h3 class="t-l3"><i class="fa-solid fa-screwdriver-wrench"></i> Outils</h3>
           <ul id="d-tools" class="ing-list tool-wear"></ul>
+        </div>
+
+        <div class="block block-ings" id="block-ings">
+          <h3 class="t-l3"><i class="fa-solid fa-cubes"></i> Matériaux <span class="ing-summary" id="d-ings-summary"></span></h3>
+          <ul id="d-ings" class="ing-list"></ul>
         </div>
 
         <div class="block dual" id="block-power-noise">
