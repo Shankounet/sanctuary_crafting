@@ -16,6 +16,9 @@ Skills = Skills or {}
 local RES = 'ml_skills'
 local UnlockedCache = {} -- [src] = { unlocked = { ['cat:uid']=true }, levels = { [catKey]=n }, loadedAt, available, loading }
 local labelIndex = nil
+-- Published ml_skills tree is the recipe-gate SoT: recipeId -> real skill/category UID.
+local recipeSkillIndex = nil
+local recipeIndexLoaded = false
 local warnedDown = false
 local bypassNotified = {}
 
@@ -149,8 +152,17 @@ end
 -- Labels (human — never expose UIDs to players)
 --------------------------------------------------------------------------------
 
+local function decodeMeta(raw)
+    if type(raw) == 'table' then return raw end
+    if type(raw) ~= 'string' or raw == '' then return {} end
+    local ok, decoded = pcall(json.decode, raw)
+    return ok and type(decoded) == 'table' and decoded or {}
+end
+
 local function loadLabelIndex()
     labelIndex = {}
+    recipeSkillIndex = {}
+    recipeIndexLoaded = false
     local res = resourceName()
     if not started(res) then return end
     -- Prefer GetSkillTrees / GetConfig (official admin/tree surface)
@@ -169,6 +181,31 @@ local function loadLabelIndex()
             if type(catUid) == 'string' then
                 labelIndex[catUid .. ':' .. suid] = slabel
             end
+        end
+        if type(suid) ~= 'string' or suid == '' or type(catUid) ~= 'string' or catUid == '' then
+            return
+        end
+
+        -- Same published node convention as the tree editor: recipeId / recipeIds in meta.
+        local meta = decodeMeta(sk.meta or sk.metadata or sk.meta_json)
+        local seen = {}
+        local function link(recipeId)
+            if type(recipeId) ~= 'string' or recipeId == '' or seen[recipeId] then return end
+            seen[recipeId] = true
+            -- First published node wins deterministically if an admin linked a recipe twice.
+            if not recipeSkillIndex[recipeId] then
+                recipeSkillIndex[recipeId] = {
+                    recipeId = recipeId,
+                    categoryUid = catUid,
+                    skillUid = suid,
+                    label = slabel,
+                }
+            end
+        end
+        link(meta.recipeId or meta.recipe_id or sk.recipeId or sk.recipe_id)
+        local ids = meta.recipeIds or meta.recipe_ids or sk.recipeIds or sk.recipe_ids
+        if type(ids) == 'table' then
+            for i = 1, #ids do link(ids[i]) end
         end
     end
 
@@ -221,6 +258,7 @@ local function loadLabelIndex()
             labelIndex['catkey:' .. key] = def.label
         end
     end
+    recipeIndexLoaded = true
 end
 
 function Skills.SkillLabel(skillUid, catKey)
@@ -261,8 +299,10 @@ end
 
 function Skills.RefreshLabels()
     labelIndex = nil
+    recipeSkillIndex = nil
+    recipeIndexLoaded = false
     loadLabelIndex()
-    return labelIndex ~= nil
+    return labelIndex ~= nil and recipeIndexLoaded == true
 end
 
 --------------------------------------------------------------------------------
@@ -588,6 +628,44 @@ function Skills.normalizeSkillRequirements(recipe, src)
     if visibility == 'mystery' then visibility = 'mystery_until_unlocked' end
     if visibility == 'discovered' then visibility = 'discovered_locked' end
 
+    if recipeSkillIndex == nil then loadLabelIndex() end
+    local linked = recipe.id and recipeSkillIndex and recipeSkillIndex[recipe.id] or nil
+    if linked then
+        local catUid = linked.categoryUid
+        local catKey = (SkillTree and SkillTree.ResolveKey and SkillTree.ResolveKey(catUid)) or catUid
+        local skillUid = linked.skillUid
+        local row = {
+            provider = 'ml_skills',
+            category = catKey,
+            categoryKey = catKey,
+            categoryUid = catUid,
+            uid = skillUid,
+            skillUid = skillUid,
+            label = linked.label or Skills.SkillLabel(skillUid, catUid),
+            source = 'ml_skills_tree',
+        }
+        if src then
+            row.unlocked = Skills.HasUnlockedSkill(src, catUid, skillUid) == true
+        end
+        return {
+            mode = 'all',
+            skills = { row },
+            visibility = visibility,
+            xp = recipe.skillXp or recipe.xp,
+            rawCount = 1,
+            normalizedCount = 1,
+            duplicatesRemoved = 0,
+            provider = 'ml_skills',
+            treeIndexed = true,
+        }
+    end
+    -- Once published trees are available, absence from their recipe index means FREE craft.
+    -- Legacy DevHub/SST `skill_N` fields must never invent a runtime gate.
+    if recipeIndexLoaded then
+        return nil
+    end
+
+    -- Cold-start fallback only (ml_skills unavailable): keep legacy parsing/failClosed.
     local skills = {}
     local seen = {}
     local rawCount = 0
@@ -1075,6 +1153,7 @@ function Skills.HealthReport()
     local cats = 0
     for _ in pairs(Config.SkillCategories or {}) do cats = cats + 1 end
     local withReq, valid, invalid = 0, 0, 0
+    local indexedGates, ignoredLegacy = 0, 0
     local invalidList = {}
     if not labelIndex then loadLabelIndex() end
     local recipes = (Config.RecipeById or Config.Recipes or {})
@@ -1088,6 +1167,13 @@ function Skills.HealthReport()
     for i = 1, #list do
         local r = list[i]
         if type(r) == 'table' then
+            local linked = r.id and recipeSkillIndex and recipeSkillIndex[r.id] or nil
+            if linked then
+                indexedGates = indexedGates + 1
+            elseif recipeIndexLoaded and (r.requiredSkill ~= nil or r.requiredSkills ~= nil
+                or r.skillTree ~= nil or r.requireSkill ~= nil or r.requireLevel ~= nil) then
+                ignoredLegacy = ignoredLegacy + 1
+            end
             local req = Skills.ParseRecipeRequirement(r)
             if req and req.skills and #req.skills > 0 then
                 withReq = withReq + 1
@@ -1121,6 +1207,9 @@ function Skills.HealthReport()
         validMappings = valid,
         invalidMappings = invalid,
         invalidList = invalidList,
+        recipeIndexLoaded = recipeIndexLoaded,
+        indexedRecipeGates = indexedGates,
+        ignoredLegacyMappings = ignoredLegacy,
         failClosed = failClosed(),
         cache = cacheEnabled(),
         xpOn = integ().xpOn or (Config.StationOutput and Config.StationOutput.XpOn) or 'collect',
@@ -1130,18 +1219,20 @@ end
 function Skills.ValidateRecipesAtStartup()
     local report = Skills.HealthReport()
     if report.invalidMappings > 0 then
-        print(('[CRAFT] ML SKILLS: %d invalid skill mapping(s) — skillUid absent from published ml_skills trees (often legacy skill_N)'):format(report.invalidMappings))
+        print(('[CRAFT] ML SKILLS: %d invalid indexed mapping(s)'):format(report.invalidMappings))
         for i = 1, math.min(20, #report.invalidList) do
             local row = report.invalidList[i]
             print(('[CRAFT]   recipe=%s category=%s uid=%s'):format(
                 tostring(row.recipeId), tostring(row.category), tostring(row.uid)))
         end
-        if report.invalidMappings > 20 then
-            print(('[CRAFT]   … +%d more (see /craftskillhealth)'):format(report.invalidMappings - 20))
-        end
     else
-        print(('[CRAFT] ML SKILLS: ok — %d gated recipes, %d categories, resource=%s started=%s'):format(
-            report.recipesWithSkillReq, report.categoriesCount, tostring(report.resource), tostring(report.mlSkillsStarted)))
+        print(('[CRAFT] ML SKILLS: ok — %d published recipe gate(s), indexLoaded=%s, resource=%s started=%s'):format(
+            report.indexedRecipeGates or 0, tostring(report.recipeIndexLoaded),
+            tostring(report.resource), tostring(report.mlSkillsStarted)))
+    end
+    if (report.ignoredLegacyMappings or 0) > 0 then
+        print(('[CRAFT] ML SKILLS: %d legacy skill field(s) ignored — recipes absent from published tree stay free'):format(
+            report.ignoredLegacyMappings))
     end
     return report
 end
@@ -1234,6 +1325,8 @@ end)
 local function onMlResource(res)
     if res ~= resourceName() and res ~= GetCurrentResourceName() then return end
     labelIndex = nil
+    recipeSkillIndex = nil
+    recipeIndexLoaded = false
     UnlockedCache = {}
     warnedDown = false
     if res == resourceName() and started(resourceName()) then
@@ -1259,6 +1352,8 @@ end)
 AddEventHandler('onResourceStop', function(res)
     if res == resourceName() then
         labelIndex = nil
+        recipeSkillIndex = nil
+        recipeIndexLoaded = false
         UnlockedCache = {}
         warnedDown = false
     end
