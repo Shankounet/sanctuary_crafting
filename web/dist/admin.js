@@ -20,6 +20,7 @@
       id: '', result: '', qty: 1, oxLabel: '', description: '',
       station: '', category: '', rarity: 'common',
       requireSpec: '', requireSkill: '', requireLevel: '',
+      skillVisibility: 'visible_locked', mysteryMode: '', previewPlayerState: '',
       duration: 5000, xp: 0, xpCategory: '',
       mastery: 0, ingredients: [], tools: [],
       energy: 0, noise: 0, heat: 0, blueprint: '',
@@ -76,6 +77,9 @@
     d.requireSpec = $('#ca-spec').value.trim();
     d.requireSkill = $('#ca-skill').value.trim();
     d.requireLevel = $('#ca-level').value;
+    d.skillVisibility = ($('#ca-visibility') && $('#ca-visibility').value) || 'visible_locked';
+    d.mysteryMode = ($('#ca-mystery-mode') && $('#ca-mystery-mode').value) || '';
+    d.previewPlayerState = ($('#ca-preview-state') && $('#ca-preview-state').value) || '';
     d.duration = Number($('#ca-duration').value) || 5000;
     d.xp = Number($('#ca-xp').value) || 0;
     d.xpCategory = $('#ca-xpcat').value.trim();
@@ -118,6 +122,9 @@
     $('#ca-spec').value = r.requireSpec || '';
     $('#ca-skill').value = r.requireSkill || '';
     $('#ca-level').value = r.requireLevel || '';
+    if ($('#ca-visibility')) $('#ca-visibility').value = r.skillVisibility || 'visible_locked';
+    if ($('#ca-mystery-mode')) $('#ca-mystery-mode').value = r.mysteryMode || '';
+    if ($('#ca-preview-state')) $('#ca-preview-state').value = '';
     $('#ca-duration').value = r.duration || 5000;
     $('#ca-xp').value = (r.xp && r.xp.amount) || r.xp || 0;
     $('#ca-xpcat').value = (r.xp && r.xp.category) || r.xpCategory || r.requireSkill || '';
@@ -276,7 +283,9 @@
         <div class="kv-row"><span>Résultat</span><span>${escapeHtml(item)} ×${(entry.result && entry.result.count) || 1}</span></div>
         <div class="kv-row"><span>Durée</span><span>${Math.round((entry.duration || 0)/1000)}s</span></div>
         <div class="kv-row"><span>Station</span><span>${escapeHtml(entry.station || '')}</span></div>
-        <div class="kv-row"><span>Skill</span><span>${escapeHtml(entry.requireSkill || '—')} ${entry.requireLevel || ''}</span></div>
+        <div class="kv-row"><span>Skill</span><span>${escapeHtml(entry.requireSkill || entry.requiredSkillLabel || '—')} ${entry.requireLevel || ''}${entry.adminMysteryBadge ? ' <span class="ca-mystery-badge">MYSTERY</span>' : ''}</span></div>
+        <div class="kv-row"><span>État joueur</span><span>${escapeHtml(entry.playerVisualState || entry.state || '—')} · ${escapeHtml(entry.skillVisibility || '')}</span></div>
+        <div class="kv-row"><span>Label vu</span><span>${escapeHtml(entry.displayLabel || entry.label || '—')}</span></div>
         <div class="kv-row"><span>XP</span><span>${entry.xp ? (entry.xp.amount + ' ' + (entry.xp.category || '')) : '—'}</span></div>
         <div class="kv-row"><span>Batch max</span><span>${entry.batchMax || entry.maxQuantity || '—'}</span></div>
         <div class="kv-row"><span>Signature</span><span>${escapeHtml(entry.signatureMode || '')}</span></div>

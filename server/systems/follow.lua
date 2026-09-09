@@ -65,6 +65,15 @@ function FollowNotify.Scan(src)
                 local label = (OxItemCatalog and OxItemCatalog.RecipeLabel and OxItemCatalog.RecipeLabel(recipe))
                     or recipe.label
                     or rid
+                -- Follow OK while unknown as "Savoir inconnu"
+                if CraftingPipeline and CraftingPipeline.BuildRecipeEntry then
+                    local entry = CraftingPipeline.BuildRecipeEntry(src, recipe, { includeHints = false })
+                    if entry and entry.playerVisualState == 'unknown' then
+                        label = entry.followLabel or 'Savoir inconnu'
+                    elseif entry and entry.followLabel then
+                        label = entry.followLabel
+                    end
+                end
                 TriggerClientEvent('ox_lib:notify', src, {
                     type = 'success',
                     description = _('craft_now_craftable', label),

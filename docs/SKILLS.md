@@ -83,7 +83,9 @@ requiredSkills = {
 
 skillVisibility = 'visible_locked'       -- default: shown, FABRIQUER disabled
              -- | 'hidden_until_unlocked' -- omitted from menu while locked
+             -- | 'mystery_until_unlocked' -- shown as ??? until unlock (secure strip)
              -- | 'discovered_locked'     -- visible once discovered, still locked
+-- mysteryMode = 'full' | 'recipe_only'   -- FULL hides skill name; RECIPE_ONLY shows category
 
 skillXp = { category = 'survival', amount = 10 } -- category defaults to requiredSkill.category
 -- or legacy: xp = { category = 'survival', amount = 10 }

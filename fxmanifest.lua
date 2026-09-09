@@ -5,7 +5,7 @@ lua54 'yes'
 name 'sanctuary_crafting'
 author 'Shankounet / Sanctuary'
 description 'Plateforme de craft post-apo + Carnet de survie — ESX, ox_*, ml_skills, NUI industrielle'
-version '2.30.5'
+version '2.31.0'
 
 ui_page 'web/dist/index.html'
 
@@ -97,6 +97,7 @@ server_scripts {
     'server/systems/recently_crafted.lua',
     'server/systems/newly_learned.lua',
     -- crafting pipeline last (depends on above)
+    'server/crafting/mystery_view.lua', -- player UNKNOWN view + skill→recipe index
     'server/crafting/pipeline.lua',
     -- survival book (after crafting systems)
     'book/server/db.lua',

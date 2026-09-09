@@ -585,6 +585,8 @@ function Skills.normalizeSkillRequirements(recipe, src)
     local visibility = recipe.skillVisibility
         or (recipe.hideIfSkillLocked and 'hidden_until_unlocked')
         or 'visible_locked'
+    if visibility == 'mystery' then visibility = 'mystery_until_unlocked' end
+    if visibility == 'discovered' then visibility = 'discovered_locked' end
 
     local skills = {}
     local seen = {}
@@ -995,6 +997,9 @@ function Skills.FacingSkill(src, recipe, _snap)
         skilltreeSkillLabel = talentLabel,
         openSkillHint = locked == true,
         skillVisibility = req and req.visibility or 'visible_locked',
+        mysteryMode = (recipe and recipe.mysteryMode)
+            or ((req and req.visibility == 'mystery_until_unlocked') and 'full')
+            or 'recipe_only',
         skillsLoading = entry.loading == true and entry.available ~= true,
         visualStatus = locked and (talentUid and 'LOCKED_SKILL' or (requireLevel and 'LOCKED_LEVEL' or 'LOCKED_SKILL')) or nil,
         mode = mode,
@@ -1162,10 +1167,23 @@ AddEventHandler('ml_skills:server:skillUnlocked', function(src, categoryUid, ski
     else
         Skills.RebuildCache(src)
     end
+    local recipeIds = {}
+    if type(uid) == 'string' and MysteryView and MysteryView.RecipeIdsForSkill then
+        recipeIds = MysteryView.RecipeIdsForSkill(cat, uid) or {}
+    elseif type(uid) == 'string' then
+        for _, recipe in pairs(Config.RecipeById or {}) do
+            local g = SkillTree and SkillTree.RecipeGate and SkillTree.RecipeGate(recipe) or {}
+            if g.requiredSkill == uid then
+                recipeIds[#recipeIds + 1] = recipe.id
+            end
+        end
+    end
     notifyRecipeSkillUpdated(src, {
         reason = 'skillUnlocked',
         categoryUid = cat,
         skillUid = uid,
+        recipeIds = recipeIds,
+        revealMs = 280,
     })
 end)
 

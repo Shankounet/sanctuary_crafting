@@ -5,7 +5,8 @@
     Canonical recipe skill fields:
       requiredSkill = nil | { category, uid, level? }
       requiredSkills = { mode = 'all'|'any', skills = { ... } }
-      skillVisibility = 'visible_locked' | 'hidden_until_unlocked' | 'discovered_locked'
+      skillVisibility = 'visible_locked' | 'hidden_until_unlocked' | 'mystery_until_unlocked' | 'discovered_locked'
+      mysteryMode = 'full' | 'recipe_only'  -- FULL hides skill name; RECIPE_ONLY shows SAVOIR REQUIS category
       skillXp = { category?, amount }
     Legacy skillTree / require* / hideIfSkillLocked migrated at NormalizeRecipe.
 ]]
@@ -95,6 +96,8 @@ function SkillTree.RecipeGate(recipe)
     local visibility = recipe.skillVisibility
         or (recipe.hideIfSkillLocked and 'hidden_until_unlocked')
         or 'visible_locked'
+    if visibility == 'mystery' then visibility = 'mystery_until_unlocked' end
+    if visibility == 'discovered' then visibility = 'discovered_locked' end
 
     -- New schema: requiredSkill table
     if type(recipe.requiredSkill) == 'table' then
@@ -216,6 +219,21 @@ function SkillTree.NormalizeRecipe(recipe)
             recipe.skillVisibility = g.visibility or 'visible_locked'
         end
     end
+    do
+        local v = recipe.skillVisibility
+        if v == 'mystery' then recipe.skillVisibility = 'mystery_until_unlocked' end
+        if v == 'discovered' then recipe.skillVisibility = 'discovered_locked' end
+    end
+    if type(recipe.mysteryMode) == 'string' then
+        local m = recipe.mysteryMode:lower()
+        if m == 'recipe_only' or m == 'recipe-only' or m == 'recipeonly' then
+            recipe.mysteryMode = 'recipe_only'
+        else
+            recipe.mysteryMode = 'full'
+        end
+    elseif recipe.skillVisibility == 'mystery_until_unlocked' then
+        recipe.mysteryMode = 'full' -- default for secrets
+    end
 
     recipe.requireLevel = g.requiredLevel
     recipe.requireSkill = g.requiredSkill
@@ -256,4 +274,20 @@ function SkillTree.IsHiddenForPlayer(recipe, hasSkill)
         return true
     end
     return false
+end
+
+--- Mystery card (shown as ???) while skill locked — NOT omitted from menu.
+function SkillTree.IsMysteryForPlayer(recipe, hasSkill)
+    local vis = recipe and recipe.skillVisibility
+    return vis == 'mystery_until_unlocked' and hasSkill == false
+end
+
+function SkillTree.MysteryMode(recipe)
+    if MysteryView and MysteryView.ResolveMysteryMode then
+        return MysteryView.ResolveMysteryMode(recipe, recipe and recipe.skillVisibility)
+    end
+    local m = recipe and recipe.mysteryMode
+    if m == 'recipe_only' then return 'recipe_only' end
+    if (recipe and recipe.skillVisibility) == 'mystery_until_unlocked' then return 'full' end
+    return 'recipe_only'
 end

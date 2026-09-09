@@ -2374,10 +2374,40 @@ local function buildRecipeEntry(src, r, ctx)
         entry.artisanHints = buildArtisanHints(src, r, artisans, ctx and ctx.orders)
     end
 
+    -- Player visual states + secure UNKNOWN stripping (ml_skills remains unlock SoT).
+    -- Admin preview may force state via ctx.previewPlayerState.
+    if MysteryView and MysteryView.FinalizePlayerEntry and not (ctx and ctx.skipMysteryView) then
+        if ctx and ctx.previewPlayerState then
+            local forced = ctx.previewPlayerState
+            if forced == 'unknown' then
+                entry = MysteryView.ApplyUnknownView(entry, r, facing)
+            elseif forced == 'discovered_locked' or forced == 'discovered' then
+                entry = MysteryView.ApplyDiscoveredLocked(entry)
+            elseif forced == 'unlocked' or forced == 'appris' then
+                entry = MysteryView.ApplyUnlocked(entry)
+            else
+                entry = MysteryView.FinalizePlayerEntry(entry, r, facing)
+            end
+        else
+            entry = MysteryView.FinalizePlayerEntry(entry, r, facing)
+        end
+        -- Admin-only MYSTERY badge never on player UI
+        if not (ctx and ctx.adminPreview) then
+            entry.adminMysteryBadge = nil
+        elseif entry.playerVisualState == 'unknown' or entry.skillVisibility == 'mystery_until_unlocked' then
+            entry.adminMysteryBadge = 'MYSTERY'
+        end
+    end
+
     return entry
 end
 
 function CraftingPipeline.BuildRecipeEntry(src, r, ctx)
+    return buildRecipeEntry(src, r, ctx)
+end
+
+--- Secure player view (task API). Same as BuildRecipeEntry — always sanitized.
+function CraftingPipeline.BuildRecipeViewForPlayer(src, r, ctx)
     return buildRecipeEntry(src, r, ctx)
 end
 
@@ -2433,14 +2463,24 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
     for i = 1, #recipes do
         local recipe = recipes[i]
         local entry = buildRecipeEntry(src, recipe, ctx)
-        -- skillVisibility: hide locked until unlocked (search still finds visible_locked)
-        local vis = entry.skillVisibility or recipe.skillVisibility or 'visible_locked'
-        local lockedSkill = entry.lockReason == 'craft_skill_required'
-            or entry.lockReason == 'skill_locked'
-            or entry.lockKind == 'ml_skill'
-        if vis == 'hidden_until_unlocked' and lockedSkill and not skillsLoading then
-            -- omit from menu
+        -- skillVisibility:
+        --   hidden_until_unlocked → omit while skill-locked
+        --   mystery_until_unlocked → keep (UNKNOWN ??? card)
+        --   visible_locked / discovered_locked → keep (discovered_locked card)
+        local omit = false
+        if MysteryView and MysteryView.ShouldOmitFromMenu then
+            omit = MysteryView.ShouldOmitFromMenu(recipe, entry, nil, skillsLoading)
         else
+            local vis = entry.skillVisibility or recipe.skillVisibility or 'visible_locked'
+            local lockedSkill = entry.lockReason == 'craft_skill_required'
+                or entry.lockReason == 'skill_locked'
+                or entry.lockKind == 'ml_skill'
+                or entry.playerVisualState == 'unknown'
+            if vis == 'hidden_until_unlocked' and lockedSkill and not skillsLoading then
+                omit = true
+            end
+        end
+        if not omit then
             if skillsLoading then
                 entry.skillState = entry.skillState or {}
                 entry.skillState.loading = true

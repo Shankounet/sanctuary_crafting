@@ -35,6 +35,9 @@ end)
 CreateThread(function()
     registerPlaceableHooks()
     local nRecipes = RecipeRegistry and select(1, RecipeRegistry.Rebuild()) or #(Config.Recipes or {})
+    if MysteryView and MysteryView.RebuildSkillRecipeIndex then
+        MysteryView.RebuildSkillRecipeIndex()
+    end
     print(('[^2sanctuary_crafting^0] v%s — %d recettes, %d bancs monde | NUI=%s Blueprints=%s Quality=%s Queue=%s'):format(
         Config.Version or '?',
         type(nRecipes) == 'number' and nRecipes or #(Config.Recipes or {}),

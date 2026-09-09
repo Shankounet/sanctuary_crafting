@@ -4501,7 +4501,7 @@ local Imported = {
     },
     {
         id = 'craft_smallboat',
-        label = 'Smallboat',
+        label = 'Petit Bateau',
         category = 'weapons',
         station = 'survie',
         ingredients = { { item = 'plastic', count = 350 }, { item = 'cuted_wood', count = 20 }, { item = 'engineoil', count = 40 } },
@@ -4511,7 +4511,9 @@ local Imported = {
         xp = { category = 'survie', amount = 20 },
         requireSkill = 'skill_139',
         requireSkillCategory = 'survie',
-        hideIfSkillLocked = true,
+        -- Mystery until ml_skills unlock (skill_139) — shown as ??? not hidden
+        skillVisibility = 'mystery_until_unlocked',
+        mysteryMode = 'full',
         rarity = 'common',
     },
     {

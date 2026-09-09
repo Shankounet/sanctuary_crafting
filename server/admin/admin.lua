@@ -51,6 +51,8 @@ local function slimRecipe(r)
         xp = r.xp,
         requireLevel = r.requireLevel,
         requireSkill = r.requireSkill,
+        skillVisibility = r.skillVisibility,
+        mysteryMode = r.mysteryMode,
         skillTree = r.skillTree,
         requireSpec = r.requireSpec,
         requireBlueprint = r.requireBlueprint or r.blueprintId,
@@ -208,6 +210,8 @@ local function draftToRecipe(draft)
         duration = math.max(500, math.floor(tonumber(draft.duration) or 5000)),
         requireLevel = tonumber(draft.requireLevel),
         requireSkill = draft.requireSkill,
+        skillVisibility = draft.skillVisibility,
+        mysteryMode = (draft.mysteryMode ~= '' and draft.mysteryMode) or nil,
         skillTree = draft.skillTree or draft.requiredSkillTree,
         requireSpec = draft.requireSpec,
         requireBlueprint = draft.blueprint or draft.requireBlueprint or draft.blueprintId,
@@ -239,7 +243,13 @@ lib.callback.register('sanctuary_crafting:craftadminPreview', function(src, draf
     local valid = RecipeRegistry and RecipeRegistry.Validate and RecipeRegistry.Validate(recipe)
     local entry = nil
     if CraftingPipeline and CraftingPipeline.BuildRecipeEntry then
-        entry = CraftingPipeline.BuildRecipeEntry(src, recipe, { includeHints = false })
+        local previewState = type(draft) == 'table' and draft.previewPlayerState or nil
+        if previewState == '' then previewState = nil end
+        entry = CraftingPipeline.BuildRecipeEntry(src, recipe, {
+            includeHints = false,
+            adminPreview = true,
+            previewPlayerState = previewState,
+        })
     end
     local ox
     local item = recipe.result and recipe.result.item
