@@ -55,7 +55,7 @@ Config.Debug = {
     Enabled = false,
     GiveMaterials = false, -- true + Validation.IsAdmin → bouton GIVE MATÉRIAUX
 }
-Config.Version = '2.31.0'
+Config.Version = '2.32.0'
 
 --------------------------------------------------------------------------------
 -- Feature flags (Phase 2–7) — stubs uniquement, aucun comportement Phase 1
@@ -118,7 +118,7 @@ Config.Admin = {
     CustomCallback = nil, -- optional function(src) -> boolean (OR with ACE / ESX group)
 }
 
-Config.SchemaVersion = 224
+Config.SchemaVersion = 225
 
 Config.EnableWorldBenchCommand = true
 Config.WorldBenchCommand = 'placeworldbench'

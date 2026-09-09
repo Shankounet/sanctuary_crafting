@@ -54,11 +54,36 @@ end
 
 local function categoryFacingLabel(cat)
     if not cat then return nil end
+    if CraftTaxonomy and CraftTaxonomy.GetCategory then
+        local def = CraftTaxonomy.GetCategory(cat)
+        if def and type(def.label) == 'string' and def.label ~= '' then
+            return def.label
+        end
+    end
     local def = Config.RecipeCategories and Config.RecipeCategories[cat]
     if def and type(def.label) == 'string' and def.label ~= '' then
         return def.label
     end
     return nil
+end
+
+local function craftCategoryFields(r)
+    if CraftTaxonomy and CraftTaxonomy.NormalizeRecipeClassification then
+        CraftTaxonomy.NormalizeRecipeClassification(r)
+    end
+    local catUid = r.craftCategoryUid or 'divers'
+    local subUid = r.craftSubcategoryUid
+    local catDef = CraftTaxonomy and CraftTaxonomy.GetCategory and CraftTaxonomy.GetCategory(catUid)
+    local subDef = CraftTaxonomy and CraftTaxonomy.GetSubcategory and CraftTaxonomy.GetSubcategory(catUid, subUid)
+    return {
+        craftCategoryUid = catUid,
+        craftCategoryLabel = (catDef and catDef.label) or categoryFacingLabel(catUid) or catUid,
+        craftCategoryIcon = (catDef and catDef.icon) or 'fa-solid fa-tag',
+        craftCategoryAccent = catDef and catDef.accent or nil,
+        craftSubcategoryUid = subUid,
+        craftSubcategoryLabel = subDef and subDef.label or nil,
+        craftSubcategoryIcon = subDef and subDef.icon or nil,
+    }
 end
 
 local function stationFacingLabel(station)
@@ -2090,7 +2115,7 @@ local function buildRecipeEntry(src, r, ctx)
     end
 
     local entry = {
-        id = r.id, label = recipeFacingLabel(r), category = r.category, tags = tags,
+        id = r.id, label = recipeFacingLabel(r), category = (r.craftCategoryUid or r.category), tags = tags,
         description = recipeFacingDesc(r),
         ingredients = ingsOut,
         result = resultOut, duration = r.duration,
@@ -2196,7 +2221,8 @@ local function buildRecipeEntry(src, r, ctx)
     local talentLab = facing and facing.requiredSkillLabel or nil
     local specLab = requireSpecLabel
     local stationLab = stationFacingLabel(r.station) or (ctx and ctx.bench and ctx.bench.label) or nil
-    local uiCatLab = categoryFacingLabel(r.category)
+    local craftFields = craftCategoryFields(r)
+    local uiCatLab = craftFields.craftCategoryLabel or categoryFacingLabel(r.craftCategoryUid or r.category)
 
     local function fmtMissing(pm)
         if not pm then return 'Matériaux insuffisants' end
@@ -2304,7 +2330,8 @@ local function buildRecipeEntry(src, r, ctx)
     end
 
     local hayParts = {
-        recipeFacingLabel(r), recipeFacingDesc(r), uiCatLab, r.category,
+        recipeFacingLabel(r), recipeFacingDesc(r), uiCatLab, craftFields.craftCategoryUid,
+        craftFields.craftSubcategoryLabel, craftFields.craftSubcategoryUid,
         stationLab, r.station, specLab, talentLab, catLab,
     }
     for i = 1, #ingsOut do
@@ -2359,6 +2386,15 @@ local function buildRecipeEntry(src, r, ctx)
     entry.maxCraftableCause = maxCraftableCause
     entry.searchHaystack = searchHaystack
     entry.categoryLabel = uiCatLab
+    entry.category = craftFields.craftCategoryUid -- player UI category uid (compat)
+    entry.craftCategoryUid = craftFields.craftCategoryUid
+    entry.craftCategoryLabel = craftFields.craftCategoryLabel
+    entry.craftCategoryIcon = craftFields.craftCategoryIcon
+    entry.craftCategoryAccent = craftFields.craftCategoryAccent
+    entry.craftSubcategoryUid = craftFields.craftSubcategoryUid
+    entry.craftSubcategoryLabel = craftFields.craftSubcategoryLabel
+    entry.craftSubcategoryIcon = craftFields.craftSubcategoryIcon
+    entry.legacyCategory = r._legacyUiCategory or r.category
     entry.stationLabel = stationLab
     entry.requireModule = r.requireModule or r.requiredModule or (r.needsVentilation and 'ventilation') or nil
     if entry.requireModule == 'ventilation' and r.needsVentilation then
@@ -2632,6 +2668,9 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
         overheat = snap.overheat, stationKind = snap.kind,
         maxLevel = snap.maxLevel,
         recipes = out, favorites = favorites, pinned = pinned,
+        craftCategories = (CraftTaxonomy and CraftTaxonomy.PayloadForClient and CraftTaxonomy.PayloadForClient()) or {},
+        -- Counts policy (documented): left-rail counts = recipes visible under current NON-category
+        -- filters (search / favoris / nouveaux / faisables / rareté). Category chip itself is the selection.
         knownArtisans = artisanBook,
         playerSpec = (Specializations and Specializations.Resolve and Specializations.Resolve(src)) or nil,
         specialtyIcons = (SpecialtyIcon and SpecialtyIcon.BuildNuiMap and SpecialtyIcon.BuildNuiMap()) or {},

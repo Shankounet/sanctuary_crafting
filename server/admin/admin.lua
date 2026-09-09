@@ -40,7 +40,13 @@ local function slimRecipe(r)
         id = r.id,
         label = oxLabel or r.label,
         description = r.description or oxDesc,
-        category = r.category,
+        category = r.craftCategoryUid or r.category,
+        craftCategoryUid = r.craftCategoryUid,
+        craftSubcategoryUid = r.craftSubcategoryUid,
+        craftCategoryLabel = r._craftCategoryLabel,
+        craftSubcategoryLabel = r._craftSubcategoryLabel,
+        legacyCategory = r._legacyUiCategory or r.category,
+        _craftCategoryInvalid = r._craftCategoryInvalid,
         station = r.station or r.category,
         rarity = r.rarity,
         result = r.result,
@@ -88,16 +94,25 @@ local function metaPayload()
         stations[#stations + 1] = { id = id, label = (Config.BenchLabels and _(Config.BenchLabels[id] or id)) or id }
     end
     table.sort(stations, function(a, b) return a.id < b.id end)
+    local craftCategories = (CraftTaxonomy and CraftTaxonomy.PayloadForClient and CraftTaxonomy.PayloadForClient()) or {}
+    -- compat: categories list for legacy select (id/label/order)
     local categories = {}
-    for id, def in pairs(Config.RecipeCategories or {}) do
-        if id ~= 'all' then
-            categories[#categories + 1] = { id = id, label = def.label or id, order = def.order or 99 }
-        end
+    for i = 1, #craftCategories do
+        local c = craftCategories[i]
+        categories[#categories + 1] = {
+            id = c.uid,
+            uid = c.uid,
+            label = c.label,
+            order = c.sortOrder or 99,
+            icon = c.icon,
+            accent = c.accent,
+            subcategories = c.subcategories,
+        }
     end
-    table.sort(categories, function(a, b) return (a.order or 99) < (b.order or 99) end)
     return {
         stations = stations,
         categories = categories,
+        craftCategories = craftCategories,
         rarities = { 'common', 'uncommon', 'rare', 'epic', 'legendary' },
         signatureModes = { 'none', 'batch', 'individual' },
         version = Config.Version,
@@ -120,8 +135,15 @@ lib.callback.register('sanctuary_crafting:craftadminList', function(src, filter)
         if filter.station and filter.station ~= '' and (r.station or r.category) ~= filter.station then
             goto continue
         end
-        if filter.category and filter.category ~= '' and r.category ~= filter.category then
-            goto continue
+        if filter.category and filter.category ~= '' then
+            local uid = r.craftCategoryUid or r.category
+            if uid ~= filter.category then goto continue end
+        end
+        if filter.craftCategoryUid and filter.craftCategoryUid ~= '' then
+            if (r.craftCategoryUid or r.category) ~= filter.craftCategoryUid then goto continue end
+        end
+        if filter.craftSubcategoryUid and filter.craftSubcategoryUid ~= '' then
+            if (r.craftSubcategoryUid or '') ~= filter.craftSubcategoryUid then goto continue end
         end
         if filter.rarity and filter.rarity ~= '' and tostring(r.rarity or '') ~= filter.rarity then
             goto continue
@@ -202,7 +224,9 @@ local function draftToRecipe(draft)
         labelOverride = draft.labelOverride or draft.oxLabel,
         description = draft.description,
         descriptionOverride = draft.descriptionOverride,
-        category = draft.category or 'scrap',
+        category = draft.category or draft.craftCategoryUid or 'divers',
+        craftCategoryUid = draft.craftCategoryUid or draft.category or 'divers',
+        craftSubcategoryUid = draft.craftSubcategoryUid,
         station = draft.station or draft.category,
         rarity = draft.rarity,
         ingredients = ings,
@@ -390,6 +414,224 @@ lib.callback.register('sanctuary_crafting:craftadminCreate', function(src, draft
     return { ok = true, version = version, recipe = slimRecipe(recipe) }
 end)
 
+
+
+
+--- Taxonomie craft: audit migration (preview only — no silent apply)
+lib.callback.register('sanctuary_crafting:craftadminTaxonomyAudit', function(src)
+    if not CraftAdmin.IsAllowed(src) then return deny() end
+    local audit = CraftTaxonomy and CraftTaxonomy.BuildMigrationAudit and CraftTaxonomy.BuildMigrationAudit() or { summary = {}, rows = {} }
+    return { ok = true, audit = audit, craftCategories = CraftTaxonomy.PayloadForClient() }
+end)
+
+--- Suggest classification for one recipe (ADMIN only, never auto-truth)
+lib.callback.register('sanctuary_crafting:craftadminSuggestClass', function(src, recipeId)
+    if not CraftAdmin.IsAllowed(src) then return deny() end
+    if type(recipeId) ~= 'string' then return { ok = false, reason = 'craft_invalid' } end
+    local r = RecipeRegistry.Get(recipeId)
+    if not r then
+        local list = RecipeOverlay and RecipeOverlay.ListForAdmin and RecipeOverlay.ListForAdmin() or {}
+        for i = 1, #list do
+            if list[i].id == recipeId then r = list[i] break end
+        end
+    end
+    if not r then return { ok = false, reason = 'craft_invalid' } end
+    -- Suggest from override/legacy — ignore current craftCategoryUid so admin sees a proposal
+    local sug = CraftTaxonomy.SuggestClassification({
+        id = r.id,
+        label = r.label,
+        category = r._legacyUiCategory or r.category,
+    })
+    local cat = CraftTaxonomy.GetCategory(sug.category)
+    local sub = CraftTaxonomy.GetSubcategory(sug.category, sug.subcategory)
+    return {
+        ok = true,
+        suggestion = {
+            craftCategoryUid = sug.category,
+            craftSubcategoryUid = sug.subcategory,
+            craftCategoryLabel = cat and cat.label,
+            craftSubcategoryLabel = sub and sub.label,
+            source = sug.source,
+            legacyCategory = sug.legacyCategory,
+        },
+    }
+end)
+
+--- Bulk move recipes → Category>Subcategory (preview or apply with confirm)
+lib.callback.register('sanctuary_crafting:craftadminBulkMove', function(src, payload)
+    if not CraftAdmin.IsAllowed(src) then return deny() end
+    payload = type(payload) == 'table' and payload or {}
+    local ids = payload.recipeIds or payload.ids
+    local catUid = payload.craftCategoryUid or payload.category
+    local subUid = payload.craftSubcategoryUid or payload.subcategory
+    local preview = payload.preview == true or payload.apply ~= true
+    local confirm = payload.confirm == true
+    if type(ids) ~= 'table' or #ids < 1 then
+        return { ok = false, reason = 'craft_invalid' }
+    end
+    if type(catUid) ~= 'string' or not CraftTaxonomy.IsValidCategory(catUid) then
+        return { ok = false, reason = 'admin_invalid_category' }
+    end
+    if subUid ~= nil and subUid ~= '' and not CraftTaxonomy.IsValidSubcategory(catUid, subUid) then
+        return { ok = false, reason = 'admin_invalid_subcategory' }
+    end
+    if subUid == '' then subUid = nil end
+
+    local previewRows = {}
+    for i = 1, #ids do
+        local id = ids[i]
+        if type(id) == 'string' then
+            local r = RecipeRegistry.Get(id)
+            previewRows[#previewRows + 1] = {
+                recipeId = id,
+                label = r and r.label,
+                fromCategory = r and r.craftCategoryUid,
+                fromSubcategory = r and r.craftSubcategoryUid,
+                toCategory = catUid,
+                toSubcategory = subUid,
+            }
+        end
+    end
+
+    if preview or not confirm then
+        return { ok = true, preview = true, rows = previewRows, count = #previewRows }
+    end
+
+    -- Apply via overlay Save (explicit confirm)
+    local moved, failed = 0, {}
+    for i = 1, #ids do
+        local id = ids[i]
+        if type(id) == 'string' then
+            local r = RecipeRegistry.Get(id)
+            if not r then
+                failed[#failed + 1] = { id = id, reason = 'missing' }
+            else
+                local clone = RecipeSnapshot and RecipeSnapshot.Clone and RecipeSnapshot.Clone(r) or r
+                clone.craftCategoryUid = catUid
+                clone.craftSubcategoryUid = subUid
+                clone.category = catUid -- deprecated mirror for transitional tools
+                if CraftTaxonomy and CraftTaxonomy.NormalizeRecipeClassification then
+                    CraftTaxonomy.NormalizeRecipeClassification(clone)
+                end
+                local ok, err = RecipeOverlay.Save(clone, src)
+                if ok then
+                    moved = moved + 1
+                else
+                    failed[#failed + 1] = { id = id, reason = err or 'save_failed' }
+                end
+            end
+        end
+    end
+    if RecipeRegistry and RecipeRegistry.Rebuild then RecipeRegistry.Rebuild() end
+    return { ok = true, preview = false, moved = moved, failed = failed }
+end)
+
+--- Apply suggested classification for selected recipes (preview/confirm)
+lib.callback.register('sanctuary_crafting:craftadminApplySuggestions', function(src, payload)
+    if not CraftAdmin.IsAllowed(src) then return deny() end
+    payload = type(payload) == 'table' and payload or {}
+    local ids = payload.recipeIds or payload.ids
+    local confirm = payload.confirm == true
+    if type(ids) ~= 'table' or #ids < 1 then
+        return { ok = false, reason = 'craft_invalid' }
+    end
+    local rows = {}
+    for i = 1, #ids do
+        local id = ids[i]
+        local r = type(id) == 'string' and RecipeRegistry.Get(id) or nil
+        if r then
+            local sug = CraftTaxonomy.SuggestClassification({
+                id = r.id,
+                category = r._legacyUiCategory or r.category,
+                craftCategoryUid = nil, -- force suggest from legacy/override
+                label = r.label,
+            })
+            -- Prefer override map using raw recipe
+            sug = CraftTaxonomy.SuggestClassification(r)
+            rows[#rows + 1] = {
+                recipeId = id,
+                label = r.label,
+                fromCategory = r.craftCategoryUid,
+                fromSubcategory = r.craftSubcategoryUid,
+                toCategory = sug.category,
+                toSubcategory = sug.subcategory,
+                source = sug.source,
+                legacyCategory = sug.legacyCategory,
+            }
+        end
+    end
+    if not confirm then
+        return { ok = true, preview = true, rows = rows }
+    end
+    local moved, failed = 0, {}
+    for i = 1, #rows do
+        local row = rows[i]
+        local r = RecipeRegistry.Get(row.recipeId)
+        if not r then
+            failed[#failed + 1] = { id = row.recipeId, reason = 'missing' }
+        else
+            local clone = RecipeSnapshot.Clone(r)
+            clone.craftCategoryUid = row.toCategory
+            clone.craftSubcategoryUid = row.toSubcategory
+            clone.category = row.toCategory
+            CraftTaxonomy.NormalizeRecipeClassification(clone)
+            local ok, err = RecipeOverlay.Save(clone, src)
+            if ok then moved = moved + 1 else failed[#failed + 1] = { id = row.recipeId, reason = err } end
+        end
+    end
+    if RecipeRegistry.Rebuild then RecipeRegistry.Rebuild() end
+    return { ok = true, preview = false, moved = moved, failed = failed }
+end)
+
+--- Runtime category def upsert (session Config — persisted via note; structural edits live in config)
+lib.callback.register('sanctuary_crafting:craftadminUpsertCategory', function(src, def)
+    if not CraftAdmin.IsAllowed(src) then return deny() end
+    if type(def) ~= 'table' or type(def.uid) ~= 'string' or def.uid == '' then
+        return { ok = false, reason = 'craft_invalid' }
+    end
+    Config.CraftCategories = Config.CraftCategories or {}
+    local existing = Config.CraftCategories[def.uid] or {}
+    Config.CraftCategories[def.uid] = {
+        uid = def.uid,
+        label = def.label or existing.label or def.uid,
+        icon = def.icon or existing.icon or 'fa-solid fa-tag',
+        sortOrder = tonumber(def.sortOrder) or existing.sortOrder or 100,
+        accent = def.accent or existing.accent,
+        enabled = def.enabled ~= false,
+        subcategories = type(def.subcategories) == 'table' and def.subcategories or (existing.subcategories or {}),
+    }
+    -- refresh flat RecipeCategories compat
+    if Config.RecipeCategories then
+        Config.RecipeCategories[def.uid] = {
+            id = def.uid, uid = def.uid,
+            label = Config.CraftCategories[def.uid].label,
+            icon = Config.CraftCategories[def.uid].icon,
+            order = Config.CraftCategories[def.uid].sortOrder,
+            sortOrder = Config.CraftCategories[def.uid].sortOrder,
+            accent = Config.CraftCategories[def.uid].accent,
+            enabled = true,
+        }
+    end
+    return { ok = true, category = Config.CraftCategories[def.uid], craftCategories = CraftTaxonomy.PayloadForClient() }
+end)
+
+lib.callback.register('sanctuary_crafting:craftadminUpsertSubcategory', function(src, catUid, def)
+    if not CraftAdmin.IsAllowed(src) then return deny() end
+    if type(catUid) ~= 'string' or type(def) ~= 'table' or type(def.uid) ~= 'string' then
+        return { ok = false, reason = 'craft_invalid' }
+    end
+    local cat = Config.CraftCategories and Config.CraftCategories[catUid]
+    if not cat then return { ok = false, reason = 'admin_invalid_category' } end
+    cat.subcategories = cat.subcategories or {}
+    cat.subcategories[def.uid] = {
+        uid = def.uid,
+        label = def.label or def.uid,
+        icon = def.icon,
+        sortOrder = tonumber(def.sortOrder) or 50,
+        enabled = def.enabled ~= false,
+    }
+    return { ok = true, subcategory = cat.subcategories[def.uid], craftCategories = CraftTaxonomy.PayloadForClient() }
+end)
 
 --- ML Skills admin: tree picker payload + health
 lib.callback.register('sanctuary_crafting:adminMlSkills', function(src)
