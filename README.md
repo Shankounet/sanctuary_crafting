@@ -11,6 +11,14 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 ## Notes de version
 
+### v2.31.0 — Mystery / unknown recipe visibility
+- Player states: UNKNOWN (???) / DISCOVERED_LOCKED / UNLOCKED — `skillVisibility` + optional `mysteryMode`
+- Secure `BuildRecipeViewForPlayer` strips secrets while unknown; search does not match true names
+- Reveal on `ml_skills:server:skillUnlocked` for linked recipes only (light CSS, no restart)
+- Admin visibility picker + player-state preview; Petit Bateau (`craft_smallboat`) = mystery_until_unlocked
+- See `docs/MYSTERY_VISIBILITY.md`
+
+
 ### v2.30.0 — Phase 4: sanctuary_skilltree sole skill/XP source
 - `CraftingSkills` → `sanctuary_skilltree` exports (level / XP / totalXp / points / unlocked / hasUnlockedSkill / addXp).
 - `Config.SkillSystem = 'sanctuary'` (auto/devhub fallback optional). DevHub **not** a hard fxmanifest dependency.

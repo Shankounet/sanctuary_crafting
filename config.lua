@@ -25,7 +25,8 @@ Config = {}
       xp          = { category = 'engineer', amount = 15 }, -- KEY Config.SkillCategories
       requiredSkill = { category = 'medic', uid = 'bandage_basic', level = 1 }, -- nil = free
       -- requiredSkills = { mode = 'all'|'any', skills = { { category, uid, level? }, ... } }
-      -- skillVisibility = 'visible_locked' | 'hidden_until_unlocked' | 'discovered_locked'
+      -- skillVisibility = 'visible_locked' | 'hidden_until_unlocked' | 'mystery_until_unlocked' | 'discovered_locked'
+      -- mysteryMode = 'full' | 'recipe_only'  -- FULL hides skill name; RECIPE_ONLY shows category
       -- skillXp = { category?, amount } — defaults category to requiredSkill.category
       -- legacy skillTree / requireLevel / requireSkill / DevHub fields migrés au load
 
@@ -54,7 +55,7 @@ Config.Debug = {
     Enabled = false,
     GiveMaterials = false, -- true + Validation.IsAdmin → bouton GIVE MATÉRIAUX
 }
-Config.Version = '2.30.5'
+Config.Version = '2.31.0'
 
 --------------------------------------------------------------------------------
 -- Feature flags (Phase 2–7) — stubs uniquement, aucun comportement Phase 1
@@ -137,6 +138,23 @@ Config.SkillIntegration = {
     debug = false, -- temporary: log normalize/FacingSkill/gate for gated recipes
     -- Optional: map craft KEY → ml_skills categoryUid when SkillCategories is not enough
     -- CategoryMapping = { survival = 'survie', medic = 'medecin' },
+}
+
+--------------------------------------------------------------------------------
+-- Mystery / unknown recipe visibility (player states)
+-- UNKNOWN (mystery_until_unlocked) → ??? card; DISCOVERED_LOCKED → real label locked;
+-- UNLOCKED / APPRIS → full data. ml_skills remains unlock source of truth.
+--------------------------------------------------------------------------------
+Config.Mystery = {
+    Enabled = true,
+    defaultModeForSecrets = 'full',          -- mystery_until_unlocked default
+    defaultModeForProgression = 'recipe_only',
+    BlockFavoritesWhenUnknown = true,
+    RevealMs = 280, -- CSS reveal duration when skill unlocks (200–350)
+}
+
+Config.Favorites = Config.Favorites or {
+    BlockUnknown = true, -- discourage / block favorites while fully unknown
 }
 
 -- Legacy alias (SkillSystem removed from unlock path; kept for older configs reading it)

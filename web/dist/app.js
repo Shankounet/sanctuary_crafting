@@ -597,6 +597,9 @@
   };
 
   function lockText(r) {
+    if (isMysteryRecipe(r)) {
+      return { text: 'Connaissance inconnue', cls: 'mystery', tag: 'INCONNUE' };
+    }
     if (r.canCraft) return { text: 'Conditions remplies', cls: 'ok', tag: 'FAISABLE' };
     if (!r.locked && r.missingItems) return { text: 'Matériaux manquants', cls: 'bad', tag: 'MANQUANT' };
     if (!r.locked) return { text: 'Disponible', cls: 'ok', tag: 'FAISABLE' };
@@ -645,10 +648,42 @@
       || (r.skillState && r.skillState.unlocked === false && (r.requiredSkill || r.requireSkill));
   }
 
+  function isMysteryRecipe(r) {
+    if (!r) return false;
+    return r.playerVisualState === 'unknown'
+      || r.state === 'unknown'
+      || (r.skillVisibility === 'mystery_until_unlocked' && isSkillLockedRecipe(r));
+  }
+
+  function isDiscoveredLockedRecipe(r) {
+    if (!r) return false;
+    return r.playerVisualState === 'discovered_locked'
+      || r.state === 'discovered_locked';
+  }
+
+  function mysterySkilltreeCtaHtml(r) {
+    const categoryUid = r.openSkillsCategory
+      || (r.skillState && r.skillState.categoryUid)
+      || r.skilltreeCategoryUid
+      || '';
+    if (!categoryUid && !r.canOpenSkillTree) return '';
+    const recipeId = r.id || '';
+    // OpenSkillTree(categoryUid) only — no invented node focus (skillUid empty)
+    return `<button type="button" class="btn ghost btn-skilltree-open" title="Voir dans les savoirs" data-recipe-id="${escapeHtml(recipeId)}" data-skill-uid="" data-category-uid="${escapeHtml(categoryUid)}">VOIR DANS LES SAVOIRS →</button>`;
+  }
+
   function savoirRequisHtml(r) {
     if (!r) return '';
     if (r.skillState && r.skillState.loading) {
       return `<div class="savoir-requis loading">Chargement des savoirs...</div>`;
+    }
+    if (isMysteryRecipe(r)) {
+      const mode = r.mysteryMode || 'full';
+      if (mode === 'recipe_only') {
+        const cat = r.skillCategoryLabel || (r.skillState && r.skillState.categoryLabel) || 'Savoir';
+        return `<div class="savoir-requis mystery" title="Savoir requis">SAVOIR REQUIS : ${escapeHtml(cat)} <span class="mark">?</span></div>`;
+      }
+      return `<div class="savoir-requis mystery" title="Connaissance inconnue">SAVOIR REQUIS : ??? <span class="mark">?</span></div>`;
     }
     const lab = talentLabelOf(r) || (r.skillState && r.skillState.label);
     const needLvl = (r.skillState && r.skillState.requireLevel) || r.requireLevel || (r.skillTree && r.skillTree.requiredLevel);
@@ -662,7 +697,9 @@
   }
 
 function skilltreeCtaHtml(r) {
-    if (!r || r.canCraft) return '';
+    if (!r) return '';
+    if (isMysteryRecipe(r)) return mysterySkilltreeCtaHtml(r);
+    if (r.canCraft) return '';
     const lockedBySkill = r.lockReason === 'craft_recipe_locked'
       || r.lockReason === 'craft_skill_required'
       || r.lockReason === 'skill_locked'
@@ -720,6 +757,9 @@ function skilltreeCtaHtml(r) {
   }
 
   function cardStatus(r) {
+    if (isMysteryRecipe(r)) {
+      return { text: '???', cls: 'mystery', tip: 'Connaissance inconnue — Voir dans les savoirs →' };
+    }
     if (r && r.skillState && r.skillState.loading) {
       return { text: 'CHARGEMENT', cls: 'warn', tip: 'Chargement des savoirs...' };
     }
@@ -971,11 +1011,16 @@ function skilltreeCtaHtml(r) {
       const card = document.createElement('article');
       card.className = 'recipe-card';
       if (r.locked) card.classList.add('locked');
+      if (isMysteryRecipe(r)) card.classList.add('is-mystery', 'knowledge-unknown');
+      if (isDiscoveredLockedRecipe(r)) card.classList.add('is-discovered-locked');
       if (state.selected && state.selected.id === r.id) card.classList.add('selected');
       card.dataset.id = r.id;
+      if (r.playerVisualState) card.dataset.visual = r.playerVisualState;
 
       const favOn = isFavorite(r.id);
-      const status = cardStatus(r);
+      const status = isMysteryRecipe(r)
+        ? { text: '???', cls: 'mystery', tip: 'Connaissance inconnue — Voir dans les savoirs →' }
+        : cardStatus(r);
       card.classList.add(`state-${status.cls || 'bad'}`);
       if (r.rarity) {
         const rk = rarityKey(r.rarity);
@@ -1023,8 +1068,9 @@ function skilltreeCtaHtml(r) {
       } else if (isPinned(r.id)) {
         cornerHtml = '<span class="card-corner-mark is-followed" title="Suivi dans le Carnet"><i class="fa-solid fa-bookmark" aria-hidden="true"></i></span>';
       }
-      const titleText = kn === 'unknown' ? '???' : r.label;
-      const veilImg = (kn === 'unknown' || kn === 'partial');
+      const mystery = isMysteryRecipe(r);
+      const titleText = mystery || kn === 'unknown' ? '???' : (r.displayLabel || r.label);
+      const veilImg = mystery || (kn === 'unknown' || kn === 'partial');
       const hasSpecSignal = !!(
         (r.skillTree && r.skillTree.category)
         || r.skillCategory
@@ -1038,24 +1084,29 @@ function skilltreeCtaHtml(r) {
         ? `<span class="card-spec${showNouveau ? ' with-nouveau' : ''}" title="${escapeHtml(specDef.label || '')}">${specialtyIconHtml(specKey, { size: 'sm' })}</span>`
         : '';
 
+      const favDisabled = mystery || r.favoriteAllowed === false;
+      const hoverTip = mystery
+        ? 'Connaissance inconnue / Voir dans les savoirs →'
+        : tip;
+      card.title = hoverTip;
       card.innerHTML = `
-        <button type="button" class="card-fav${favOn ? ' on' : ''}" data-fav="${escapeHtml(r.id)}" title="Favori" aria-label="Favori">
+        <button type="button" class="card-fav${favOn ? ' on' : ''}${favDisabled ? ' is-disabled' : ''}" data-fav="${escapeHtml(r.id)}" title="${favDisabled ? 'Favori indisponible (connaissance inconnue)' : 'Favori'}" aria-label="Favori" ${favDisabled ? 'disabled' : ''}>
           <i class="fa-${favOn ? 'solid' : 'regular'} fa-star" aria-hidden="true"></i>
         </button>
-        <div class="card-img-zone${veilImg ? ' is-veiled' : ''}${kn === 'unknown' ? ' is-unknown' : ''}">
-          <span class="ph" aria-hidden="true"><i class="fa-solid ${kn === 'unknown' ? 'fa-question' : 'fa-cube'}"></i></span>
+        <div class="card-img-zone${veilImg ? ' is-veiled' : ''}${mystery || kn === 'unknown' ? ' is-unknown is-mystery-silhouette' : ''}">
+          <span class="ph mystery-silhouette" aria-hidden="true"><i class="fa-solid ${mystery || kn === 'unknown' ? 'fa-question' : 'fa-cube'}"></i></span>
           <img alt="" />
-          ${nouveauHtml}
-          ${cardSpecHtml}
-          ${cornerHtml}
-          <span class="card-state-badge ${status.cls}" title="${escapeHtml(tip)}">${status.text}</span>
+          ${mystery ? '' : nouveauHtml}
+          ${mystery ? '' : cardSpecHtml}
+          ${mystery ? '' : cornerHtml}
+          <span class="card-state-badge ${status.cls}" title="${escapeHtml(hoverTip)}">${status.text}</span>
         </div>
         <div class="card-body">
           <div class="card-identity">
             <div class="card-title">${escapeHtml(titleText)}</div>
             <div class="card-meta-line">
-              <span class="card-cat">${escapeHtml(categoryLabel(r.category))}</span>
-              <span class="card-code">${escapeHtml(code)}</span>
+              <span class="card-cat">${mystery ? 'Connaissance inconnue' : escapeHtml(categoryLabel(r.category))}</span>
+              <span class="card-code">${mystery ? '???' : escapeHtml(code)}</span>
             </div>
           </div>
         </div>
@@ -1063,7 +1114,7 @@ function skilltreeCtaHtml(r) {
 
       const img = card.querySelector('.card-img-zone img');
       const ph = card.querySelector('.card-img-zone .ph');
-      if (kn === 'unknown') {
+      if (mystery || kn === 'unknown') {
         if (img) { img.hidden = true; img.classList.add('is-fallback'); }
         if (ph) ph.style.display = '';
       } else {
@@ -1862,10 +1913,15 @@ function skilltreeCtaHtml(r) {
 
   async function toggleFavoriteLocal(recipeId) {
     if (!recipeId) return;
+    const recipe = (state.recipes || []).find((x) => x.id === recipeId);
+    if (recipe && (isMysteryRecipe(recipe) || recipe.favoriteAllowed === false)) {
+      showToast('Impossible d\'ajouter une connaissance inconnue aux favoris', 'warn');
+      return;
+    }
     const was = isFavorite(recipeId);
     const res = await post('favorite', { recipeId });
     if (!res || res.ok === false) {
-      showToast('Favori indisponible', 'err');
+      showToast((res && res.message) || 'Favori indisponible', 'err');
       return;
     }
     if (Array.isArray(res.favorites)) {
@@ -1903,10 +1959,80 @@ function skilltreeCtaHtml(r) {
     $('#detail-empty').classList.add('hidden');
     $('#detail').classList.remove('hidden');
 
+    const ficheRoot = $('#detail');
+    if (ficheRoot) {
+      ficheRoot.classList.toggle('is-mystery', isMysteryRecipe(r));
+      ficheRoot.classList.toggle('is-discovered-locked', isDiscoveredLockedRecipe(r));
+    }
+
+    if (isMysteryRecipe(r)) {
+      const img = $('#d-image');
+      const fb = $('#d-image-fallback');
+      if (img) { img.hidden = true; img.removeAttribute('src'); }
+      if (fb) { fb.classList.remove('hidden'); fb.innerHTML = '<i class="fa-solid fa-question mystery-silhouette" aria-hidden="true"></i>'; }
+      $('#d-title').textContent = '???';
+      const catEl = $('#d-category');
+      if (catEl) catEl.textContent = 'Connaissance inconnue';
+      const codeEl = $('#d-code');
+      if (codeEl) codeEl.textContent = '???';
+      const rarityEl = $('#d-rarity');
+      if (rarityEl) { rarityEl.classList.add('hidden'); rarityEl.innerHTML = ''; }
+      const descEl = $('#d-desc');
+      if (descEl) {
+        descEl.textContent = r.description || 'Cette fabrication reste inconnue.';
+        descEl.style.display = '';
+      }
+      const locksEl = $('#d-locks');
+      if (locksEl) {
+        locksEl.textContent = 'INCONNUE';
+        locksEl.title = 'Connaissance inconnue';
+        locksEl.className = 'status-tag mystery';
+      }
+      let cta = $('#d-skilltree-cta');
+      if (!cta && locksEl && locksEl.parentElement) {
+        cta = document.createElement('div');
+        cta.id = 'd-skilltree-cta';
+        cta.className = 'skilltree-cta-wrap';
+        locksEl.parentElement.appendChild(cta);
+      }
+      if (cta) {
+        cta.innerHTML = mysterySkilltreeCtaHtml(r);
+        cta.classList.toggle('hidden', !cta.innerHTML);
+      }
+      const resEl = $('#d-result');
+      if (resEl) resEl.textContent = '???';
+      const durEl = $('#d-duration');
+      if (durEl) durEl.textContent = '???';
+      const qtyEl = $('#d-qty');
+      if (qtyEl) qtyEl.textContent = '???';
+      const qEl = $('#d-quality');
+      if (qEl) qEl.textContent = '—';
+      // INGRÉDIENTS ???
+      const ings = $('#d-ings');
+      if (ings) {
+        ings.innerHTML = '<li class="ing mystery-ing"><span class="ing-label">INGRÉDIENTS</span><span class="ing-qty">???</span></li>';
+      }
+      renderProfilRequis(r);
+      // Hide station/tools/xp detail noise for mystery
+      ['block-station', 'block-tools', 'block-xp'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+      updateActionBar(r);
+      const grid = $('#recipe-grid');
+      if (grid) {
+        grid.querySelectorAll('.recipe-card.selected').forEach((el) => el.classList.remove('selected'));
+        const esc = (window.CSS && CSS.escape) ? CSS.escape(r.id) : String(r.id).replace(/"/g, '');
+        const card = grid.querySelector(`.recipe-card[data-id="${esc}"]`);
+        if (card) card.classList.add('selected');
+      }
+      return;
+    }
+
     const resultItem = (r.result && r.result.item) || r.id;
     bindItemImg($('#d-image'), resultItem, $('#d-image-fallback'));
 
-    $('#d-title').textContent = r.label;
+    $('#d-title').textContent = r.displayLabel || r.label;
     $('#d-category').textContent = categoryLabel(r.category);
     const codeEl = $('#d-code');
     if (codeEl) codeEl.textContent = recipeCode(r);
@@ -2372,7 +2498,11 @@ function skilltreeCtaHtml(r) {
     if (!btnPin) return;
     const follow = uxOn('pinFollow', true);
     const pinned = !!(r && isPinned(r.id));
-    btnPin.title = follow ? 'Suivre dans le Carnet' : 'Épingler au carnet';
+    if (r && isMysteryRecipe(r)) {
+      btnPin.title = 'Suivre — Savoir inconnu';
+    } else {
+      btnPin.title = follow ? 'Suivre dans le Carnet' : 'Épingler au carnet';
+    }
     btnPin.setAttribute('aria-label', btnPin.title);
     btnPin.classList.toggle('on', pinned);
     btnPin.classList.toggle('is-pinned', pinned);
@@ -2639,6 +2769,20 @@ function skilltreeCtaHtml(r) {
   function updateActionBar(r) {
 
     const recipe = r || state.selected;
+    if (recipe && isMysteryRecipe(recipe)) {
+      const craftBtn = $('#btn-craft');
+      if (craftBtn) {
+        craftBtn.disabled = true;
+        craftBtn.classList.add('is-mystery-blocked');
+        const engageLabel = document.querySelector('#btn-craft .craft-engage-label');
+        if (engageLabel) engageLabel.textContent = 'CONNAISSANCE INCONNUE';
+      }
+      const giveBtn = $('#btn-debug-give');
+      if (giveBtn) giveBtn.classList.add('hidden');
+      return;
+    }
+    const craftBtnClear = $('#btn-craft');
+    if (craftBtnClear) craftBtnClear.classList.remove('is-mystery-blocked');
     const batchEl = $('#batch');
     const batch = clampBatchInput(recipe);
     syncLotSeg(batch);
@@ -4246,12 +4390,31 @@ function skilltreeCtaHtml(r) {
         if (typeof selectRecipe === 'function') selectRecipe(state.selected);
       }
     } else if (msg.action === 'recipeSkillUpdated') {
-      // Hot unlock: refresh menu from cache (no export storm)
+      // Hot unlock: refresh linked recipes only (??? → revealed, light CSS)
+      const payload = msg.data || {};
+      const ids = Array.isArray(payload.recipeIds) ? payload.recipeIds : [];
+      const revealMs = Math.max(200, Math.min(350, Number(payload.revealMs) || 280));
+      const markReveal = () => {
+        ids.forEach((id) => {
+          const esc = (window.CSS && CSS.escape) ? CSS.escape(id) : String(id).replace(/"/g, '');
+          document.querySelectorAll(`.recipe-card[data-id="${esc}"]`).forEach((el) => {
+            el.classList.add('mystery-reveal');
+            setTimeout(() => el.classList.remove('mystery-reveal'), revealMs + 40);
+          });
+          const fiche = $('#detail');
+          if (fiche && state.selected && state.selected.id === id) {
+            fiche.classList.add('mystery-reveal');
+            setTimeout(() => fiche.classList.remove('mystery-reveal'), revealMs + 40);
+          }
+        });
+      };
+      const after = () => { markReveal(); };
       if (typeof refresh === 'function') {
-        refresh().catch(() => {});
+        refresh().then(after).catch(() => {});
       } else {
         post('refresh', { benchKey: state.benchKey }).then((menu) => {
           if (menu && menu.ok && typeof applyMenu === 'function') applyMenu(menu);
+          after();
         });
       }
     } else if (msg.action === 'close' || msg.action === 'craftUiClose') {

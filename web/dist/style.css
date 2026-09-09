@@ -7127,3 +7127,101 @@ button, input { font: inherit; color: inherit; }
 }
 #app #btn-debug-give.debug-give:hover i { color: #c4b089; }
 
+
+/* —— v2.31.0 Mystery / unknown recipe visibility —— */
+#app .recipe-card.is-mystery {
+  background: linear-gradient(165deg, rgba(18, 17, 15, 0.96), rgba(10, 10, 9, 0.98));
+  border-color: rgba(70, 66, 58, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(40, 38, 34, 0.8);
+  opacity: 0.92;
+}
+#app .recipe-card.is-mystery::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px dashed rgba(90, 84, 72, 0.45);
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.85;
+}
+#app .recipe-card.is-mystery .card-img-zone.is-mystery-silhouette {
+  background:
+    radial-gradient(ellipse at 50% 60%, rgba(40, 38, 34, 0.9), rgba(12, 11, 10, 0.95)),
+    repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(30, 28, 24, 0.35) 6px, rgba(30, 28, 24, 0.35) 7px);
+}
+#app .recipe-card.is-mystery .mystery-silhouette {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  opacity: 0.42;
+  color: rgba(160, 150, 130, 0.75);
+  font-size: 1.65rem;
+  filter: none;
+}
+#app .recipe-card.is-mystery .card-title {
+  letter-spacing: 0.22em;
+  color: rgba(150, 145, 135, 0.78);
+  font-weight: 500;
+}
+#app .recipe-card.is-mystery .card-cat {
+  color: rgba(130, 124, 110, 0.75);
+  font-style: italic;
+}
+#app .recipe-card.is-mystery .card-fav.is-disabled,
+#app .recipe-card.is-mystery .card-fav:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+#app .card-state-badge.mystery {
+  background: rgba(28, 26, 22, 0.9);
+  color: rgba(170, 160, 140, 0.85);
+  border-color: rgba(80, 74, 62, 0.5);
+  letter-spacing: 0.14em;
+}
+#app .status-tag.mystery {
+  color: rgba(170, 160, 140, 0.9);
+  border-color: rgba(90, 84, 70, 0.45);
+}
+#app #detail.is-mystery .fiche-hero {
+  background: radial-gradient(ellipse at 40% 40%, rgba(32, 30, 26, 0.95), rgba(12, 11, 10, 0.98));
+}
+#app #detail.is-mystery .mystery-silhouette {
+  font-size: 2.4rem;
+  opacity: 0.45;
+  color: rgba(160, 150, 130, 0.8);
+}
+#app #detail.is-mystery .ing.mystery-ing {
+  letter-spacing: 0.12em;
+  color: rgba(150, 142, 128, 0.8);
+  font-style: italic;
+}
+#app .savoir-requis.mystery .mark {
+  color: rgba(170, 160, 140, 0.85);
+}
+#app .recipe-card.mystery-reveal,
+#app #detail.mystery-reveal {
+  animation: sanctuaryMysteryReveal 280ms ease-out;
+}
+@keyframes sanctuaryMysteryReveal {
+  0% { filter: brightness(0.55) saturate(0.4); opacity: 0.7; }
+  55% { filter: brightness(1.08) saturate(0.95); opacity: 1; }
+  100% { filter: none; opacity: 1; }
+}
+#app #btn-craft.is-mystery-blocked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* Admin-only MYSTERY badge — never injected into player catalogue */
+#craft-admin .ca-mystery-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  color: rgba(210, 180, 120, 0.95);
+  border: 1px solid rgba(140, 110, 60, 0.55);
+  background: rgba(40, 32, 18, 0.85);
+}

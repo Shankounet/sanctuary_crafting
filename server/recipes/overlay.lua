@@ -164,6 +164,9 @@ function RecipeOverlay.Save(recipe, src, opts)
     }
     if RecipeRegistry and RecipeRegistry.Rebuild then
         RecipeRegistry.Rebuild()
+        if MysteryView and MysteryView.RebuildSkillRecipeIndex then
+            MysteryView.RebuildSkillRecipeIndex()
+        end
     end
     if CraftingCore and CraftingCore.Emit then
         CraftingCore.Emit('adminRecipeEdit', src, recipe.id, version, disabled)
@@ -270,5 +273,8 @@ CreateThread(function()
     RecipeOverlay.Load()
     if RecipeRegistry and RecipeRegistry.Rebuild then
         RecipeRegistry.Rebuild()
+        if MysteryView and MysteryView.RebuildSkillRecipeIndex then
+            MysteryView.RebuildSkillRecipeIndex()
+        end
     end
 end)

@@ -52,6 +52,28 @@ end)
 AddEventHandler('esx:playerLoaded', function(pid) Favorites.Load(pid) end)
 
 lib.callback.register('sanctuary_crafting:toggleFavorite', function(src, recipeId)
+    -- Fully UNKNOWN (mystery) recipes: config-block favorites by default
+    local blockUnknown = true
+    if Config.Favorites and Config.Favorites.BlockUnknown == false then
+        blockUnknown = false
+    elseif Config.Mystery and Config.Mystery.BlockFavoritesWhenUnknown == false then
+        blockUnknown = false
+    end
+    if blockUnknown and type(recipeId) == 'string' and Config.RecipeById then
+        local recipe = Config.RecipeById[recipeId]
+        if recipe and CraftingPipeline and CraftingPipeline.BuildRecipeEntry then
+            local entry = CraftingPipeline.BuildRecipeEntry(src, recipe, { includeHints = false })
+            if entry and entry.playerVisualState == 'unknown' then
+                return {
+                    ok = false,
+                    reason = 'favorite_unknown',
+                    message = "Impossible d'ajouter une connaissance inconnue aux favoris",
+                    favored = false,
+                    favorites = Favorites.Get(src),
+                }
+            end
+        end
+    end
     local favored = Favorites.Toggle(src, recipeId)
     return { ok = true, favored = favored, favorites = Favorites.Get(src) }
 end)

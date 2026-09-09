@@ -805,6 +805,31 @@
           <div class="ca-field"><label>requireLevel</label><input id="ca-level" type="number" /></div>
         </div>
         <div class="ca-row">
+          <div class="ca-field"><label>skillVisibility</label>
+            <select id="ca-visibility">
+              <option value="visible_locked">visible_locked</option>
+              <option value="hidden_until_unlocked">hidden_until_unlocked</option>
+              <option value="mystery_until_unlocked">mystery_until_unlocked</option>
+              <option value="discovered_locked">discovered_locked</option>
+            </select>
+          </div>
+          <div class="ca-field"><label>mysteryMode</label>
+            <select id="ca-mystery-mode">
+              <option value="">(auto)</option>
+              <option value="full">full (hide skill name)</option>
+              <option value="recipe_only">recipe_only (show category)</option>
+            </select>
+          </div>
+          <div class="ca-field"><label>Aperçu joueur</label>
+            <select id="ca-preview-state" title="Admin preview only">
+              <option value="">(auto)</option>
+              <option value="unknown">Inconnu</option>
+              <option value="discovered_locked">Découvert</option>
+              <option value="unlocked">Appris</option>
+            </select>
+          </div>
+        </div>
+        <div class="ca-row">
           <div class="ca-field"><label>duration (ms)</label><input id="ca-duration" type="number" min="500" /></div>
           <div class="ca-field"><label>XP</label><input id="ca-xp" type="number" /></div>
           <div class="ca-field"><label>XP category</label><input id="ca-xpcat" /></div>
