@@ -233,13 +233,13 @@ Config.Skills = {
     craftTimeBonus = false, -- no GetTotalCategoryBonus assumed
     maxCraftTimeReduction = 0.40,
 
-    --[[ Bypass (LIVE : actuellement true — ne PAS désactiver silencieusement)
+    --[[ Bypass
          BypassRequirements = true  → TOUS les joueurs sautent requiredLevel / requiredSkill
          BypassAce                  → ACE (ou AdminGroups via Validation.IsAdmin)
          NE JAMAIS activer BypassRequirements sur un serveur public / production.
-         Valeur actuelle true conservée (économie live / labs). Documenté, pas un changement.
+         Défaut false : les savoirs ml_skills s'appliquent. Labs only → true manuellement.
     ]]
-    BypassRequirements = true,
+    BypassRequirements = false,
     BypassAce = 'sanctuary.crafting.bypassskills',
     BypassAlsoSkipXP = false,
     BypassNotify = true,
