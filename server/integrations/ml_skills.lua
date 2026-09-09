@@ -136,7 +136,7 @@ function Skills.NotifyBypassIfNeeded(src)
     if not src or src < 1 then return end
     if bypassNotified[src] then return end
     if not Skills.ShouldBypassRequirements(src) then return end
-    local notify = (Config.Debug == true) or (skillsCfg().BypassNotify == true)
+    local notify = (DebugEnabled and DebugEnabled() or false) or (skillsCfg().BypassNotify == true)
     if not notify then return end
     bypassNotified[src] = true
     TriggerClientEvent('ox_lib:notify', src, {
@@ -553,7 +553,7 @@ end
 --------------------------------------------------------------------------------
 
 local function skillDebugEnabled()
-    return integ().debug == true or (Config and Config.Debug == true)
+    return integ().debug == true or (DebugEnabled and DebugEnabled() or false)
 end
 
 local function skillDebugLog(...)

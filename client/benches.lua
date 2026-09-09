@@ -54,7 +54,7 @@ local function addZoneTarget(data)
     local zoneId = exports.ox_target:addSphereZone({
         coords = vec3(c.x, c.y, c.z),
         radius = radius,
-        debug = Config.Debug or false,
+        debug = DebugEnabled and DebugEnabled() or false,
         options = {
             {
                 name = 'sanctuary_craft_open_' .. data.key,

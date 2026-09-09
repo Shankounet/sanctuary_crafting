@@ -23,8 +23,20 @@ function Dist3(coords, other)
     return math.sqrt(dx * dx + dy * dy + dz * dz)
 end
 
+function DebugEnabled()
+    local d = Config and Config.Debug
+    if type(d) == 'table' then return d.Enabled == true end
+    return d == true
+end
+
+function DebugGiveMaterialsEnabled()
+    local d = Config and Config.Debug
+    if type(d) == 'table' then return d.GiveMaterials == true end
+    return false
+end
+
 function DebugPrint(...)
-    if Config.Debug then
+    if DebugEnabled() then
         print('[sanctuary_crafting]', ...)
     end
 end

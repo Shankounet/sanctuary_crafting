@@ -49,8 +49,12 @@ Config = {}
 ]]
 
 Config.Locale = 'fr'
-Config.Debug = false
-Config.Version = '2.30.0'
+-- Debug / labs: Enabled = DebugPrint; GiveMaterials = admin NUI button (missing mats)
+Config.Debug = {
+    Enabled = false,
+    GiveMaterials = false, -- true + Validation.IsAdmin → bouton GIVE MATÉRIAUX
+}
+Config.Version = '2.30.5'
 
 --------------------------------------------------------------------------------
 -- Feature flags (Phase 2–7) — stubs uniquement, aucun comportement Phase 1

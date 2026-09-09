@@ -1333,7 +1333,7 @@ end)
 -- so disconnect / restart / reboot keep the job; finish_at catch-up -> completed output.
 
 local function craftSessionDebug()
-    return Config.Debug or (Config.CraftTracker and Config.CraftTracker.Debug)
+    return (DebugEnabled and DebugEnabled()) or (Config.CraftTracker and Config.CraftTracker.Debug)
 end
 
 local function serializeActiveCraft(craft)
@@ -2661,6 +2661,8 @@ lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
             knowledge = Config.Knowledge and Config.Knowledge.Enabled ~= false,
             compare = compareCfg.Enabled == true,
             stationOutput = not (StationOutput and StationOutput.Enabled) or StationOutput.Enabled() ~= false,
+            debugGiveMaterials = (DebugGiveMaterialsEnabled and DebugGiveMaterialsEnabled())
+                and (Validation and Validation.IsAdmin and Validation.IsAdmin(src)) and true or false,
         },
         knowledge = Config.Knowledge,
         masteryCfg = Config.Mastery and {
@@ -2676,4 +2678,147 @@ lib.callback.register('sanctuary_crafting:pathHints', function(src, recipeId)
     local data, err = CraftingPipeline.BuildPathHints(src, recipeId)
     if not data then return { ok = false, reason = err or 'craft_invalid' } end
     return data
+end)
+
+--- Debug / labs: give missing recipe materials (admin + Config.Debug.GiveMaterials).
+--- Client sends recipeId only — never trust a client item list.
+lib.callback.register('sanctuary_crafting:debugGiveMaterials', function(src, recipeId)
+    if not (DebugGiveMaterialsEnabled and DebugGiveMaterialsEnabled()) then
+        return { ok = false, reason = 'craft_denied' }
+    end
+    if not Validation or not Validation.IsAdmin or not Validation.IsAdmin(src) then
+        return { ok = false, reason = 'craft_denied' }
+    end
+    if type(recipeId) ~= 'string' or recipeId == '' then
+        return { ok = false, reason = 'craft_invalid' }
+    end
+
+    local recipe = (RecipeRegistry and RecipeRegistry.Get and RecipeRegistry.Get(recipeId))
+        or (Config.RecipeById and Config.RecipeById[recipeId])
+    if not recipe then
+        return { ok = false, reason = 'craft_invalid' }
+    end
+
+    local needs = {} -- item -> count
+    local function addNeed(item, count)
+        if type(item) ~= 'string' or item == '' then return end
+        local n = math.max(0, math.floor(tonumber(count) or 1))
+        if n <= 0 then return end
+        needs[item] = (needs[item] or 0) + n
+    end
+
+    if recipeHasSteps(recipe) then
+        for si = 1, #recipe.steps do
+            local step = recipe.steps[si]
+            for _, ing in ipairs((step and step.ingredients) or {}) do
+                addNeed(ing.item, ing.count)
+            end
+        end
+    else
+        for _, ing in ipairs(recipe.ingredients or {}) do
+            addNeed(ing.item, ing.count)
+        end
+    end
+
+    -- Tools only when clearly inventory items on the recipe (after materials).
+    local toolItems = {}
+    if recipe.tools and type(recipe.tools) == 'table' then
+        for i = 1, #recipe.tools do
+            local t = recipe.tools[i]
+            if type(t) == 'string' then
+                toolItems[#toolItems + 1] = t
+            elseif type(t) == 'table' and type(t.item) == 'string' then
+                toolItems[#toolItems + 1] = t.item
+            end
+        end
+    elseif recipe.requireTool then
+        if type(recipe.requireTool) == 'string' then
+            toolItems[#toolItems + 1] = recipe.requireTool
+        elseif type(recipe.requireTool) == 'table' and type(recipe.requireTool.item) == 'string' then
+            toolItems[#toolItems + 1] = recipe.requireTool.item
+        end
+    end
+
+    local given = {}
+    local function giveMissing(item, need, kind)
+        local owned = 0
+        local okCount, count = pcall(function()
+            return exports.ox_inventory:GetItemCount(src, item) or 0
+        end)
+        if okCount then owned = tonumber(count) or 0 end
+        local missing = need - owned
+        if missing <= 0 then return true end
+        local can = true
+        if Validation and Validation.CanCarry then
+            can = Validation.CanCarry(src, item, missing)
+        else
+            local okC, resC = pcall(function()
+                return exports.ox_inventory:CanCarryItem(src, item, missing)
+            end)
+            can = okC and resC and true or false
+        end
+        if not can then
+            return false, 'craft_inventory_full'
+        end
+        local okAdd, addRes = pcall(function()
+            return exports.ox_inventory:AddItem(src, item, missing)
+        end)
+        if not okAdd or not addRes then
+            return false, 'craft_inventory_full'
+        end
+        given[#given + 1] = { item = item, count = missing, kind = kind or 'material' }
+        return true
+    end
+
+    -- Materials first
+    local items = {}
+    for item, need in pairs(needs) do
+        items[#items + 1] = { item = item, need = need }
+    end
+    table.sort(items, function(a, b) return a.item < b.item end)
+    for i = 1, #items do
+        local okG, err = giveMissing(items[i].item, items[i].need, 'material')
+        if not okG then
+            print(('[Craft][Debug] give materials src=%s recipe=%s partial fail=%s'):format(tostring(src), recipeId, tostring(err)))
+            return {
+                ok = false,
+                reason = err or 'craft_inventory_full',
+                given = given,
+                recipeId = recipeId,
+            }
+        end
+    end
+
+    -- Then missing tools (1× each if not owned)
+    local seenTool = {}
+    for i = 1, #toolItems do
+        local item = toolItems[i]
+        if item and not seenTool[item] then
+            seenTool[item] = true
+            -- skip if already covered as ingredient need above
+            local need = 1
+            if needs[item] then
+                -- already handled as material
+            else
+                local okG, err = giveMissing(item, need, 'tool')
+                if not okG then
+                    print(('[Craft][Debug] give materials src=%s recipe=%s tool fail=%s'):format(tostring(src), recipeId, tostring(err)))
+                    return {
+                        ok = false,
+                        reason = err or 'craft_inventory_full',
+                        given = given,
+                        recipeId = recipeId,
+                    }
+                end
+            end
+        end
+    end
+
+    print(('[Craft][Debug] give materials src=%s recipe=%s given=%d'):format(tostring(src), recipeId, #given))
+    return {
+        ok = true,
+        recipeId = recipeId,
+        given = given,
+        nothingNeeded = #given == 0,
+    }
 end)
