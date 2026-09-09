@@ -17,7 +17,9 @@ local RES = 'ml_skills'
 local UnlockedCache = {} -- [src] = { unlocked = { ['cat:uid']=true }, levels = { [catKey]=n }, loadedAt, available, loading }
 local labelIndex = nil
 -- Published ml_skills tree is the recipe-gate SoT: recipeId -> real skill/category UID.
+-- publishedSkillByUid: skillUid -> list of { categoryUid, skillUid, label } from published nodes.
 local recipeSkillIndex = nil
+local publishedSkillByUid = nil
 local recipeIndexLoaded = false
 local publishedCategoryUids = {} -- exact ml_skills category UIDs; beat legacy aliases
 local warnedDown = false
@@ -165,6 +167,7 @@ end
 local function loadLabelIndex()
     labelIndex = {}
     recipeSkillIndex = {}
+    publishedSkillByUid = {}
     recipeIndexLoaded = false
     publishedCategoryUids = {}
     local res = resourceName()
@@ -190,6 +193,19 @@ local function loadLabelIndex()
             return
         end
 
+        -- Track every published skill uid so legacy recipe.requireSkill can resolve
+        -- only when that uid actually exists in the live tree (never invent orphan skill_N).
+        local bucket = publishedSkillByUid[suid]
+        if not bucket then
+            bucket = {}
+            publishedSkillByUid[suid] = bucket
+        end
+        bucket[#bucket + 1] = {
+            categoryUid = catUid,
+            skillUid = suid,
+            label = slabel,
+        }
+
         -- Same published node convention as the tree editor: recipeId / recipeIds in meta.
         local meta = decodeMeta(sk.meta or sk.metadata or sk.meta_json)
         local seen = {}
@@ -210,6 +226,18 @@ local function loadLabelIndex()
         local ids = meta.recipeIds or meta.recipe_ids or sk.recipeIds or sk.recipe_ids
         if type(ids) == 'table' then
             for i = 1, #ids do link(ids[i]) end
+        end
+        -- Secondary safe links when the node uid itself is a recipe id / result item name.
+        if suid:find('^craft_', 1, false) or suid:find('^recipe_', 1, false) then
+            link(suid)
+        end
+        local resultItem = meta.resultItem or meta.result_item or meta.item or sk.resultItem
+        if type(resultItem) == 'string' and resultItem ~= '' then
+            -- Only link recipe.id == resultItem when Config.RecipeById is already warm.
+            local byId = Config.RecipeById
+            if type(byId) == 'table' and byId[resultItem] then
+                link(resultItem)
+            end
         end
     end
 
@@ -264,6 +292,9 @@ local function loadLabelIndex()
         end
     end
     recipeIndexLoaded = true
+    if skillsCfg().BypassRequirements == true then
+        print('[CRAFT] WARNING: Config.Skills.BypassRequirements=true — ALL skill gates skipped for every player (labs only)')
+    end
 end
 
 function Skills.SkillLabel(skillUid, catKey)
@@ -312,6 +343,7 @@ end
 function Skills.RefreshLabels()
     labelIndex = nil
     recipeSkillIndex = nil
+    publishedSkillByUid = nil
     recipeIndexLoaded = false
     loadLabelIndex()
     return labelIndex ~= nil and recipeIndexLoaded == true
@@ -638,6 +670,100 @@ end
 
 --- Canonical unique skill requirement list for gates + NUI.
 --- Returns nil | { mode, skills=[{provider,category,categoryUid,categoryKey,uid,skillUid,label,level,unlocked?}], visibility, xp, rawCount, normalizedCount, duplicatesRemoved }
+
+--- Resolve a skillUid against published ml_skills nodes only.
+---@param skillUid string
+---@param preferredCat string|nil category key or uid from the recipe
+---@return table|nil { categoryUid, skillUid, label }
+local function resolvePublishedSkill(skillUid, preferredCat)
+    if type(skillUid) ~= 'string' or skillUid == '' then return nil end
+    if publishedSkillByUid == nil then loadLabelIndex() end
+    local bucket = publishedSkillByUid and publishedSkillByUid[skillUid]
+    if type(bucket) ~= 'table' or #bucket == 0 then return nil end
+
+    local preferredUid = nil
+    if type(preferredCat) == 'string' and preferredCat ~= '' then
+        preferredUid = resolveCategoryUid(preferredCat) or preferredCat
+        -- Exact published category uid beats legacy aliases.
+        if publishedCategoryUids and publishedCategoryUids[preferredCat] then
+            preferredUid = preferredCat
+        end
+    end
+
+    if preferredUid or preferredCat then
+        for i = 1, #bucket do
+            local row = bucket[i]
+            if row.categoryUid == preferredUid or row.categoryUid == preferredCat then
+                return row
+            end
+        end
+        -- Legacy maps often alias agriculture→survival; if the uid exists only once
+        -- in the published tree, still bind it rather than freeing the craft.
+        if #bucket == 1 then return bucket[1] end
+        return nil
+    end
+    if #bucket == 1 then return bucket[1] end
+    return nil
+end
+
+--- Collect legacy skill refs from recipe fields (requireSkill / requiredSkill / …).
+--- Used only to probe publishedSkillByUid — never invents a gate for orphans.
+---@param recipe table
+---@return { uid: string, cat: string|nil }[]
+local function collectLegacySkillRefs(recipe)
+    local out, seen = {}, {}
+    local function push(uid, cat)
+        if type(uid) ~= 'string' or uid == '' then return end
+        local key = tostring(cat or '') .. ':' .. uid
+        if seen[key] then return end
+        seen[key] = true
+        out[#out + 1] = { uid = uid, cat = cat }
+    end
+
+    local defCat = recipe.requireSkillCategory or recipe.skillCategory
+        or (recipe.xp and recipe.xp.category) or nil
+
+    if type(recipe.requireSkill) == 'string' then
+        push(recipe.requireSkill, defCat)
+    elseif type(recipe.requireSkill) == 'table' then
+        push(recipe.requireSkill.uid or recipe.requireSkill.skillUid or recipe.requireSkill.skill,
+            recipe.requireSkill.category or recipe.requireSkill.categoryUid or defCat)
+    end
+
+    if type(recipe.requiredSkill) == 'string' then
+        push(recipe.requiredSkill, defCat)
+    elseif type(recipe.requiredSkill) == 'table' then
+        push(recipe.requiredSkill.uid or recipe.requiredSkill.skillUid or recipe.requiredSkill.skill,
+            recipe.requiredSkill.category or recipe.requiredSkill.categoryUid or defCat)
+    end
+
+    local rs = recipe.requiredSkills
+    if type(rs) == 'table' then
+        local list = rs.skills or rs
+        if type(list) == 'table' then
+            if list[1] ~= nil then
+                for i = 1, #list do
+                    local sk = list[i]
+                    if type(sk) == 'string' then
+                        push(sk, defCat)
+                    elseif type(sk) == 'table' then
+                        push(sk.uid or sk.skillUid or sk.skill, sk.category or sk.categoryUid or defCat)
+                    end
+                end
+            end
+        end
+    end
+
+    local st = recipe.skillTree
+    if type(st) == 'table' then
+        local uid = st.requiredSkill or st.skillUid or st.uid
+        local cat = st.category or st.categoryUid or defCat
+        if type(uid) == 'string' then push(uid, cat) end
+    end
+
+    return out
+end
+
 function Skills.normalizeSkillRequirements(recipe, src)
     if type(recipe) ~= 'table' then
         return nil
@@ -682,9 +808,57 @@ function Skills.normalizeSkillRequirements(recipe, src)
             treeIndexed = true,
         }
     end
-    -- Once published trees are available, absence from their recipe index means FREE craft.
-    -- Legacy DevHub/SST `skill_N` fields must never invent a runtime gate.
+    -- Published trees available: try legacy requireSkill ONLY if that uid exists in the tree.
+    -- Orphan skill_N (absent from published nodes) must never invent a gate.
     if recipeIndexLoaded then
+        local refs = collectLegacySkillRefs(recipe)
+        local skills, seen = {}, {}
+        for i = 1, #refs do
+            local ref = refs[i]
+            local pub = resolvePublishedSkill(ref.uid, ref.cat)
+            if pub then
+                local key = pub.categoryUid .. ':' .. pub.skillUid
+                if not seen[key] then
+                    seen[key] = true
+                    local row = {
+                        provider = 'ml_skills',
+                        category = pub.categoryUid,
+                        categoryKey = pub.categoryUid,
+                        categoryUid = pub.categoryUid,
+                        uid = pub.skillUid,
+                        skillUid = pub.skillUid,
+                        label = pub.label or Skills.SkillLabel(pub.skillUid, pub.categoryUid),
+                        source = 'ml_skills_published_uid',
+                    }
+                    if src then
+                        row.unlocked = Skills.HasUnlockedSkill(src, pub.categoryUid, pub.skillUid) == true
+                    end
+                    skills[#skills + 1] = row
+                end
+            end
+        end
+        if #skills > 0 then
+            -- Backfill recipe index so health/debug counts these as real gates.
+            if recipe.id and recipeSkillIndex and not recipeSkillIndex[recipe.id] then
+                recipeSkillIndex[recipe.id] = {
+                    recipeId = recipe.id,
+                    categoryUid = skills[1].categoryUid,
+                    skillUid = skills[1].skillUid,
+                    label = skills[1].label,
+                }
+            end
+            return {
+                mode = 'all',
+                skills = skills,
+                visibility = visibility,
+                xp = recipe.skillXp or recipe.xp,
+                rawCount = #refs,
+                normalizedCount = #skills,
+                duplicatesRemoved = math.max(0, #refs - #skills),
+                provider = 'ml_skills',
+                treeIndexed = true,
+            }
+        end
         return nil
     end
 
@@ -1191,6 +1365,25 @@ function Skills.HealthReport()
         local r = list[i]
         if type(r) == 'table' then
             local linked = r.id and recipeSkillIndex and recipeSkillIndex[r.id] or nil
+            if not linked and recipeIndexLoaded then
+                -- Probe published uids from legacy requireSkill (same rules as normalize).
+                local refs = collectLegacySkillRefs(r)
+                for ri = 1, #refs do
+                    local pub = resolvePublishedSkill(refs[ri].uid, refs[ri].cat)
+                    if pub then
+                        linked = {
+                            recipeId = r.id,
+                            categoryUid = pub.categoryUid,
+                            skillUid = pub.skillUid,
+                            label = pub.label,
+                        }
+                        if r.id and recipeSkillIndex then
+                            recipeSkillIndex[r.id] = linked
+                        end
+                        break
+                    end
+                end
+            end
             if linked then
                 indexedGates = indexedGates + 1
             elseif recipeIndexLoaded and (r.requiredSkill ~= nil or r.requiredSkills ~= nil
@@ -1349,6 +1542,7 @@ local function onMlResource(res)
     if res ~= resourceName() and res ~= GetCurrentResourceName() then return end
     labelIndex = nil
     recipeSkillIndex = nil
+    publishedSkillByUid = nil
     recipeIndexLoaded = false
     UnlockedCache = {}
     warnedDown = false
