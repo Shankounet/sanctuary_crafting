@@ -635,19 +635,35 @@
     craft_knowledge_required: () => 'Recette non connue',
   };
 
+  function recipeStateOf(r) {
+    if (!r) return null;
+    if (r.recipeState && r.recipeState.code) return r.recipeState;
+    return null;
+  }
+
   function lockText(r) {
     if (isMysteryRecipe(r)) {
-      return { text: 'Connaissance inconnue', cls: 'mystery', tag: 'INCONNUE' };
+      return { text: 'Connaissance inconnue', cls: 'mystery', tag: 'MYSTÈRE' };
     }
-    if (r.canCraft) return { text: 'Conditions remplies', cls: 'ok', tag: 'FAISABLE' };
-    if (!r.locked && r.missingItems) return { text: 'Matériaux manquants', cls: 'bad', tag: 'MANQUANT' };
-    if (!r.locked) return { text: 'Disponible', cls: 'ok', tag: 'FAISABLE' };
+    const st = recipeStateOf(r);
+    if (st) {
+      return {
+        text: st.label || st.cardTag || 'PRÊT À FABRIQUER',
+        cls: st.cls || (st.blocking ? 'warn' : 'ok'),
+        tag: st.cardTag || st.label || 'FAISABLE',
+      };
+    }
+    if (r.canCraft) return { text: 'PRÊT À FABRIQUER', cls: 'ok', tag: 'FAISABLE' };
+    if (!r.locked && r.missingItems) return { text: 'MATÉRIAUX MANQUANTS', cls: 'bad', tag: 'MATÉRIAUX MANQUANTS' };
+    if (!r.locked) return { text: 'PRÊT À FABRIQUER', cls: 'ok', tag: 'FAISABLE' };
     const fn = LOCK_LABELS[r.lockReason];
-    const text = fn ? fn(r) : (r.lockReason ? humanize(r.lockReason) : 'Verrouillé');
-    let tag = 'VERROUILLÉ';
-    if (r.lockReason === 'craft_blueprint_required') tag = 'PLAN REQUIS';
-    else if (r.lockReason === 'craft_level_required' || r.lockReason === 'craft_station_level') tag = 'NIVEAU REQUIS';
-    else if (r.lockReason === 'craft_skill_required' || r.lockReason === 'skill_locked' || r.lockReason === 'craft_recipe_locked') tag = 'VERROUILLÉ';
+    const text = fn ? fn(r) : (r.lockReason ? humanize(r.lockReason) : 'SAVOIR REQUIS');
+    let tag = 'SAVOIR REQUIS';
+    if (r.lockReason === 'craft_blueprint_required' || r.lockReason === 'craft_knowledge_required') tag = 'PLAN REQUIS';
+    else if (r.lockReason === 'craft_level_required') tag = 'NIVEAU REQUIS';
+    else if (r.lockReason === 'craft_station_level' || r.lockReason === 'craft_no_power' || r.lockReason === 'craft_spec_required') tag = 'ATELIER';
+    else if (r.lockReason === 'craft_tool_required') tag = 'OUTIL MANQUANT';
+    else if (r.lockReason === 'craft_skill_required' || r.lockReason === 'skill_locked' || r.lockReason === 'craft_recipe_locked') tag = 'SAVOIR REQUIS';
     return { text, cls: 'warn', tag };
   }
 
@@ -680,6 +696,9 @@
 
     function isSkillLockedRecipe(r) {
     if (!r) return false;
+    const st = recipeStateOf(r);
+    if (st && st.code === 'skill_locked') return true;
+    if (st && (st.code === 'ready' || st.code === 'materials_missing' || st.code === 'almost' || st.code === 'tool_required' || st.code === 'station_incompatible')) return false;
     return r.lockReason === 'craft_skill_required'
       || r.lockReason === 'skill_locked'
       || r.lockReason === 'craft_recipe_locked'
@@ -797,10 +816,16 @@ function skilltreeCtaHtml(r) {
 
   function cardStatus(r) {
     if (isMysteryRecipe(r)) {
-      return { text: '???', cls: 'mystery', tip: 'Connaissance inconnue — Voir dans les savoirs →' };
+      return { text: 'MYSTÈRE', cls: 'mystery', tip: 'Connaissance inconnue — Voir dans les savoirs →' };
     }
     if (r && r.skillState && r.skillState.loading) {
       return { text: 'CHARGEMENT', cls: 'warn', tip: 'Chargement des savoirs...' };
+    }
+    const st = recipeStateOf(r);
+    if (st) {
+      const cls = st.cls || (st.code === 'ready' ? 'ok' : (st.code === 'almost' ? 'almost' : (st.code === 'skill_locked' || st.code === 'level_required' || st.code === 'blueprint_required' ? 'warn' : 'bad')));
+      const tip = st.helper || r.lockHint || r.blockReason || st.label;
+      return { text: st.cardTag || st.label, cls, tip };
     }
     const skillLock = r && (
       r.lockReason === 'craft_skill_required'
@@ -810,8 +835,8 @@ function skilltreeCtaHtml(r) {
       || (r.skillState && r.skillState.visualStatus === 'LOCKED_SKILL')
     );
     if (skillLock) {
-      const tip = (r.lockHint) || (typeof LOCK_LABELS.craft_skill_required === 'function' && LOCK_LABELS.craft_skill_required(r)) || 'Connaissance non apprise';
-      return { text: 'VERROUILLÉ', cls: 'bad', tip };
+      const tip = (r.lockHint) || (typeof LOCK_LABELS.craft_skill_required === 'function' && LOCK_LABELS.craft_skill_required(r)) || 'Savoir non appris';
+      return { text: 'SAVOIR REQUIS', cls: 'warn', tip };
     }
     if (r.canCraft) {
       const bits = ['Prêt à fabriquer'];
@@ -824,9 +849,11 @@ function skilltreeCtaHtml(r) {
       const tip = r.almostReason || almostMissingTip(r);
       return { text: 'PRESQUE', cls: 'almost', tip };
     }
-    const locked = r.locked || r.lockReason;
-    const tip = (locked && r.lockHint) || r.blockReason || primaryBadgeReason(r) || 'Non faisable';
-    return { text: 'NON FAISABLE', cls: 'bad', tip };
+    if (!r.locked && r.missingItems) {
+      return { text: 'MATÉRIAUX MANQUANTS', cls: 'bad', tip: r.blockReason || r.lockHint || 'Matériaux manquants' };
+    }
+    const tip = r.lockHint || r.blockReason || primaryBadgeReason(r) || 'Matériaux manquants';
+    return { text: 'MATÉRIAUX MANQUANTS', cls: 'bad', tip };
   }
 
   function prodMissingCause(recipe, batch) {
@@ -862,16 +889,23 @@ function skilltreeCtaHtml(r) {
     const reasons = [];
     if (!r) return ['Sélectionnez une recette'];
     if (state.crafting && !fileProcessing()) reasons.push('Fabrication en cours…');
-    if (isSkillLockedRecipe(r)) {
+    const st = recipeStateOf(r);
+    if (st && st.helper) {
+      reasons.push(st.helper);
+    } else if (st && st.code === 'skill_locked') {
       reasons.push('Apprenez d\'abord le savoir requis.');
+    } else if (isSkillLockedRecipe(r)) {
+      reasons.push('Apprenez d\'abord le savoir requis.');
+    } else if (st && st.blocking) {
+      reasons.push(st.label);
     } else if (r.locked) {
       reasons.push(lockText(r).text);
     }
-    if (r.missingItems) {
+    if (r.missingItems && !(st && (st.code === 'skill_locked' || st.code === 'level_required' || st.code === 'blueprint_required' || st.code === 'mystery'))) {
       const miss = prodMissingCause(r, batch);
-      reasons.push(miss ? ('Il manque ' + miss.label + ' x' + miss.need) : 'Matériaux insuffisants pour fabriquer');
+      reasons.push(miss ? ('Manque : ' + miss.label + ' x' + miss.need) : 'Matériaux manquants');
     }
-    if (!r.canCraft && !r.locked && !r.missingItems && !isSkillLockedRecipe(r)) reasons.push('Conditions non remplies');
+    if (!r.canCraft && !r.locked && !r.missingItems && !isSkillLockedRecipe(r) && !(st && st.blocking)) reasons.push('Conditions non remplies');
     return reasons;
   }
 
@@ -2208,9 +2242,10 @@ function skilltreeCtaHtml(r) {
 
     const lock = lockText(r);
     const locksEl = $('#d-locks');
-    locksEl.textContent = lock.tag || lock.text;
-    locksEl.title = lock.text;
-    locksEl.className = `status-tag ${lock.cls}`;
+    const st = recipeStateOf(r);
+    locksEl.textContent = (st && st.label) || lock.text || lock.tag;
+    locksEl.title = (st && st.helper) || lock.text || '';
+    locksEl.className = `status-tag recipe-state ${lock.cls}${(st && st.code) ? ` is-${st.code}` : ''}`;
 
     // Tech progression CTA → skilltree
     let cta = $('#d-skilltree-cta');
@@ -2240,6 +2275,13 @@ function skilltreeCtaHtml(r) {
 
     // —— ATELIER compact: "Table · Niv. X" + ✓/✕ status ——
     const stationBlock = $('#block-station');
+    if (stationBlock) {
+      const h = stationBlock.querySelector('h3, .t-l3');
+      if (h && !h.dataset.stateLocal) {
+        h.dataset.stateLocal = '1';
+        h.innerHTML = '<i class="fa-solid fa-industry"></i> Atelier';
+      }
+    }
     const meta = state.menuMeta || {};
     const stationName = meta.label || (r.station ? frLabel(r.station, humanize(r.station)) : null);
     const stationLvl = meta.stationLevel != null ? meta.stationLevel : null;
@@ -2350,8 +2392,27 @@ function skilltreeCtaHtml(r) {
     });
     const sumEl = $('#d-ings-summary');
     if (sumEl) {
-      if (ingList.length) sumEl.textContent = `${okN}/${ingList.length} conditions remplies`;
+      if (ingList.length) sumEl.textContent = `${okN}/${ingList.length}`;
       else sumEl.textContent = '';
+    }
+    let missBox = $('#d-ings-miss');
+    if (!missBox && ings && ings.parentElement) {
+      missBox = document.createElement('div');
+      missBox.id = 'd-ings-miss';
+      missBox.className = 'ings-miss hidden';
+      ings.parentElement.appendChild(missBox);
+    }
+    if (missBox) {
+      const reqMats = r.requirements && r.requirements.materials;
+      const miss = (reqMats && reqMats.missing) || [];
+      if (miss.length) {
+        const lines = miss.map((m) => `${m.label || itemDisplayName(m.item)} x${m.missing || Math.max(1, (m.need || 1) - (m.owned || 0))}`);
+        missBox.textContent = `Manque : ${lines.join(', ')}`;
+        missBox.classList.remove('hidden');
+      } else {
+        missBox.textContent = '';
+        missBox.classList.add('hidden');
+      }
     }
     if (!ingList.length) {
       ings.innerHTML = '<li><span class="iname muted">Aucun matériau</span></li>';
@@ -3034,7 +3095,8 @@ function skilltreeCtaHtml(r) {
       if (full) reasons.unshift('FILE DE PRODUCTION PLEINE');
       const whyEl = $('#craft-why');
       const hintEl = $('#craft-engage-hint');
-      const matsOnly = !!(recipe && recipe.missingItems && !recipe.locked && !full);
+      const stNow = recipeStateOf(recipe);
+      const matsOnly = !!(recipe && (stNow ? stNow.code === 'materials_missing' : (recipe.missingItems && !recipe.locked)) && !full);
       if (hintEl) {
         hintEl.classList.toggle('hidden', !(matsOnly && !can));
       }
