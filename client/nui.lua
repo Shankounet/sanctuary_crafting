@@ -131,6 +131,12 @@ RegisterNUICallback('craft', function(data, cb)
     cb(start or { ok = false })
 end)
 
+RegisterNUICallback('debugGiveMaterials', function(data, cb)
+    local recipeId = data and data.recipeId
+    local r = lib.callback.await('sanctuary_crafting:debugGiveMaterials', false, recipeId)
+    cb(r or { ok = false, reason = 'craft_denied' })
+end)
+
 RegisterNUICallback('complete', function(data, cb)
     local result = lib.callback.await('sanctuary_crafting:completeCraft', false, data.craftId)
     if trackerEnabled() and data.craftId then

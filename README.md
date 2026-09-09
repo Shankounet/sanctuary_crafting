@@ -532,6 +532,10 @@ KEYS : `survival`, `medic`, `engineer`, `gunsmith` → `categoryUid` publiés da
 
 Recette : `skillTree = { category = 'medic', requiredLevel = 10, requiredSkill = nil }`. XP = `xp.category` (KEY) + `xp.amount`. Mapping one-time des anciens champs au load.
 
+### DEBUG — GIVE MATÉRIAUX
+
+Labs only: set `Config.Debug.GiveMaterials = true`. Admins see a secondary **GIVE MATÉRIAUX** button that grants missing recipe ingredients via ox_inventory (no result item, no skill unlock). See `docs/SKILLS.md`.
+
 ### BypassRequirements (rappel)
 
 > **NE JAMAIS activer `Config.Skills.BypassRequirements` sur un serveur public / production.**

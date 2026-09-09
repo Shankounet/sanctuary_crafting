@@ -7113,4 +7113,17 @@ button, input { font: inherit; color: inherit; }
   letter-spacing: 0.04em;
 }
 
+/* —— Debug give materials (labs / admin) — secondary accent, not FABRIQUER —— */
+#app #btn-debug-give.debug-give {
+  color: #9a8866;
+  border-color: rgba(154, 136, 102, 0.45);
+  opacity: 0.92;
+}
+#app #btn-debug-give.debug-give i { color: #9a8866; }
+#app #btn-debug-give.debug-give:hover {
+  color: #c4b089;
+  border-color: #9a8866;
+  opacity: 1;
+}
+#app #btn-debug-give.debug-give:hover i { color: #c4b089; }
 

@@ -138,6 +138,10 @@ Uncertain DevHub/SST-only fields → log `UNMAPPED RECIPE SKILL`, **no** dangero
 
 Debug: `Config.SkillIntegration.debug = true` and `/craftskilldebug [recipeId]`.
 
+### DEBUG — give materials (labs)
+
+`Config.Debug.GiveMaterials = true` (default `false`) + admin (`Validation.IsAdmin` / ACE) shows **GIVE MATÉRIAUX** near FABRIQUER. Server loads the recipe by id and `AddItem`s only missing ingredients (tools if inventory items). Does not grant the result, unlock ML skills, or bypass skill gates. Log: `[Craft][Debug] give materials src=… recipe=…`.
+
 ## Cache
 
 Per-player `UnlockedCache[src]` keyed `categoryUid:skillUid` via `GetUnlockedSkills` on load.

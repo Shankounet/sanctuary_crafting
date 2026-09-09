@@ -2789,6 +2789,12 @@ function skilltreeCtaHtml(r) {
     if (qBtn) qBtn.classList.toggle('hidden', !state.flags.queue);
     const sBtn = $('#btn-shop');
     if (sBtn) sBtn.classList.toggle('hidden', state.flags.shopping === false);
+    const dbgBtn = $('#btn-debug-give');
+    if (dbgBtn) {
+      const showDbg = !!(state.flags && state.flags.debugGiveMaterials) && !!recipe;
+      dbgBtn.classList.toggle('hidden', !showDbg);
+      dbgBtn.disabled = !recipe;
+    }
 
     if (!state.crafting && !fileProcessing()) {
       const mod = $('#fab-module');
@@ -3909,6 +3915,43 @@ function skilltreeCtaHtml(r) {
     });
   });
 
+
+  function formatGivenList(given) {
+    if (!Array.isArray(given) || !given.length) return '';
+    return given.map((g) => {
+      const label = (state.itemLabels && state.itemLabels[g.item]) || g.item;
+      return `${label} ×${g.count}`;
+    }).join(', ');
+  }
+
+  async function giveDebugMaterials() {
+    const recipe = state.selected;
+    if (!recipe || !state.flags.debugGiveMaterials) return;
+    const r = await post('debugGiveMaterials', { recipeId: recipe.id });
+    if (!(r && r.ok)) {
+      const partial = formatGivenList(r && r.given);
+      if (partial && r && r.reason === 'craft_inventory_full') {
+        showToast('Inventaire plein — donné : ' + partial, 'warn');
+      } else if (r && r.reason === 'craft_denied') {
+        showToast('Debug matériaux refusé', 'err');
+      } else if (r && r.reason === 'craft_invalid') {
+        showToast('Recette invalide', 'err');
+      } else {
+        showToast((r && r.reason === 'craft_inventory_full') ? 'Inventaire plein' : 'Don impossible', 'err');
+      }
+      if (partial) await refresh();
+      return;
+    }
+    if (r.nothingNeeded) {
+      showToast('Aucun matériau manquant', 'ok');
+      return;
+    }
+    const list = formatGivenList(r.given);
+    showToast(list ? ('Matériaux donnés : ' + list) : 'Matériaux donnés', 'ok');
+    await refresh();
+  }
+
+  bindUi('#btn-debug-give', 'click', giveDebugMaterials);
   bindUi('#btn-craft', 'click', startCraft);
   bindUi('#btn-cancel', 'click', cancelCraft);
   const batchInput = $('#batch');
