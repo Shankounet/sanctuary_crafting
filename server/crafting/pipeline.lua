@@ -1880,20 +1880,177 @@ local function buildArtisanHints(src, r, artisans, orders)
     return { potential = potential, confirmed = confirmed }
 end
 
+
+--- Build one authoritative global recipe state + local requirement sub-states.
+--- Priority: skill → level → blueprint/discovery → station → tool → materials → ready.
+local function buildRecipeStateAndRequirements(opts)
+    opts = opts or {}
+    local skillOk = opts.skillOk ~= false
+    local skillReason = opts.skillReason
+    local skillArgs = opts.skillArgs
+    local levelOk = opts.levelOk ~= false
+    local levelNeed, levelCur = opts.levelNeed, opts.levelCur
+    local blueprintOk = opts.blueprintOk ~= false
+    local blueprintReason = opts.blueprintReason
+    local stationOk = opts.stationOk ~= false
+    local stationReason = opts.stationReason
+    local stationLabel = opts.stationLabel
+    local stationLevel = opts.stationLevel
+    local stationNeedLevel = opts.stationNeedLevel
+    local stationStatusLabel = opts.stationStatusLabel or 'Opérationnelle'
+    local stationStatusOk = opts.stationStatusOk ~= false
+    local toolOk = opts.toolOk ~= false
+    local toolLabel = opts.toolLabel
+    local materialsOk = opts.materialsOk ~= false
+    local missingList = opts.missingList or {}
+    local missingSummary = opts.missingSummary
+    local talentLab = opts.talentLab
+    local catLab = opts.catLab
+    local skillsFacing = opts.skillsFacing
+    local openSkillsCategory = opts.openSkillsCategory
+    local mystery = opts.mystery == true
+    local almost = opts.almost == true
+    local almostReason = opts.almostReason
+
+    local function skillReq()
+        local ok = skillOk and levelOk
+        local status = ok and 'ok' or 'bad'
+        local label = talentLab or (skillsFacing and skillsFacing[1] and (skillsFacing[1].label or skillsFacing[1].skillLabel)) or nil
+        return {
+            ok = ok,
+            status = status,
+            label = label,
+            categoryLabel = catLab,
+            categoryUid = openSkillsCategory,
+            skills = skillsFacing,
+            reason = (not skillOk and (talentLab and ('Savoir non appris') or 'Savoir non appris'))
+                or (not levelOk and (('Niveau %s requis — actuel : %s'):format(tostring(levelNeed or '?'), tostring(levelCur or '—'))))
+                or nil,
+            unlocked = skillOk,
+            requireLevel = levelNeed,
+            currentLevel = levelCur,
+        }
+    end
+
+    local function stationReq()
+        return {
+            ok = stationOk and stationStatusOk,
+            status = (stationOk and stationStatusOk) and 'ok' or 'bad',
+            label = stationLabel,
+            level = stationLevel,
+            requiredLevel = stationNeedLevel,
+            statusLabel = stationStatusLabel,
+            reason = stationReason,
+            localOnly = true,
+        }
+    end
+
+    local function materialsReq()
+        return {
+            ok = materialsOk,
+            status = materialsOk and 'ok' or 'bad',
+            missing = missingList,
+            summary = missingSummary,
+            reason = materialsOk and nil or (missingSummary or 'Matériaux manquants'),
+        }
+    end
+
+    local function toolsReq()
+        return {
+            ok = toolOk,
+            status = toolOk and 'ok' or 'bad',
+            label = toolLabel,
+            reason = toolOk and nil or 'Outil manquant',
+        }
+    end
+
+    local requirements = {
+        skill = skillReq(),
+        station = stationReq(),
+        materials = materialsReq(),
+        tools = toolsReq(),
+        other = {},
+    }
+
+    local state
+    if mystery then
+        state = { code = 'mystery', label = 'MYSTÈRE', cardTag = 'MYSTÈRE', blocking = true, cls = 'mystery' }
+    elseif not skillOk then
+        state = { code = 'skill_locked', label = 'SAVOIR NON APPRIS', cardTag = 'SAVOIR REQUIS', blocking = true, cls = 'warn', helper = 'Apprenez d\'abord le savoir requis.' }
+    elseif not levelOk then
+        state = { code = 'level_required', label = 'NIVEAU INSUFFISANT', cardTag = 'NIVEAU REQUIS', blocking = true, cls = 'warn' }
+    elseif not blueprintOk then
+        local lab = (blueprintReason == 'craft_knowledge_required') and 'PLAN INCONNU' or 'PLAN INCONNU'
+        state = { code = 'blueprint_required', label = lab, cardTag = 'PLAN REQUIS', blocking = true, cls = 'warn' }
+    elseif not stationOk then
+        state = { code = 'station_incompatible', label = 'ATELIER INCOMPATIBLE', cardTag = 'ATELIER', blocking = true, cls = 'bad' }
+    elseif not toolOk then
+        state = { code = 'tool_required', label = 'OUTIL MANQUANT', cardTag = 'OUTIL MANQUANT', blocking = true, cls = 'bad' }
+    elseif not materialsOk then
+        if almost then
+            state = { code = 'almost', label = 'PRESQUE', cardTag = 'PRESQUE', blocking = true, cls = 'almost', helper = almostReason }
+        else
+            state = { code = 'materials_missing', label = 'MATÉRIAUX MANQUANTS', cardTag = 'MATÉRIAUX MANQUANTS', blocking = true, cls = 'bad' }
+        end
+    else
+        state = { code = 'ready', label = 'PRÊT À FABRIQUER', cardTag = 'FAISABLE', blocking = false, cls = 'ok' }
+    end
+
+    -- Map to legacy lockReason for older UI paths
+    local lockReason, lockArgs = nil, nil
+    if state.code == 'skill_locked' then
+        lockReason, lockArgs = skillReason or 'craft_skill_required', skillArgs
+    elseif state.code == 'level_required' then
+        lockReason, lockArgs = 'craft_level_required', { levelNeed, levelCur }
+    elseif state.code == 'blueprint_required' then
+        lockReason, lockArgs = blueprintReason or 'craft_blueprint_required', skillArgs
+    elseif state.code == 'station_incompatible' then
+        lockReason = stationReason or 'craft_station_level'
+    elseif state.code == 'tool_required' then
+        lockReason = 'craft_tool_required'
+    end
+
+    return state, requirements, lockReason, lockArgs
+end
+
 local function buildRecipeEntry(src, r, ctx)
 
-    local canCraft, lockReason, lockArgs = true, nil, nil
+    -- Independent gates (do NOT overwrite each other — priority resolved later).
+    local skillOk, skillReason, skillArgs = true, nil, nil
+    local levelOk, levelNeed, levelCur = true, nil, nil
     if CraftingSkills and CraftingSkills.CheckRecipeGates then
-        local okSkill, skillReason, skillArgs = CraftingSkills.CheckRecipeGates(src, r)
+        local okSkill, sReason, sArgs = CraftingSkills.CheckRecipeGates(src, r)
         if okSkill ~= true then
-            canCraft, lockReason, lockArgs = false, skillReason or 'craft_skill_required', skillArgs
+            skillOk = false
+            skillReason = sReason or 'craft_skill_required'
+            skillArgs = sArgs
+            if sReason == 'craft_level_required' or sReason == 'skill_level_low' then
+                levelOk = false
+                skillOk = true -- level is its own priority bucket after raw skill unlock
+                levelNeed = sArgs and sArgs[1] or nil
+                levelCur = sArgs and sArgs[2] or nil
+                skillReason = sReason
+                skillArgs = sArgs
+            end
         end
     end
+    local blueprintOk, blueprintReason, blueprintArgs = true, nil, nil
     if r.requireBlueprint or r.blueprintId then
         local bpId = r.requireBlueprint or r.blueprintId
         if Config.Blueprints and Config.Blueprints.Enabled and Blueprints and not Blueprints.Has(src, bpId) then
-            canCraft, lockReason, lockArgs = false, 'craft_blueprint_required', { bpId }
+            blueprintOk, blueprintReason, blueprintArgs = false, 'craft_blueprint_required', { bpId }
         end
+    end
+    local specBlocked, specBlockedLabel = false, nil
+    -- Temporary legacy mirrors while we finish resolving primary state
+    local canCraft = skillOk and levelOk and blueprintOk
+    local lockReason, lockArgs = nil, nil
+    if not skillOk then
+        lockReason, lockArgs = skillReason or 'craft_skill_required', skillArgs
+    elseif not levelOk then
+        lockReason, lockArgs = skillReason or 'craft_level_required', skillArgs or { levelNeed, levelCur }
+    elseif not blueprintOk then
+        lockReason, lockArgs = blueprintReason, blueprintArgs
     end
     local checkIngs = recipeHasSteps(r) and stepIngredients(r, 1, 1) or scaleIngredients(r.ingredients or {}, 1)
     local hasItems = Validation and Validation.HasIngredients and Validation.HasIngredients(src, checkIngs) or false
@@ -1961,7 +2118,13 @@ local function buildRecipeEntry(src, r, ctx)
         local okSpec = Specializations.CanCraftRecipe and select(1, Specializations.CanCraftRecipe(src, r))
         hasSpecialization = okSpec and true or false
         if not okSpec then
-            canCraft, lockReason, lockArgs = false, 'craft_spec_required', { requireSpecLabel or requireSpec }
+            -- Spec is a hard identity gate; treat as station/atelier incompatible for player clarity.
+            canCraft = false
+            specBlocked = true
+            specBlockedLabel = requireSpecLabel or requireSpec
+            if lockReason == nil then
+                lockReason, lockArgs = 'craft_spec_required', { requireSpecLabel or requireSpec }
+            end
         end
     end
 
@@ -1970,9 +2133,13 @@ local function buildRecipeEntry(src, r, ctx)
         knownRecipe = Blueprints.KnowsRecipe(src, r) == true
         if not knownRecipe then
             local bpId = r.requireBlueprint or r.blueprintId
+            blueprintOk = false
+            blueprintReason = bpId and 'craft_blueprint_required' or 'craft_knowledge_required'
+            blueprintArgs = { bpId or r.id }
             canCraft = false
-            lockReason = bpId and 'craft_blueprint_required' or 'craft_knowledge_required'
-            lockArgs = { bpId or r.id }
+            if lockReason == nil then
+                lockReason, lockArgs = blueprintReason, blueprintArgs
+            end
         end
     end
 
@@ -1997,18 +2164,51 @@ local function buildRecipeEntry(src, r, ctx)
     end
 
     local bench = ctx and ctx.bench
+    local stationOk, stationReason = true, nil
+    local stationStatusOk, stationStatusLabel = true, 'Opérationnelle'
     if bench and Benches and Benches.MeetsStationLevel and not Benches.MeetsStationLevel(bench, r) then
-        canCraft, lockReason, lockArgs = false, 'craft_station_level', { r.stationLevel, bench.stationLevel or 1 }
+        stationOk, stationReason = false, 'craft_station_level'
+        canCraft = false
+        if lockReason == nil then
+            lockReason, lockArgs = 'craft_station_level', { r.stationLevel, bench.stationLevel or 1 }
+        end
+        stationStatusOk, stationStatusLabel = false, ('Niveau %s requis'):format(tostring(r.stationLevel or '?'))
     end
     if StationRuntime and StationRuntime.CanRun and bench then
         local okRun, runReason = StationRuntime.CanRun(bench, r)
         if not okRun then
-            canCraft, lockReason, lockArgs = false, runReason or 'craft_failed', nil
+            stationOk = false
+            stationReason = runReason or 'craft_failed'
+            canCraft = false
+            if lockReason == nil then
+                lockReason = stationReason
+            end
+            if runReason == 'craft_no_power' then
+                stationStatusOk, stationStatusLabel = false, 'Hors tension'
+            elseif runReason == 'craft_station_broken' then
+                stationStatusOk, stationStatusLabel = false, 'Hors service'
+            elseif runReason == 'craft_overheat' then
+                stationStatusOk, stationStatusLabel = false, 'Surchauffe'
+            else
+                stationStatusOk, stationStatusLabel = false, 'Indisponible'
+            end
         end
     end
+    if specBlocked then
+        stationOk = false
+        stationReason = 'craft_spec_required'
+        stationStatusOk, stationStatusLabel = false, (specBlockedLabel and ('Spécialisation %s requise'):format(specBlockedLabel)) or 'Spécialisation requise'
+        canCraft = false
+        if lockReason == nil then
+            lockReason, lockArgs = 'craft_spec_required', { specBlockedLabel }
+        end
+    end
+    local toolOk = true
     if Tools and Tools.HasRecipe and not Tools.HasRecipe(src, r) then
-        if canCraft then
-            canCraft, lockReason, lockArgs = false, 'craft_tool_required', nil
+        toolOk = false
+        canCraft = false
+        if lockReason == nil then
+            lockReason = 'craft_tool_required'
         end
     end
 
@@ -2027,31 +2227,20 @@ local function buildRecipeEntry(src, r, ctx)
     end
 
     local levelGap = nil
-    if lockReason == 'craft_level_required' then
-        local need = (lockArgs and lockArgs[1]) or (r.skillTree and r.skillTree.requiredLevel) or r.requireLevel
-        local cur = (lockArgs and lockArgs[2]) or playerSkillLevel
+    if not levelOk then
+        local need = levelNeed or (r.skillTree and r.skillTree.requiredLevel) or r.requireLevel
+        local cur = levelCur or playerSkillLevel
         if need ~= nil and cur ~= nil then
             levelGap = math.max(0, (tonumber(need) or 0) - (tonumber(cur) or 0))
         end
-    elseif lockReason == 'craft_station_level' and r.stationLevel then
-        -- bench level filled at menu level; gap computed client-side if needed
-        levelGap = nil
     end
 
-    -- PRESQUE: only if close — one missing material OR small missing qty OR one light prereq.
-    -- Totally inaccessible (wrong spec, unknown blueprint, far from level) = NON FAISABLE.
-    local hardLock = lockReason == 'craft_spec_required'
-        or lockReason == 'craft_blueprint_required'
-        or lockReason == 'craft_knowledge_required'
-        or lockReason == 'craft_skills_unavailable'
-        or lockReason == 'craft_recipe_locked'
-        or lockReason == 'craft_skill_required'
-        or lockReason == 'skill_locked'
-        or lockReason == 'skill_level_low'
-        or lockReason == 'skills_unavailable'
+    -- PRESQUE: materials-only proximity. Skill/blueprint/station hard blocks never become PRESQUE.
+    local hardLock = (not skillOk) or (not levelOk) or (not blueprintOk) or (not stationOk)
+        or (skillReason == 'craft_skills_unavailable') or (skillReason == 'skills_unavailable')
     local farLevel = (levelGap ~= nil and levelGap > 2)
     local stationGap = nil
-    if lockReason == 'craft_station_level' and r.stationLevel and bench then
+    if not stationOk and stationReason == 'craft_station_level' and r.stationLevel and bench then
         stationGap = math.max(0, (tonumber(r.stationLevel) or 0) - (tonumber(bench.stationLevel) or 1))
         if stationGap > 1 then farLevel = true end
     end
@@ -2059,26 +2248,26 @@ local function buildRecipeEntry(src, r, ctx)
     local smallMissingQty = false
     if oneMissingMat and primaryMissing then
         local deficit = (primaryMissing.count or 1) - (primaryMissing.owned or 0)
-        smallMissingQty = deficit > 0 -- single ingredient missing (any deficit of that one item)
+        smallMissingQty = deficit > 0
     end
     local lightPrereq = false
     if not hardLock and hasItems then
         if levelGap ~= nil and levelGap > 0 and levelGap <= 2 then lightPrereq = true end
         if stationGap ~= nil and stationGap == 1 then lightPrereq = true end
-        if lockReason == 'craft_tool_required' and toolDurability ~= nil and toolDurability > 0 and toolDurability <= 15 then
+        if (not toolOk) and toolDurability ~= nil and toolDurability > 0 and toolDurability <= 15 then
             lightPrereq = true
         end
     end
     local almostCraftable = false
-    if not (canCraft and hasItems) and not hardLock and not farLevel then
-        if canCraft and not hasItems and oneMissingMat then
-            almostCraftable = true
-        elseif (not canCraft) and hasItems and lightPrereq then
-            almostCraftable = true
-        elseif canCraft and not hasItems and smallMissingQty then
+    if skillOk and levelOk and blueprintOk and stationOk and toolOk and (not hasItems) and not farLevel then
+        if oneMissingMat or smallMissingQty then
             almostCraftable = true
         end
+    elseif skillOk and levelOk and blueprintOk and stationOk and hasItems and lightPrereq and not farLevel then
+        almostCraftable = true
     end
+    -- Recompute canCraft from independent flags (materials included for legacy canCraft).
+    canCraft = skillOk and levelOk and blueprintOk and stationOk and toolOk
 
     local tags = r.tags or {}
     local isNew = r.isNew == true
@@ -2216,7 +2405,7 @@ local function buildRecipeEntry(src, r, ctx)
         relatedRecipeId = r.relatedRecipeId,
     }
 
-    -- Structured French reasons for NUI badges (never dump uids / snake_case).
+    -- Structured French reasons / authoritative recipeState (never dump uids / snake_case).
     local catLab = (facing and facing.categoryLabel) or (SkillTree and SkillTree.CategoryLabel and SkillTree.CategoryLabel(skillCategory)) or nil
     local talentLab = facing and facing.requiredSkillLabel or nil
     local specLab = requireSpecLabel
@@ -2225,76 +2414,101 @@ local function buildRecipeEntry(src, r, ctx)
     local uiCatLab = craftFields.craftCategoryLabel or categoryFacingLabel(r.craftCategoryUid or r.category)
 
     local function fmtMissing(pm)
-        if not pm then return 'Matériaux insuffisants' end
+        if not pm then return 'Matériaux manquants' end
         local lab = pm.label or itemLabelOf(pm.item)
         local n = math.max(1, (pm.count or 1) - (pm.owned or 0))
-        return ('Il manque : %s x%d'):format(lab, n)
+        return ('Manque : %s x%d'):format(lab, n)
+    end
+
+    local missingList = {}
+    for i = 1, #ingsOut do
+        local ing = ingsOut[i]
+        local need = ing.count or 1
+        local owned = ing.owned or 0
+        if owned < need then
+            missingList[#missingList + 1] = {
+                item = ing.item,
+                label = ing.label or itemLabelOf(ing.item),
+                owned = owned,
+                need = need,
+                missing = need - owned,
+            }
+        end
+    end
+    local missingSummary = nil
+    if #missingList > 0 then
+        local bits = {}
+        for i = 1, math.min(3, #missingList) do
+            bits[#bits + 1] = ('%s x%d'):format(missingList[i].label, missingList[i].missing)
+        end
+        missingSummary = 'Manque : ' .. table.concat(bits, ', ')
     end
 
     local almostReason = nil
     if almostCraftable then
         if missingCount >= 1 and primaryMissing then
             almostReason = fmtMissing(primaryMissing)
-        elseif lockReason == 'craft_level_required' then
-            local need = (lockArgs and lockArgs[1]) or (r.skillTree and r.skillTree.requiredLevel) or r.requireLevel
-            local cur = (lockArgs and lockArgs[2]) or playerSkillLevel
-            almostReason = ('Niveau %s %s / %s'):format(catLab or 'Survie', tostring(cur or '—'), tostring(need or '—'))
-        elseif lockReason == 'craft_skill_required' then
-            almostReason = talentLab and ('Savoir requis : %s'):format(talentLab) or 'Savoir non appris'
-        elseif lockReason == 'craft_station_level' then
-            almostReason = ('Station niveau %s requise'):format(tostring(r.stationLevel or 2))
-        elseif lockReason == 'craft_tool_required' then
+        elseif not levelOk then
+            almostReason = ('Niveau %s %s / %s'):format(catLab or 'Savoir', tostring(levelCur or playerSkillLevel or '—'), tostring(levelNeed or '?'))
+        elseif not toolOk then
             almostReason = 'Outil usé'
+        elseif not stationOk and stationReason == 'craft_station_level' then
+            almostReason = ('Station niveau %s requise'):format(tostring(r.stationLevel or 2))
         else
             almostReason = 'Une seule condition mineure manque'
         end
     end
 
-    local blockReason
-    if canCraft and hasItems then
-        blockReason = 'Conditions remplies'
-    elseif lockReason == 'craft_knowledge_required' then
-        blockReason = 'Plan inconnu'
-    elseif lockReason == 'craft_blueprint_required' then
-        blockReason = 'Plan inconnu'
-    elseif lockReason == 'craft_spec_required' then
-        blockReason = specLab and ('Spécialisation %s requise'):format(specLab) or 'Spécialisation requise'
-    elseif lockReason == 'craft_skill_required' then
-        blockReason = talentLab and ('Talent non débloqué : %s'):format(talentLab) or 'Talent non débloqué'
-    elseif lockReason == 'craft_level_required' then
-        local need = (lockArgs and lockArgs[1]) or (r.skillTree and r.skillTree.requiredLevel) or r.requireLevel
-        local cur = (lockArgs and lockArgs[2]) or playerSkillLevel
-        blockReason = ('Niveau %s %s / %s'):format(catLab or 'Survie', tostring(cur or '—'), tostring(need or '—'))
-    elseif lockReason == 'craft_station_level' then
-        blockReason = ('Station niveau %s requise'):format(tostring(r.stationLevel or ''))
-    elseif lockReason == 'craft_no_power' then
-        blockReason = 'Atelier hors tension'
-    elseif lockReason == 'craft_tool_required' then
-        blockReason = 'Outil requis manquant ou usé'
-    elseif lockReason == 'craft_skills_unavailable' then
-        blockReason = 'Système de compétences indisponible'
-    elseif not hasItems then
-        if missingCount == 1 and primaryMissing then
-            blockReason = fmtMissing(primaryMissing)
-        else
-            blockReason = 'Matériaux insuffisants'
-        end
-    else
-        blockReason = 'Non faisable'
+    if skillReason == 'craft_skills_unavailable' or skillReason == 'skills_unavailable' then
+        skillOk = false
     end
 
-    local lockHint = nil
-    if not canCraft then
-        if lockReason == 'craft_skill_required' then
-            lockHint = talentLab and ('Verrouillée — Savoir requis : %s'):format(talentLab) or 'Verrouillée — Savoir requis'
-        elseif lockReason == 'craft_blueprint_required' or lockReason == 'craft_knowledge_required' then
-            lockHint = 'Verrouillée — Plan requis'
-        elseif lockReason == 'craft_spec_required' then
-            lockHint = specLab and ('Verrouillée — Spécialisation %s requise'):format(specLab) or 'Verrouillée — Spécialisation requise'
-        else
-            lockHint = 'Verrouillée — ' .. (blockReason or 'condition manquante')
-        end
+    local recipeState, requirements, primReason, primArgs = buildRecipeStateAndRequirements({
+        skillOk = skillOk,
+        skillReason = skillReason,
+        skillArgs = skillArgs,
+        levelOk = levelOk,
+        levelNeed = levelNeed or (facing and facing.requireLevel) or r.requireLevel,
+        levelCur = levelCur or playerSkillLevel,
+        blueprintOk = blueprintOk,
+        blueprintReason = blueprintReason,
+        stationOk = stationOk,
+        stationReason = stationReason,
+        stationLabel = stationLab or (bench and bench.label) or nil,
+        stationLevel = bench and (bench.stationLevel or 1) or nil,
+        stationNeedLevel = r.stationLevel,
+        stationStatusLabel = stationStatusLabel,
+        stationStatusOk = stationStatusOk,
+        toolOk = toolOk,
+        toolLabel = toolItem and itemLabelOf(toolItem) or nil,
+        materialsOk = hasItems,
+        missingList = missingList,
+        missingSummary = missingSummary,
+        talentLab = talentLab,
+        catLab = catLab,
+        skillsFacing = facing and facing.skills or nil,
+        openSkillsCategory = facing and (facing.categoryUid or facing.category) or nil,
+        almost = almostCraftable,
+        almostReason = almostReason,
+    })
+
+    lockReason = primReason or lockReason
+    lockArgs = primArgs or lockArgs
+    local blockReason = recipeState.label
+    if recipeState.code == 'ready' then
+        blockReason = 'Conditions remplies'
+    elseif recipeState.code == 'materials_missing' or recipeState.code == 'almost' then
+        blockReason = missingSummary or recipeState.label
+    elseif recipeState.code == 'skill_locked' then
+        blockReason = talentLab and ('Savoir non appris : %s'):format(talentLab) or 'Savoir non appris'
+    elseif recipeState.code == 'level_required' then
+        blockReason = ('Niveau %s requis — actuel : %s'):format(tostring(levelNeed or '?'), tostring(levelCur or playerSkillLevel or '—'))
+    elseif recipeState.code == 'station_incompatible' then
+        blockReason = stationStatusLabel or 'Atelier incompatible'
     end
+
+    -- Precise player hint (never generic VERROUILLÉ)
+    local lockHint = recipeState.helper or blockReason
 
     -- max currently craftable from already-fetched owned counts (no extra ox/DevHub)
     local maxCraftable = 0
@@ -2395,6 +2609,23 @@ local function buildRecipeEntry(src, r, ctx)
         end
     end
 
+
+    entry.recipeState = recipeState
+    entry.requirements = requirements
+    entry.canCraft = (recipeState.code == 'ready')
+    entry.locked = recipeState.blocking == true and recipeState.code ~= 'materials_missing' and recipeState.code ~= 'almost' and recipeState.code ~= 'ready'
+    -- materials-only: locked=false, missingItems=true (legacy NUI)
+    if recipeState.code == 'materials_missing' or recipeState.code == 'almost' then
+        entry.locked = false
+    end
+    if recipeState.code == 'ready' then
+        entry.locked = false
+    end
+    entry.missingItems = not hasItems
+    entry.lockReason = lockReason
+    entry.lockArgs = lockArgs
+    entry.cardStatus = recipeState.cardTag
+    entry.globalStatus = recipeState.label
     entry.blockReason = blockReason
     entry.lockHint = lockHint
     entry.maxCraftable = maxCraftable
@@ -2442,6 +2673,15 @@ local function buildRecipeEntry(src, r, ctx)
         else
             entry = MysteryView.FinalizePlayerEntry(entry, r, facing)
         end
+        if entry.playerVisualState == 'unknown' then
+            entry.recipeState = { code = 'mystery', label = 'MYSTÈRE', cardTag = 'MYSTÈRE', blocking = true, cls = 'mystery' }
+            entry.cardStatus = 'MYSTÈRE'
+            entry.globalStatus = 'MYSTÈRE'
+            entry.locked = true
+            entry.canCraft = false
+            entry.blockReason = 'Connaissance inconnue'
+            entry.lockHint = 'Connaissance inconnue'
+        end
         -- Admin-only MYSTERY badge never on player UI
         if not (ctx and ctx.adminPreview) then
             entry.adminMysteryBadge = nil
@@ -2451,6 +2691,10 @@ local function buildRecipeEntry(src, r, ctx)
     end
 
     return entry
+end
+
+function CraftingPipeline.ResolveRecipeStateForTest(opts)
+    return buildRecipeStateAndRequirements(opts)
 end
 
 function CraftingPipeline.BuildRecipeEntry(src, r, ctx)

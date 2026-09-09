@@ -7246,3 +7246,27 @@ button, input { font: inherit; color: inherit; }
   color: inherit; padding:3px 9px; border-radius:999px;
 }
 .subcat-chip.active { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); }
+
+/* recipeState — one global cause, local sub-states */
+#app .status-tag.recipe-state {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+#app .status-tag.recipe-state.is-skill_locked,
+#app .status-tag.recipe-state.is-level_required,
+#app .status-tag.warn.recipe-state { color: #c4a46a; border-color: rgba(154,136,102,0.55); }
+#app .status-tag.recipe-state.is-materials_missing,
+#app .status-tag.recipe-state.is-tool_required { color: #b07a5a; }
+#app .status-tag.recipe-state.is-ready,
+#app .status-tag.ok.recipe-state { color: #7a9468; }
+#app .status-tag.recipe-state.is-mystery { color: #9a8866; }
+#app .recipe-card .status-tag { letter-spacing: 0.06em; }
+#app .ings-miss {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: #b07a5a;
+  line-height: 1.35;
+}
+#app .block-station .t-l3 { letter-spacing: 0.1em; }
