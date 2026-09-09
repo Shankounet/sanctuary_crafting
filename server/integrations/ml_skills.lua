@@ -19,6 +19,7 @@ local labelIndex = nil
 -- Published ml_skills tree is the recipe-gate SoT: recipeId -> real skill/category UID.
 local recipeSkillIndex = nil
 local recipeIndexLoaded = false
+local publishedCategoryUids = {} -- exact ml_skills category UIDs; beat legacy aliases
 local warnedDown = false
 local bypassNotified = {}
 
@@ -77,6 +78,8 @@ end
 
 local function resolveCategoryUid(catKeyOrUid)
     if type(catKeyOrUid) ~= 'string' or catKeyOrUid == '' then return nil end
+    -- Published UID is authoritative. Never rewrite `agriculture` to legacy `survival`.
+    if publishedCategoryUids[catKeyOrUid] then return catKeyOrUid end
     if SkillTree and SkillTree.CategoryUid then
         local uid = SkillTree.CategoryUid(catKeyOrUid)
         if uid then return uid end
@@ -163,6 +166,7 @@ local function loadLabelIndex()
     labelIndex = {}
     recipeSkillIndex = {}
     recipeIndexLoaded = false
+    publishedCategoryUids = {}
     local res = resourceName()
     if not started(res) then return end
     -- Prefer GetSkillTrees / GetConfig (official admin/tree surface)
@@ -213,8 +217,9 @@ local function loadLabelIndex()
         if type(cat) ~= 'table' then return end
         local cuid = cat.categoryUid or cat.category_uid or cat.uid or cat.id
         local clabel = cat.label or cat.name
-        if type(cuid) == 'string' and type(clabel) == 'string' then
-            labelIndex['cat:' .. cuid] = clabel
+        if type(cuid) == 'string' and cuid ~= '' then
+            publishedCategoryUids[cuid] = true
+            if type(clabel) == 'string' then labelIndex['cat:' .. cuid] = clabel end
         end
         local skills = cat.skills or cat.Skills or cat.nodes or cat.talents
         if type(skills) == 'table' then
@@ -264,6 +269,9 @@ end
 function Skills.SkillLabel(skillUid, catKey)
     if type(skillUid) ~= 'string' or skillUid == '' then return nil end
     if not labelIndex then loadLabelIndex() end
+    if type(catKey) == 'string' and labelIndex and labelIndex[catKey .. ':' .. skillUid] then
+        return labelIndex[catKey .. ':' .. skillUid]
+    end
     local cuid = resolveCategoryUid(catKey)
     if cuid and labelIndex and labelIndex[cuid .. ':' .. skillUid] then
         return labelIndex[cuid .. ':' .. skillUid]
@@ -275,14 +283,18 @@ function Skills.SkillLabel(skillUid, catKey)
 end
 
 function Skills.CategoryLabel(catKey)
-    if SkillTree and SkillTree.CategoryLabel then
-        local fromCfg = SkillTree.CategoryLabel(catKey)
-        if fromCfg and fromCfg ~= '' and fromCfg ~= catKey then return fromCfg end
-    end
     if not labelIndex then loadLabelIndex() end
+    -- Exact published ml_skills category label beats legacy SkillLegacyMap aliases.
+    if type(catKey) == 'string' and labelIndex and labelIndex['cat:' .. catKey] then
+        return labelIndex['cat:' .. catKey]
+    end
     local cuid = resolveCategoryUid(catKey)
     if cuid and labelIndex and labelIndex['cat:' .. cuid] then
         return labelIndex['cat:' .. cuid]
+    end
+    if SkillTree and SkillTree.CategoryLabel then
+        local fromCfg = SkillTree.CategoryLabel(catKey)
+        if fromCfg and fromCfg ~= '' and fromCfg ~= catKey then return fromCfg end
     end
     return catKey or ''
 end
@@ -450,6 +462,15 @@ function Skills.RebuildCache(src)
         if raw then ingestUnlockedRaw(entry, raw, cuid) end
     end
 
+    -- Published categories not represented in legacy Config.SkillCategories (e.g. agriculture).
+    for cuid in pairs(publishedCategoryUids) do
+        if entry.levels[cuid] == nil then
+            entry.levels[cuid] = fetchLevel(src, cuid)
+            local raw = Skills.GetUnlockedSkills(src, cuid)
+            if raw then ingestUnlockedRaw(entry, raw, cuid) end
+        end
+    end
+
     -- Global unlocked dump if available
     local all = Skills.GetUnlockedSkills(src, nil)
     if all then ingestUnlockedRaw(entry, all, nil) end
@@ -487,7 +508,8 @@ end
 
 function Skills.GetLevel(src, catKey)
     if warnIfDown() then return 0 end
-    local key = (SkillTree and SkillTree.ResolveKey and SkillTree.ResolveKey(catKey)) or catKey
+    local key = publishedCategoryUids[catKey] and catKey
+        or ((SkillTree and SkillTree.ResolveKey and SkillTree.ResolveKey(catKey)) or catKey)
     local entry = Skills.GetCache(src)
     if entry.levels[key] ~= nil then return entry.levels[key] end
     local cuid = resolveCategoryUid(catKey)
@@ -632,7 +654,8 @@ function Skills.normalizeSkillRequirements(recipe, src)
     local linked = recipe.id and recipeSkillIndex and recipeSkillIndex[recipe.id] or nil
     if linked then
         local catUid = linked.categoryUid
-        local catKey = (SkillTree and SkillTree.ResolveKey and SkillTree.ResolveKey(catUid)) or catUid
+        -- Keep the exact published UID. Legacy aliases are only for old recipe config.
+        local catKey = catUid
         local skillUid = linked.skillUid
         local row = {
             provider = 'ml_skills',
