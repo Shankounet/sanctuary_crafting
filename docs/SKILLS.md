@@ -63,10 +63,22 @@ Client:
 - Feedback: `HasUnlockedSkill(categoryUid, skillUid)` — if `GetPlayerData()` nil → **loading/unknown**, not locked
 - Open tree: `OpenSkillTree(categoryUid)` — **no** invented focus-node export
 
-## Recipe schema
+## Recipe gates — published tree is source of truth
+
+At runtime, craft builds `recipeId → categoryUid + skillUid` from published ml_skills nodes:
+
+- node `meta.recipeId` / `meta.recipeIds` references recipe → gated by this node's real `skillUid`;
+- recipe absent from the published tree index → free craft;
+- old DevHub/SST `requireSkill = 'skill_N'` fields are ignored once the index is loaded.
+
+This prevents orphan legacy UIDs from locking recipes that are intentionally not part of a skill tree.
+Keep `ensure ml_skills` before `ensure sanctuary_crafting`; if ml_skills is unavailable at cold start,
+the existing legacy fail-closed fallback remains until the published index can load.
+
+## Recipe schema (legacy/admin compatibility)
 
 ```lua
--- Free craft
+-- Free craft (also free when no published ml_skills node links this recipeId)
 requiredSkill = nil
 
 -- Single requirement (level AND unlock when both set)
