@@ -725,17 +725,37 @@ function Skills.normalizeSkillRequirements(recipe, src)
     end
 
     -- 4) legacy requireLevel / requireSkill (post-NormalizeRecipe mirrors)
+    -- IMPORTANT: SkillTree.NormalizeRecipe mirrors requireSkill into requiredSkill/skillTree
+    -- and clears requireSkillCategory. Re-pushing the bare string then falls back to
+    -- Config.Skills.defaultCategory ('engineer') and creates a SECOND gate (mode=all)
+    -- → inflated "invalid skill mapping" + impossible unlocks. Skip if uid already present.
+    local function alreadyHasUid(uid)
+        if type(uid) ~= 'string' or uid == '' then return false end
+        for i = 1, #skills do
+            if skills[i].uid == uid or skills[i].skillUid == uid then return true end
+        end
+        return false
+    end
     if recipe.requireLevel or recipe.requiredLevel then
         local cat = recipe.requireSkillCategory or recipe.skillCategory
             or (recipe.xp and recipe.xp.category)
             or (skills[1] and skills[1].category)
         local level = recipe.requireLevel or recipe.requiredLevel
         local sk = recipe.requireSkill
-        if type(sk) == 'string' or level then
+        if type(sk) == 'string' and alreadyHasUid(sk) then
+            -- only merge level onto existing row
+            for i = 1, #skills do
+                if (skills[i].uid == sk or skills[i].skillUid == sk) and level and not skills[i].level then
+                    skills[i].level = tonumber(level)
+                end
+            end
+        elseif type(sk) == 'string' or level then
             pushSkill({ category = cat, uid = type(sk) == 'string' and sk or nil, level = level }, cat, 'requireLevel')
         end
     elseif type(recipe.requireSkill) == 'string' then
-        pushSkill(recipe.requireSkill, recipe.requireSkillCategory or recipe.skillCategory, 'requireSkill')
+        if not alreadyHasUid(recipe.requireSkill) then
+            pushSkill(recipe.requireSkill, recipe.requireSkillCategory or recipe.skillCategory, 'requireSkill')
+        end
     end
 
     -- 5) SST / DevHub / sanctuary leftovers — NEVER silently add as unlock OR.
@@ -1110,11 +1130,14 @@ end
 function Skills.ValidateRecipesAtStartup()
     local report = Skills.HealthReport()
     if report.invalidMappings > 0 then
-        print(('[CRAFT] ML SKILLS: %d invalid skill mapping(s)'):format(report.invalidMappings))
+        print(('[CRAFT] ML SKILLS: %d invalid skill mapping(s) — skillUid absent from published ml_skills trees (often legacy skill_N)'):format(report.invalidMappings))
         for i = 1, math.min(20, #report.invalidList) do
             local row = report.invalidList[i]
             print(('[CRAFT]   recipe=%s category=%s uid=%s'):format(
                 tostring(row.recipeId), tostring(row.category), tostring(row.uid)))
+        end
+        if report.invalidMappings > 20 then
+            print(('[CRAFT]   … +%d more (see /craftskillhealth)'):format(report.invalidMappings - 20))
         end
     else
         print(('[CRAFT] ML SKILLS: ok — %d gated recipes, %d categories, resource=%s started=%s'):format(
