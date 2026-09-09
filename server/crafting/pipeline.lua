@@ -2329,19 +2329,34 @@ local function buildRecipeEntry(src, r, ctx)
         end
     end
 
-    local hayParts = {
-        recipeFacingLabel(r), recipeFacingDesc(r), uiCatLab, craftFields.craftCategoryUid,
-        craftFields.craftSubcategoryLabel, craftFields.craftSubcategoryUid,
-        stationLab, r.station, specLab, talentLab, catLab,
-    }
+    -- Nil-safe haystack: table.concat errors on nil (ox_target open → craft_failed toast).
+    local hayParts = {}
+    local function hayPush(v)
+        if type(v) == 'string' and v ~= '' then
+            hayParts[#hayParts + 1] = v
+        elseif type(v) == 'number' then
+            hayParts[#hayParts + 1] = tostring(v)
+        end
+    end
+    hayPush(recipeFacingLabel(r))
+    hayPush(recipeFacingDesc(r))
+    hayPush(uiCatLab)
+    hayPush(craftFields.craftCategoryUid)
+    hayPush(craftFields.craftSubcategoryLabel)
+    hayPush(craftFields.craftSubcategoryUid)
+    hayPush(stationLab)
+    hayPush(r.station)
+    hayPush(specLab)
+    hayPush(talentLab)
+    hayPush(catLab)
     for i = 1, #ingsOut do
-        hayParts[#hayParts + 1] = ingsOut[i].label
+        hayPush(ingsOut[i].label)
     end
     if type(resultOut) == 'table' then
-        hayParts[#hayParts + 1] = resultOut.label
-        hayParts[#hayParts + 1] = resultOut.description
+        hayPush(resultOut.label)
+        hayPush(resultOut.description)
     end
-    local searchHaystack = table.concat(hayParts, ' '):lower()
+    local searchHaystack = (#hayParts > 0 and table.concat(hayParts, ' ') or ''):lower()
 
     entry.almostReason = almostReason
 
@@ -2476,7 +2491,7 @@ end
 
 lib.callback.register('sanctuary_crafting:getMenu', function(src, benchKey)
     local bench = Benches.Resolve(benchKey)
-    if not bench then return { ok = false } end
+    if not bench then return { ok = false, reason = 'craft_invalid' } end
     if not Validation.IsNearBench(src, bench.coords, Config.InteractDistance) then
         return { ok = false, reason = 'craft_too_far' }
     end
