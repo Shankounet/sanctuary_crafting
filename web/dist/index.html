@@ -204,6 +204,9 @@
       </div>
 
       <div class="nav-section flex-grow nav-cats">
+        <div class="cat-global-row">
+          <button type="button" class="cat-global" id="cat-view-all" title="Vue globale (pas une catégorie)">Tous</button>
+        </div>
         <h2 class="t-l3 nav-heading">Catégories</h2>
         <nav class="cat-list" id="cat-list" aria-label="Catégories"></nav>
       </div>
@@ -292,6 +295,7 @@
         <div>
           <p class="t-l4 panel-kicker">Catalogue</p>
           <h2 class="t-l2">Recettes</h2>
+          <div id="subcat-strip" class="subcat-strip" aria-label="Sous-catégories"></div>
         </div>
         <span class="t-l5 muted" id="recipe-count"></span>
           <label class="catalog-sort-wrap" title="Trier le catalogue">
@@ -763,13 +767,14 @@
     <header class="ca-head">
       <div>
         <p class="ca-kicker">SANCTUARY</p>
-        <h1>CRAFTADMIN · v2.16</h1>
+        <h1>CRAFTADMIN · v2.32</h1>
       </div>
       <span class="spacer"></span>
       <span id="ca-status" class="ca-status"></span>
+      <button type="button" id="ca-open-taxo" class="ghost" title="Catégories de craft">CATÉGORIES DE CRAFT</button>
       <button type="button" id="ca-close" class="ghost" title="Fermer">FERMER</button>
     </header>
-    <div class="ca-body">
+    <div class="ca-body" id="ca-body-recipes">
       <aside class="ca-col">
         <input id="ca-search" placeholder="Recherche id / label / item" />
         <div class="ca-row">
@@ -796,9 +801,15 @@
         <div class="ca-field"><label>description</label><textarea id="ca-desc"></textarea></div>
         <div class="ca-row">
           <div class="ca-field"><label>station</label><select id="ca-station"></select></div>
-          <div class="ca-field"><label>category</label><select id="ca-category"></select></div>
           <div class="ca-field"><label>rarity</label><select id="ca-rarity"></select></div>
         </div>
+        <p class="ca-kicker">CLASSEMENT (taxonomie craft — indépendant station / ML Skills)</p>
+        <div class="ca-row">
+          <div class="ca-field"><label>Catégorie</label><select id="ca-craft-cat" title="craftCategoryUid"></select></div>
+          <div class="ca-field"><label>Sous-catégorie</label><select id="ca-craft-sub" title="craftSubcategoryUid"></select></div>
+          <button type="button" id="ca-suggest-class" class="ghost" title="Suggestion admin (jamais auto)">Suggérer</button>
+        </div>
+        <input type="hidden" id="ca-category" />
         <div class="ca-row">
           <div class="ca-field"><label>requireSpec</label><input id="ca-spec" /></div>
           <div class="ca-field"><label>requireSkill</label><input id="ca-skill" /></div>
@@ -878,6 +889,56 @@
         <h2>Live preview · buildRecipeEntry</h2>
         <div id="admin-preview-app"></div>
       </aside>
+    </div>
+  </div>
+  <div id="ca-taxo-page" class="ca-taxo-page hidden" aria-label="Catégories de craft">
+    <div class="ca-taxo-shell">
+      <header class="ca-head">
+        <div>
+          <p class="ca-kicker">SANCTUARY</p>
+          <h1>CATÉGORIES DE CRAFT</h1>
+        </div>
+        <span class="spacer"></span>
+        <button type="button" id="ca-taxo-back" class="ghost">← Recettes</button>
+      </header>
+      <div class="ca-taxo-body">
+        <aside class="ca-col">
+          <p class="ca-kicker">Catégories principales</p>
+          <ul id="ca-taxo-list" class="ca-list"></ul>
+          <div class="ca-row">
+            <input id="ca-taxo-uid" placeholder="uid" />
+            <input id="ca-taxo-label" placeholder="Label FR" />
+          </div>
+          <div class="ca-row">
+            <input id="ca-taxo-icon" placeholder="fa-solid fa-…" />
+            <input id="ca-taxo-order" type="number" placeholder="ordre" style="max-width:90px" />
+            <input id="ca-taxo-accent" placeholder="#accent" style="max-width:100px" />
+          </div>
+          <button type="button" id="ca-taxo-save" class="primary">Créer / Maj catégorie</button>
+          <p class="ca-kicker" style="margin-top:12px">Sous-catégorie</p>
+          <div class="ca-row">
+            <input id="ca-taxo-sub-uid" placeholder="sub uid" />
+            <input id="ca-taxo-sub-label" placeholder="Label FR" />
+          </div>
+          <button type="button" id="ca-taxo-sub-save" class="ghost">+ sous-catégorie</button>
+        </aside>
+        <section class="ca-col">
+          <p class="ca-kicker">Audit migration (ancien → suggéré)</p>
+          <button type="button" id="ca-taxo-audit" class="ghost">Charger audit</button>
+          <div id="ca-taxo-audit-out" class="ca-ox" style="max-height:220px;overflow:auto;margin-top:8px"></div>
+          <p class="ca-kicker" style="margin-top:12px">BULK MOVE → Catégorie &gt; Sous-catégorie</p>
+          <div class="ca-row">
+            <select id="ca-bulk-cat"></select>
+            <select id="ca-bulk-sub"></select>
+          </div>
+          <textarea id="ca-bulk-ids" rows="4" placeholder="recipe ids (un par ligne) ou laisser vide = sélection liste"></textarea>
+          <div class="ca-actions">
+            <button type="button" id="ca-bulk-preview" class="ghost">Prévisualiser</button>
+            <button type="button" id="ca-bulk-apply" class="primary">Appliquer (confirm)</button>
+          </div>
+          <div id="ca-bulk-out" class="ca-ox" style="max-height:180px;overflow:auto;margin-top:8px"></div>
+        </section>
+      </div>
     </div>
   </div>
   <div id="ca-modal" class="ca-modal hidden">

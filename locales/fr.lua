@@ -140,4 +140,9 @@ Locales['fr'] = {
     ['craft_wrong_station'] = 'Récupérez cette production à sa station.',
     ['craft_must_collect'] = 'Production terminée — récupérez-la à la station.',
     ['craft_output_empty'] = 'Rien à récupérer ici.',
+
+    ['craft_category_all_view'] = 'Tous',
+    ['craft_category_divers'] = 'Divers',
+    ['admin_invalid_category'] = 'Catégorie craft invalide',
+    ['admin_invalid_subcategory'] = 'Sous-catégorie craft invalide',
 }

@@ -44,11 +44,13 @@ end
 
 ---@param category string
 ---@return boolean
+--- Deprecated wrapper — CraftTaxonomy.IsValidCategory is SoT (redefined in craft_taxonomy.lua).
 function IsValidRecipeCategory(category)
-    if not category then return false end
-    if Config.RecipeCategories and Config.RecipeCategories[category] then
+    if CraftTaxonomy and CraftTaxonomy.IsValidCategory and CraftTaxonomy.IsValidCategory(category) then
         return true
     end
-    -- fallback: exemples / anciens packs
+    if not category then return false end
+    if Config.CraftCategoryLegacyMap and Config.CraftCategoryLegacyMap[category] then return true end
+    if Config.RecipeCategories and Config.RecipeCategories[category] then return true end
     return BenchTypes[category] == true
 end

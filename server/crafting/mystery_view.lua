@@ -270,8 +270,33 @@ function MysteryView.ApplyUnknownView(entry, recipe, facing)
         entry.requireSkill = nil
     end
 
-    -- Search: only public display fields (never true names)
+    -- Craft taxonomy: UNKNOWN still belongs to a category (??? card) but hide subcategory if revealing
+    do
+        local craftUid = entry.craftCategoryUid or (recipe and recipe.craftCategoryUid)
+        local craftLab = entry.craftCategoryLabel
+        if (not craftLab or craftLab == '') and CraftTaxonomy and CraftTaxonomy.GetCategory and craftUid then
+            local def = CraftTaxonomy.GetCategory(craftUid)
+            craftLab = def and def.label or nil
+        end
+        if craftUid then
+            entry.craftCategoryUid = craftUid
+            entry.category = craftUid
+            entry.craftCategoryLabel = craftLab
+            entry.categoryLabel = craftLab or entry.categoryLabel
+            entry.craftCategoryIcon = entry.craftCategoryIcon
+                or (CraftTaxonomy and CraftTaxonomy.GetCategory and CraftTaxonomy.GetCategory(craftUid) and CraftTaxonomy.GetCategory(craftUid).icon)
+        end
+        -- Subcategory may reveal too much (e.g. Nautique for a mystery boat)
+        entry.craftSubcategoryUid = nil
+        entry.craftSubcategoryLabel = nil
+        entry.craftSubcategoryIcon = nil
+    end
+
+    -- Search: only public display fields (never true names / subcategory)
     local hay = { '???', 'connaissance inconnue', 'inconnue', 'mystery' }
+    if entry.craftCategoryLabel then
+        hay[#hay + 1] = tostring(entry.craftCategoryLabel):lower()
+    end
     if mode == 'recipe_only' and catLabel then
         hay[#hay + 1] = catLabel:lower()
     end

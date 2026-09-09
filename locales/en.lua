@@ -139,4 +139,9 @@ Locales['en'] = {
     ['craft_wrong_station'] = 'Collect this production at its station.',
     ['craft_must_collect'] = 'Production finished — collect it at the station.',
     ['craft_output_empty'] = 'Nothing to collect here.',
+
+    ['craft_category_all_view'] = 'All',
+    ['craft_category_divers'] = 'Misc',
+    ['admin_invalid_category'] = 'Invalid craft category',
+    ['admin_invalid_subcategory'] = 'Invalid craft subcategory',
 }

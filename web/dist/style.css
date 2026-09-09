@@ -7225,3 +7225,24 @@ button, input { font: inherit; color: inherit; }
   border: 1px solid rgba(140, 110, 60, 0.55);
   background: rgba(40, 32, 18, 0.85);
 }
+
+
+/* --- Craft taxonomy left rail / subcats --- */
+.cat-global-row { display:flex; gap:6px; margin:0 0 8px; }
+.cat-global {
+  flex:1; font:inherit; cursor:pointer;
+  background: transparent; border:1px solid rgba(255,255,255,.12);
+  color: inherit; padding:6px 10px; border-radius:4px; opacity:.85;
+}
+.cat-global.active, .cat-global:hover { opacity:1; border-color: rgba(255,255,255,.28); }
+.cat-list .cat-item { display:flex; align-items:center; gap:8px; width:100%; }
+.cat-list .cat-item .count { margin-left:auto; opacity:.7; font-size:.85em; }
+.cat-list .cat-item .count-ok { margin-left:4px; opacity:.9; font-size:.75em; color:#8dcf8a; }
+.cat-list .cat-item.active { outline:1px solid rgba(255,255,255,.25); }
+.subcat-strip { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.subcat-chip {
+  font:inherit; font-size:.78rem; cursor:pointer;
+  background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.12);
+  color: inherit; padding:3px 9px; border-radius:999px;
+}
+.subcat-chip.active { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); }

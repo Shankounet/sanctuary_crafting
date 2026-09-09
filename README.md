@@ -1,4 +1,4 @@
-# sanctuary_crafting v2.29.1
+# sanctuary_crafting v2.32.0
 
 Plateforme de **craft post-apocalyptique** pour FiveM (ESX Legacy + ox_lib / ox_inventory / ox_target / oxmysql).
 
@@ -10,6 +10,15 @@ UI NUI **premium** (v2.1.3) : atelier survivant reconstruit (métal usé, laiton
 
 
 ## Notes de version
+
+### v2.32.0 — Craft category taxonomy rewrite
+- Player-facing taxonomy: explicit `craftCategoryUid` / `craftSubcategoryUid` (SoT after normalize)
+- Independent of ML Skills unlocks and of station; no label/ox/token auto-classification
+- Default FR categories (Survie…Divers); typo fixes Électricité, Anti-douleurs under Soins
+- Left rail mains + counts (non-category filters); Tous = global view; subcategory chips
+- Admin CLASSEMENT + CATÉGORIES DE CRAFT (upsert, audit, bulk move preview/confirm)
+- Docs: `docs/CRAFT_CATEGORY_TAXONOMY.md`, `docs/CRAFT_CATEGORY_ADMIN.md`, `docs/CRAFT_CATEGORY_MIGRATION.md`
+
 
 ### v2.31.0 — Mystery / unknown recipe visibility
 - Player states: UNKNOWN (???) / DISCOVERED_LOCKED / UNLOCKED — `skillVisibility` + optional `mysteryMode`

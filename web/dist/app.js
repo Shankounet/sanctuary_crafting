@@ -13,7 +13,9 @@
     pinned: [],
     selected: null,
     filter: 'all',
-    category: 'all',
+    category: 'all', // 'all' = vue globale (pas une catégorie craft)
+    subcategory: 'all',
+    craftCategories: [],
     search: '',
     materialFilter: null,
     compact: false,
@@ -454,17 +456,50 @@
     return s;
   }
 
+  function recipeCraftCat(r) {
+    return (r && (r.craftCategoryUid || r.category)) || 'divers';
+  }
+
+  function recipeCraftSub(r) {
+    return (r && r.craftSubcategoryUid) || '';
+  }
+
   function categoryLabel(cat, recipe) {
-    if (!cat || cat === 'all') return 'Toutes';
-    if (recipe && recipe.categoryLabel) return recipe.categoryLabel;
-    const hit = (state.recipes || []).find((r) => r.category === cat && r.categoryLabel);
-    if (hit) return hit.categoryLabel;
+    if (!cat || cat === 'all') return 'Tous';
+    if (recipe && (recipe.craftCategoryLabel || recipe.categoryLabel)) {
+      return recipe.craftCategoryLabel || recipe.categoryLabel;
+    }
+    const def = (state.craftCategories || []).find((c) => c.uid === cat || c.id === cat);
+    if (def && def.label) return def.label;
+    const hit = (state.recipes || []).find((r) => recipeCraftCat(r) === cat && (r.craftCategoryLabel || r.categoryLabel));
+    if (hit) return hit.craftCategoryLabel || hit.categoryLabel;
     return humanize(cat);
+  }
+
+  function subcategoryLabel(catUid, subUid) {
+    if (!subUid || subUid === 'all') return 'Tous';
+    const def = (state.craftCategories || []).find((c) => c.uid === catUid);
+    const sub = def && (def.subcategories || []).find((s) => s.uid === subUid);
+    if (sub && sub.label) return sub.label;
+    const hit = (state.recipes || []).find((r) => recipeCraftCat(r) === catUid && recipeCraftSub(r) === subUid && r.craftSubcategoryLabel);
+    return (hit && hit.craftSubcategoryLabel) || humanize(subUid);
+  }
+
+  function categoryIconFromTaxonomy(cat) {
+    const def = (state.craftCategories || []).find((c) => c.uid === cat || c.id === cat);
+    if (def && def.icon) {
+      const m = String(def.icon).match(/fa-[\w-]+(?:\s+fa-[\w-]+)?/);
+      // return last fa-* token for fa-solid fa-xxx pattern used by categoryIcon
+      const parts = String(def.icon).split(/\s+/);
+      const fa = parts.find((p) => p.indexOf('fa-') === 0 && p !== 'fa-solid' && p !== 'fa-regular') || parts[parts.length - 1];
+      return fa || 'fa-tag';
+    }
+    return null;
   }
 
   function recipeCode(r) {
     if (!r) return '';
-    const cat = String(r.category || 'GEN').replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || 'GEN';
+    const cat = String(recipeCraftCat(r) || 'GEN').replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || 'GEN';
     let n = 0;
     const id = String(r.id || '');
     for (let i = 0; i < id.length; i++) n = (n * 31 + id.charCodeAt(i)) >>> 0;
@@ -491,8 +526,9 @@
   function buildRecipeHaystack(r) {
     if (r.searchHaystack) return String(r.searchHaystack).toLowerCase();
     const parts = [
-      r.label, r.categoryLabel, r.category, r.description, r.desc,
-      r.stationLabel, r.station, r.skillCategoryLabel, r.skillCategory,
+      r.label, r.craftCategoryLabel || r.categoryLabel, r.craftCategoryUid || r.category,
+      r.craftSubcategoryLabel, r.description, r.desc,
+      r.stationLabel, r.station, r.skillCategoryLabel,
       r.requireSpecLabel, r.requiredSkillLabel,
       (r.tags || []).join(' '),
     ];
@@ -515,7 +551,10 @@
   }
 
   function matchesFilter(r) {
-    if (state.category && state.category !== 'all' && r.category !== state.category) return false;
+    if (state.category && state.category !== 'all' && recipeCraftCat(r) !== state.category) return false;
+    if (state.category && state.category !== 'all' && state.subcategory && state.subcategory !== 'all') {
+      if (recipeCraftSub(r) !== state.subcategory) return false;
+    }
     if (state.materialFilter) {
       const item = state.materialFilter;
       const hit = (r.ingredients || []).some((ing) => ing && ing.item === item);
@@ -919,6 +958,8 @@ function skilltreeCtaHtml(r) {
   }
 
   function categoryIcon(cat) {
+    const fromTax = categoryIconFromTaxonomy(cat);
+    if (fromTax) return fromTax;
     const map = {
       all: 'fa-layer-group',
       scrap: 'fa-recycle',
@@ -947,38 +988,128 @@ function skilltreeCtaHtml(r) {
     return map[String(cat || '').toLowerCase()] || 'fa-tag';
   }
 
-    function renderCategories() {
+  /**
+   * Left-rail counts = recipes that pass current NON-category filters
+   * (search / favoris / nouveaux / faisables / rareté / matériaux).
+   * Category selection itself is excluded so counts stay meaningful while browsing.
+   * "Tous" is a global view control (not a craft category).
+   */
+  function recipesForCategoryCounts() {
+    const savedCat = state.category;
+    const savedSub = state.subcategory;
+    state.category = 'all';
+    state.subcategory = 'all';
+    const list = (state.recipes || []).filter((r) => {
+      // reuse matchesFilter but category forced to all above
+      return matchesFilter(r);
+    });
+    state.category = savedCat;
+    state.subcategory = savedSub;
+    return list;
+  }
+
+  function renderSubcategories() {
+    const strip = $('#subcat-strip');
+    if (!strip) return;
+    if (!state.category || state.category === 'all') {
+      strip.innerHTML = '';
+      strip.hidden = true;
+      return;
+    }
+    const def = (state.craftCategories || []).find((c) => c.uid === state.category);
+    const subs = (def && def.subcategories) || [];
+    // Also include any subcats present on recipes even if empty def
+    const present = {};
+    recipesForCategoryCounts().forEach((r) => {
+      if (recipeCraftCat(r) === state.category && recipeCraftSub(r)) {
+        present[recipeCraftSub(r)] = true;
+      }
+    });
+    const merged = [];
+    const seen = {};
+    subs.forEach((s) => {
+      if (s && s.uid && !seen[s.uid]) { merged.push(s); seen[s.uid] = true; }
+    });
+    Object.keys(present).forEach((uid) => {
+      if (!seen[uid]) merged.push({ uid, label: subcategoryLabel(state.category, uid) });
+    });
+    if (merged.length === 0) {
+      strip.innerHTML = '';
+      strip.hidden = true;
+      return;
+    }
+    strip.hidden = false;
+    let html = `<button type="button" class="subcat-chip${state.subcategory === 'all' ? ' active' : ''}" data-sub="all">Tous</button>`;
+    merged.forEach((s) => {
+      html += `<button type="button" class="subcat-chip${state.subcategory === s.uid ? ' active' : ''}" data-sub="${escapeHtml(s.uid)}">${escapeHtml(s.label || subcategoryLabel(state.category, s.uid))}</button>`;
+    });
+    strip.innerHTML = html;
+    strip.querySelectorAll('.subcat-chip').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.subcategory = btn.dataset.sub || 'all';
+        invalidateFilterCache();
+        renderSubcategories();
+        renderList();
+      });
+    });
+  }
+
+  function renderCategories() {
     const nav = $('#cat-list');
     if (!nav) return;
+    const base = recipesForCategoryCounts();
     const counts = {};
     const faisable = {};
-    state.recipes.forEach((r) => {
-      const c = r.category || 'autre';
+    base.forEach((r) => {
+      const c = recipeCraftCat(r);
       counts[c] = (counts[c] || 0) + 1;
       if (r.canCraft) faisable[c] = (faisable[c] || 0) + 1;
     });
-    const cats = Object.keys(counts).sort((a, b) => categoryLabel(a).localeCompare(categoryLabel(b), 'fr'));
-    const total = state.recipes.length;
-    const totalOk = state.recipes.filter((r) => r.canCraft).length;
-    let html = `<button type="button" class="cat-item${state.category === 'all' ? ' active' : ''}" data-cat="all">
-      <i class="fa-solid ${categoryIcon('all')}" aria-hidden="true"></i>
-      <span>Toutes</span><span class="count">${total}</span>${totalOk ? `<span class="count-ok" title="Faisables">${totalOk}</span>` : ''}
-    </button>`;
+    // Prefer server taxonomy order; never invent from labels
+    let cats = (state.craftCategories || []).map((c) => c.uid).filter(Boolean);
+    if (!cats.length) {
+      cats = Object.keys(counts).sort((a, b) => categoryLabel(a).localeCompare(categoryLabel(b), 'fr'));
+    }
+    // Keep empty categories visible (count 0) so taxonomy stays stable
+    let html = '';
     cats.forEach((c) => {
+      const n = counts[c] || 0;
       const ok = faisable[c] || 0;
-      html += `<button type="button" class="cat-item${state.category === c ? ' active' : ''}" data-cat="${escapeHtml(c)}">
+      const active = state.category === c;
+      const def = (state.craftCategories || []).find((x) => x.uid === c);
+      const ico = (def && def.icon) ? '' : '';
+      html += `<button type="button" class="cat-item${active ? ' active' : ''}" data-cat="${escapeHtml(c)}" style="${def && def.accent ? `--cat-accent:${def.accent}` : ''}">
         <i class="fa-solid ${categoryIcon(c)}" aria-hidden="true"></i>
-        <span>${escapeHtml(categoryLabel(c))}</span><span class="count">${counts[c]}</span>${ok ? `<span class="count-ok" title="Faisables">${ok}</span>` : ''}
+        <span>${escapeHtml(categoryLabel(c))}</span><span class="count">${n}</span>${ok ? `<span class="count-ok" title="Faisables">${ok}</span>` : ''}
       </button>`;
     });
     nav.innerHTML = html;
     nav.querySelectorAll('.cat-item').forEach((btn) => {
       btn.addEventListener('click', () => {
-        state.category = btn.dataset.cat || 'all';
+        const next = btn.dataset.cat || 'all';
+        if (state.category === next) {
+          // collapse → vue globale
+          state.category = 'all';
+          state.subcategory = 'all';
+        } else {
+          state.category = next;
+          state.subcategory = 'all';
+        }
+        invalidateFilterCache();
+        syncGlobalCatBtn();
         renderCategories();
+        renderSubcategories();
         renderList();
       });
     });
+    syncGlobalCatBtn();
+    renderSubcategories();
+  }
+
+  function syncGlobalCatBtn() {
+    const btn = $('#cat-view-all');
+    if (!btn) return;
+    btn.classList.toggle('active', !state.category || state.category === 'all');
   }
 
   function ingOwnedRequired(ing, r) {
@@ -1105,7 +1236,7 @@ function skilltreeCtaHtml(r) {
           <div class="card-identity">
             <div class="card-title">${escapeHtml(titleText)}</div>
             <div class="card-meta-line">
-              <span class="card-cat">${mystery ? 'Connaissance inconnue' : escapeHtml(categoryLabel(r.category))}</span>
+              <span class="card-cat">${mystery ? escapeHtml(r.craftCategoryLabel || categoryLabel(recipeCraftCat(r)) || 'Connaissance inconnue') : escapeHtml(r.craftCategoryLabel || categoryLabel(recipeCraftCat(r), r))}</span>
               <span class="card-code">${mystery ? '???' : escapeHtml(code)}</span>
             </div>
           </div>
@@ -3535,6 +3666,7 @@ function skilltreeCtaHtml(r) {
       state.shop = data.shoppingPins;
       renderShop();
     }
+    state.craftCategories = data.craftCategories || state.craftCategories || [];
     state.flags = data.flags || {};
     if (data.batch) state.batch = data.batch;
     if (data.queueSize != null) state.queueMax = data.queueSize;
@@ -3987,6 +4119,7 @@ function skilltreeCtaHtml(r) {
         searchDebounceTimer = null;
       }
       invalidateFilterCache();
+      renderCategories();
       renderList();
       return;
     }
@@ -3994,6 +4127,7 @@ function skilltreeCtaHtml(r) {
     searchDebounceTimer = setTimeout(() => {
       searchDebounceTimer = null;
       invalidateFilterCache();
+      renderCategories();
       renderList();
     }, 200);
   });
@@ -4025,6 +4159,8 @@ function skilltreeCtaHtml(r) {
       btn.classList.add('active');
       state.filter = btn.dataset.filter;
       syncFiltersMore();
+      invalidateFilterCache();
+      renderCategories();
       renderList();
     });
   });
@@ -4039,6 +4175,8 @@ function skilltreeCtaHtml(r) {
         btn.classList.add('active');
         state.rarityFilter = btn.dataset.rarity || 'all';
         syncFiltersMore();
+        invalidateFilterCache();
+        renderCategories();
         renderList();
       });
     });
@@ -4096,6 +4234,15 @@ function skilltreeCtaHtml(r) {
   }
 
   bindUi('#btn-debug-give', 'click', giveDebugMaterials);
+  bindUi('#cat-view-all', 'click', () => {
+    state.category = 'all';
+    state.subcategory = 'all';
+    invalidateFilterCache();
+    syncGlobalCatBtn();
+    renderCategories();
+    renderSubcategories();
+    renderList();
+  });
   bindUi('#btn-craft', 'click', startCraft);
   bindUi('#btn-cancel', 'click', cancelCraft);
   const batchInput = $('#batch');

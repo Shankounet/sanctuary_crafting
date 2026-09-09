@@ -148,3 +148,8 @@
 #craft-admin .ca-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 #craft-admin .ca-chk { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; }
 #craft-admin .ca-chk input { width: auto; }
+
+.ca-taxo-page { position:absolute; inset:0; z-index:5; background: inherit; }
+.ca-taxo-shell { display:flex; flex-direction:column; height:100%; }
+.ca-taxo-body { display:flex; gap:12px; padding:12px; flex:1; min-height:0; overflow:auto; }
+.ca-taxo-body .ca-col { flex:1; min-width:0; }

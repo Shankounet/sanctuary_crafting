@@ -18,7 +18,7 @@
   function emptyDraft() {
     return {
       id: '', result: '', qty: 1, oxLabel: '', description: '',
-      station: '', category: '', rarity: 'common',
+      station: '', category: '', craftCategoryUid: 'divers', craftSubcategoryUid: '', rarity: 'common',
       requireSpec: '', requireSkill: '', requireLevel: '',
       skillVisibility: 'visible_locked', mysteryMode: '', previewPlayerState: '',
       duration: 5000, xp: 0, xpCategory: '',
@@ -72,7 +72,10 @@
     d.oxLabel = $('#ca-oxlabel').value.trim();
     d.description = $('#ca-desc').value.trim();
     d.station = $('#ca-station').value;
-    d.category = $('#ca-category').value;
+    d.craftCategoryUid = ($('#ca-craft-cat') && $('#ca-craft-cat').value) || 'divers';
+    d.craftSubcategoryUid = ($('#ca-craft-sub') && $('#ca-craft-sub').value) || '';
+    d.category = d.craftCategoryUid; // deprecated mirror
+    if ($('#ca-category')) $('#ca-category').value = d.craftCategoryUid;
     d.rarity = $('#ca-rarity').value;
     d.requireSpec = $('#ca-spec').value.trim();
     d.requireSkill = $('#ca-skill').value.trim();
@@ -117,7 +120,10 @@
     $('#ca-oxlabel').value = r.oxLabel || r.label || '';
     $('#ca-desc').value = r.description || '';
     $('#ca-station').value = r.station || '';
-    $('#ca-category').value = r.category || '';
+    const catUid = r.craftCategoryUid || r.category || 'divers';
+    if ($('#ca-craft-cat')) $('#ca-craft-cat').value = catUid;
+    fillCraftSubSelect(catUid, r.craftSubcategoryUid || '');
+    if ($('#ca-category')) $('#ca-category').value = catUid;
     $('#ca-rarity').value = r.rarity || 'common';
     $('#ca-spec').value = r.requireSpec || '';
     $('#ca-skill').value = r.requireSkill || '';
@@ -424,6 +430,11 @@
     fillSelect($('#ca-f-station'), state.meta.stations, true);
     fillSelect($('#ca-category'), state.meta.categories, true);
     fillSelect($('#ca-f-category'), state.meta.categories, true);
+    fillSelect($('#ca-craft-cat'), state.meta.categories, true);
+    fillSelect($('#ca-bulk-cat'), state.meta.categories, true);
+    fillCraftSubSelect(($('#ca-craft-cat') && $('#ca-craft-cat').value) || '', '');
+    fillBulkSub();
+    bindTaxonomyUi();
     fillSelect($('#ca-rarity'), state.meta.rarities, true);
     fillSelect($('#ca-f-rarity'), state.meta.rarities, true);
     fillSelect($('#ca-sig'), state.meta.signatureModes, false);
@@ -448,4 +459,212 @@
   });
 
   wire();
+
+
+  function craftCatDefs() {
+    return state.meta.craftCategories || state.meta.categories || [];
+  }
+
+  function fillCraftSubSelect(catUid, selected) {
+    const el = $('#ca-craft-sub');
+    if (!el) return;
+    const cur = selected || el.value;
+    el.innerHTML = '';
+    const opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = '— (aucune) —';
+    el.appendChild(opt0);
+    const def = craftCatDefs().find((c) => (c.uid || c.id) === catUid);
+    (def && def.subcategories || []).forEach((s) => {
+      const o = document.createElement('option');
+      o.value = s.uid;
+      o.textContent = s.label || s.uid;
+      el.appendChild(o);
+    });
+    if (cur) el.value = cur;
+  }
+
+  function fillBulkSub() {
+    const catEl = $('#ca-bulk-cat');
+    const subEl = $('#ca-bulk-sub');
+    if (!catEl || !subEl) return;
+    fillCraftSubSelect.__bulk = true;
+    const catUid = catEl.value;
+    subEl.innerHTML = '';
+    const opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = '— (aucune) —';
+    subEl.appendChild(opt0);
+    const def = craftCatDefs().find((c) => (c.uid || c.id) === catUid);
+    (def && def.subcategories || []).forEach((s) => {
+      const o = document.createElement('option');
+      o.value = s.uid;
+      o.textContent = s.label || s.uid;
+      subEl.appendChild(o);
+    });
+  }
+
+  let taxoBound = false;
+  function bindTaxonomyUi() {
+    if (taxoBound) return;
+    taxoBound = true;
+    const craftCat = $('#ca-craft-cat');
+    if (craftCat) {
+      craftCat.addEventListener('change', () => {
+        fillCraftSubSelect(craftCat.value, '');
+        if ($('#ca-category')) $('#ca-category').value = craftCat.value;
+      });
+    }
+    const sug = $('#ca-suggest-class');
+    if (sug) {
+      sug.addEventListener('click', async () => {
+        const id = ($('#ca-id') && $('#ca-id').value.trim()) || (state.draft && state.draft.id);
+        if (!id) { status('id requis pour suggérer'); return; }
+        const r = await post('craftadminSuggestClass', { recipeId: id });
+        if (!r || !r.ok || !r.suggestion) { status('Suggestion indisponible'); return; }
+        const s = r.suggestion;
+        if ($('#ca-craft-cat')) $('#ca-craft-cat').value = s.craftCategoryUid || '';
+        fillCraftSubSelect(s.craftCategoryUid || '', s.craftSubcategoryUid || '');
+        status(`Suggestion (${s.source}): ${s.craftCategoryLabel || s.craftCategoryUid}${s.craftSubcategoryLabel ? ' > ' + s.craftSubcategoryLabel : ''} — à valider`);
+      });
+    }
+    const openTaxo = $('#ca-open-taxo');
+    const taxoPage = $('#ca-taxo-page');
+    const body = $('#ca-body-recipes');
+    if (openTaxo && taxoPage) {
+      openTaxo.addEventListener('click', () => {
+        taxoPage.classList.remove('hidden');
+        if (body) body.classList.add('hidden');
+        renderTaxoList();
+      });
+    }
+    const back = $('#ca-taxo-back');
+    if (back && taxoPage) {
+      back.addEventListener('click', () => {
+        taxoPage.classList.add('hidden');
+        if (body) body.classList.remove('hidden');
+      });
+    }
+    const saveCat = $('#ca-taxo-save');
+    if (saveCat) {
+      saveCat.addEventListener('click', async () => {
+        const uid = ($('#ca-taxo-uid').value || '').trim();
+        if (!uid) { status('uid requis'); return; }
+        const r = await post('craftadminUpsertCategory', {
+          uid,
+          label: ($('#ca-taxo-label').value || '').trim() || uid,
+          icon: ($('#ca-taxo-icon').value || '').trim() || 'fa-solid fa-tag',
+          sortOrder: Number($('#ca-taxo-order').value) || 100,
+          accent: ($('#ca-taxo-accent').value || '').trim(),
+          enabled: true,
+        });
+        if (r && r.ok) {
+          state.meta.craftCategories = r.craftCategories || state.meta.craftCategories;
+          state.meta.categories = (r.craftCategories || []).map((c) => ({ id: c.uid, uid: c.uid, label: c.label, order: c.sortOrder, subcategories: c.subcategories }));
+          fillSelect($('#ca-craft-cat'), state.meta.categories, true);
+          fillSelect($('#ca-f-category'), state.meta.categories, true);
+          fillSelect($('#ca-bulk-cat'), state.meta.categories, true);
+          renderTaxoList();
+          status('Catégorie enregistrée (runtime)');
+        } else status('Échec upsert catégorie');
+      });
+    }
+    const saveSub = $('#ca-taxo-sub-save');
+    if (saveSub) {
+      saveSub.addEventListener('click', async () => {
+        const catUid = (state._taxoSelected || ($('#ca-taxo-uid').value || '').trim());
+        const uid = ($('#ca-taxo-sub-uid').value || '').trim();
+        if (!catUid || !uid) { status('catégorie + sub uid requis'); return; }
+        const r = await post('craftadminUpsertSubcategory', {
+          catUid,
+          def: { uid, label: ($('#ca-taxo-sub-label').value || '').trim() || uid, sortOrder: 50, enabled: true },
+        });
+        if (r && r.ok) {
+          state.meta.craftCategories = r.craftCategories || state.meta.craftCategories;
+          renderTaxoList();
+          fillCraftSubSelect(($('#ca-craft-cat') && $('#ca-craft-cat').value) || '', '');
+          status('Sous-catégorie ajoutée');
+        } else status('Échec sous-catégorie');
+      });
+    }
+    const auditBtn = $('#ca-taxo-audit');
+    if (auditBtn) {
+      auditBtn.addEventListener('click', async () => {
+        const r = await post('craftadminTaxonomyAudit', {});
+        const out = $('#ca-taxo-audit-out');
+        if (!out) return;
+        if (!r || !r.ok) { out.textContent = 'Audit indisponible'; return; }
+        const lines = (r.audit.summary || []).map((row) =>
+          `${row.count}× ${row.legacyCategory} → ${row.suggested}  [${(row.samples || []).join(', ')}]`
+        );
+        out.innerHTML = `<pre style="white-space:pre-wrap;font-size:12px">${escapeHtml(lines.join('\n') || 'vide')}</pre>`;
+      });
+    }
+    const bulkCat = $('#ca-bulk-cat');
+    if (bulkCat) bulkCat.addEventListener('change', fillBulkSub);
+    const bulkPreview = $('#ca-bulk-preview');
+    if (bulkPreview) {
+      bulkPreview.addEventListener('click', () => runBulkMove(false));
+    }
+    const bulkApply = $('#ca-bulk-apply');
+    if (bulkApply) {
+      bulkApply.addEventListener('click', () => {
+        confirmModal('BULK MOVE', 'Appliquer le classement aux recettes listées ?', () => runBulkMove(true));
+      });
+    }
+  }
+
+  function renderTaxoList() {
+    const ul = $('#ca-taxo-list');
+    if (!ul) return;
+    const cats = craftCatDefs();
+    ul.innerHTML = cats.map((c) => {
+      const uid = c.uid || c.id;
+      const subs = (c.subcategories || []).map((s) => s.label || s.uid).join(', ');
+      return `<li class="ca-list-item" data-uid="${escapeHtml(uid)}"><strong>${escapeHtml(c.label || uid)}</strong> <span class="muted">${escapeHtml(uid)}</span><div class="muted">${escapeHtml(subs || '—')}</div></li>`;
+    }).join('');
+    ul.querySelectorAll('[data-uid]').forEach((li) => {
+      li.addEventListener('click', () => {
+        const uid = li.getAttribute('data-uid');
+        state._taxoSelected = uid;
+        const def = cats.find((c) => (c.uid || c.id) === uid);
+        if (!def) return;
+        $('#ca-taxo-uid').value = uid;
+        $('#ca-taxo-label').value = def.label || '';
+        $('#ca-taxo-icon').value = def.icon || '';
+        $('#ca-taxo-order').value = def.sortOrder || def.order || '';
+        $('#ca-taxo-accent').value = def.accent || '';
+      });
+    });
+  }
+
+  async function runBulkMove(apply) {
+    const raw = ($('#ca-bulk-ids') && $('#ca-bulk-ids').value) || '';
+    let ids = raw.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    if (!ids.length && state.draft && state.draft.id) ids = [state.draft.id];
+    const cat = ($('#ca-bulk-cat') && $('#ca-bulk-cat').value) || '';
+    const sub = ($('#ca-bulk-sub') && $('#ca-bulk-sub').value) || '';
+    const r = await post('craftadminBulkMove', {
+      recipeIds: ids,
+      craftCategoryUid: cat,
+      craftSubcategoryUid: sub,
+      preview: !apply,
+      apply: !!apply,
+      confirm: !!apply,
+    });
+    const out = $('#ca-bulk-out');
+    if (!out) return;
+    if (!r || !r.ok) { out.textContent = 'Bulk move échoué'; return; }
+    if (r.preview) {
+      out.innerHTML = `<pre style="white-space:pre-wrap;font-size:12px">${escapeHtml((r.rows || []).map((row) =>
+        `${row.recipeId}: ${row.fromCategory || '?'}/${row.fromSubcategory || '-'} → ${row.toCategory}/${row.toSubcategory || '-'}`
+      ).join('\n'))}</pre>`;
+      status(`Preview ${r.count || 0} recettes`);
+    } else {
+      out.textContent = `Déplacé: ${r.moved || 0}` + ((r.failed && r.failed.length) ? ` · échecs: ${r.failed.length}` : '');
+      status('Bulk move appliqué');
+      loadList();
+    }
+  }
+
 })();
