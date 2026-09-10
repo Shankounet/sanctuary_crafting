@@ -1899,6 +1899,8 @@ local function buildRecipeStateAndRequirements(opts)
     local stationNeedLevel = opts.stationNeedLevel
     local stationStatusLabel = opts.stationStatusLabel or 'Opérationnelle'
     local stationStatusOk = opts.stationStatusOk ~= false
+    local specOk = opts.specOk ~= false
+    local specLabel = opts.specLabel
     local toolOk = opts.toolOk ~= false
     local toolLabel = opts.toolLabel
     local materialsOk = opts.materialsOk ~= false
@@ -1964,11 +1966,22 @@ local function buildRecipeStateAndRequirements(opts)
         }
     end
 
+    local function specReq()
+        return {
+            ok = specOk,
+            status = specOk and 'ok' or 'bad',
+            label = specLabel,
+            reason = specOk and nil or (specLabel and ('Spécialisation %s requise'):format(specLabel) or 'Spécialisation requise'),
+            localOnly = false,
+        }
+    end
+
     local requirements = {
         skill = skillReq(),
         station = stationReq(),
         materials = materialsReq(),
         tools = toolsReq(),
+        spec = specReq(),
         other = {},
     }
 
@@ -1982,6 +1995,15 @@ local function buildRecipeStateAndRequirements(opts)
     elseif not blueprintOk then
         local lab = (blueprintReason == 'craft_knowledge_required') and 'PLAN INCONNU' or 'PLAN INCONNU'
         state = { code = 'blueprint_required', label = lab, cardTag = 'PLAN REQUIS', blocking = true, cls = 'warn' }
+    elseif not specOk then
+        state = {
+            code = 'spec_required',
+            label = 'SPÉCIALISATION REQUISE',
+            cardTag = 'SPÉCIALITÉ',
+            blocking = true,
+            cls = 'warn',
+            helper = specLabel and ('Spécialisation %s requise.'):format(specLabel) or 'Spécialisation requise.',
+        }
     elseif not stationOk then
         state = { code = 'station_incompatible', label = 'ATELIER INCOMPATIBLE', cardTag = 'ATELIER', blocking = true, cls = 'bad' }
     elseif not toolOk then
@@ -2004,6 +2026,8 @@ local function buildRecipeStateAndRequirements(opts)
         lockReason, lockArgs = 'craft_level_required', { levelNeed, levelCur }
     elseif state.code == 'blueprint_required' then
         lockReason, lockArgs = blueprintReason or 'craft_blueprint_required', skillArgs
+    elseif state.code == 'spec_required' then
+        lockReason, lockArgs = 'craft_spec_required', { specLabel }
     elseif state.code == 'station_incompatible' then
         lockReason = stationReason or 'craft_station_level'
     elseif state.code == 'tool_required' then
@@ -2194,10 +2218,9 @@ local function buildRecipeEntry(src, r, ctx)
             end
         end
     end
+    -- Spec is NOT an atelier failure — keep stationOk/status about the bench only.
+    local specOk = not specBlocked
     if specBlocked then
-        stationOk = false
-        stationReason = 'craft_spec_required'
-        stationStatusOk, stationStatusLabel = false, (specBlockedLabel and ('Spécialisation %s requise'):format(specBlockedLabel)) or 'Spécialisation requise'
         canCraft = false
         if lockReason == nil then
             lockReason, lockArgs = 'craft_spec_required', { specBlockedLabel }
@@ -2236,7 +2259,7 @@ local function buildRecipeEntry(src, r, ctx)
     end
 
     -- PRESQUE: materials-only proximity. Skill/blueprint/station hard blocks never become PRESQUE.
-    local hardLock = (not skillOk) or (not levelOk) or (not blueprintOk) or (not stationOk)
+    local hardLock = (not skillOk) or (not levelOk) or (not blueprintOk) or (not specOk) or (not stationOk)
         or (skillReason == 'craft_skills_unavailable') or (skillReason == 'skills_unavailable')
     local farLevel = (levelGap ~= nil and levelGap > 2)
     local stationGap = nil
@@ -2259,15 +2282,15 @@ local function buildRecipeEntry(src, r, ctx)
         end
     end
     local almostCraftable = false
-    if skillOk and levelOk and blueprintOk and stationOk and toolOk and (not hasItems) and not farLevel then
+    if skillOk and levelOk and blueprintOk and specOk and stationOk and toolOk and (not hasItems) and not farLevel then
         if oneMissingMat or smallMissingQty then
             almostCraftable = true
         end
-    elseif skillOk and levelOk and blueprintOk and stationOk and hasItems and lightPrereq and not farLevel then
+    elseif skillOk and levelOk and blueprintOk and specOk and stationOk and hasItems and lightPrereq and not farLevel then
         almostCraftable = true
     end
     -- Recompute canCraft from independent flags (materials included for legacy canCraft).
-    canCraft = skillOk and levelOk and blueprintOk and stationOk and toolOk
+    canCraft = skillOk and levelOk and blueprintOk and specOk and stationOk and toolOk
 
     local tags = r.tags or {}
     local isNew = r.isNew == true
@@ -2479,6 +2502,8 @@ local function buildRecipeEntry(src, r, ctx)
         stationNeedLevel = r.stationLevel,
         stationStatusLabel = stationStatusLabel,
         stationStatusOk = stationStatusOk,
+        specOk = specOk,
+        specLabel = specBlockedLabel or requireSpecLabel,
         toolOk = toolOk,
         toolLabel = toolItem and itemLabelOf(toolItem) or nil,
         materialsOk = hasItems,
@@ -2503,6 +2528,8 @@ local function buildRecipeEntry(src, r, ctx)
         blockReason = talentLab and ('Savoir non appris : %s'):format(talentLab) or 'Savoir non appris'
     elseif recipeState.code == 'level_required' then
         blockReason = ('Niveau %s requis — actuel : %s'):format(tostring(levelNeed or '?'), tostring(levelCur or playerSkillLevel or '—'))
+    elseif recipeState.code == 'spec_required' then
+        blockReason = (specBlockedLabel and ('Spécialisation %s requise'):format(specBlockedLabel)) or 'Spécialisation requise'
     elseif recipeState.code == 'station_incompatible' then
         blockReason = stationStatusLabel or 'Atelier incompatible'
     end
