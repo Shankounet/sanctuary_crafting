@@ -210,7 +210,7 @@ Config.SpecialtyIcons = {
     armurier     = { label = 'Armurier',    icon = 'fa-crosshairs',       tint = '#8a867a', skillCategory = 'gunsmith' },
     forgeron     = { label = 'Forgeron',    icon = 'fa-hammer',           tint = '#8a8070', skillCategory = 'engineer' },
     blacksmith   = { label = 'Forgeron',    icon = 'fa-hammer',           tint = '#8a8070', skillCategory = 'engineer' },
-    agriculture  = { label = 'Agriculture', icon = 'fa-seedling',         tint = '#7a8a6a', skillCategory = 'survival' },
+    agriculture  = { label = 'Agriculture', icon = 'fa-wheat-awn',        tint = '#7a8a6a', skillCategory = 'survival' },
     cuisine      = { label = 'Cuisine',     icon = 'fa-utensils',         tint = '#c4b89a', skillCategory = 'survival' },
     electricite  = { label = 'Électricité', icon = 'fa-bolt',             tint = '#b89a5a', skillCategory = 'engineer' },
     electricity  = { label = 'Électricité', icon = 'fa-bolt',         tint = '#b89a5a', skillCategory = 'engineer' },
