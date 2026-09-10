@@ -38,6 +38,9 @@ CreateThread(function()
     if MysteryView and MysteryView.RebuildSkillRecipeIndex then
         MysteryView.RebuildSkillRecipeIndex()
     end
+    if Skills and Skills.RebuildRecipeGateLinks then
+        Skills.RebuildRecipeGateLinks()
+    end
     print(('[^2sanctuary_crafting^0] v%s — %d recettes, %d bancs monde | NUI=%s Blueprints=%s Quality=%s Queue=%s'):format(
         Config.Version or '?',
         type(nRecipes) == 'number' and nRecipes or #(Config.Recipes or {}),
