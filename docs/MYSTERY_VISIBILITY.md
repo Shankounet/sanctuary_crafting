@@ -1,3 +1,12 @@
+# Mystery visibility (v2.33)
+
+Sanctuary default: skill-gated recipes (and `hideIfSkillLocked`) resolve to **`mystery_until_unlocked`** → catalog `???` / **SAVOIR INCONNU**, not omitted and not materials-leaking locked cards.
+
+- `Config.Mystery.DefaultSkillVisibility = 'mystery_until_unlocked'`
+- `MapHideIfSkillLockedTo = 'mystery_until_unlocked'`
+- `mysteryDataMode = 'strict'` (aliases: full / recipe_only / visual)
+- `mysteryRevealStation = true`, `mysteryRevealSkillName = true` (progression)
+
 # Mystery / unknown recipe visibility
 
 `ml_skills` remains the **only** unlock source of truth (`HasUnlockedSkill`, failClosed from PR #98).
