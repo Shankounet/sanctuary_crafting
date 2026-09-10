@@ -643,7 +643,7 @@
 
   function lockText(r) {
     if (isMysteryRecipe(r)) {
-      return { text: 'Connaissance inconnue', cls: 'mystery', tag: 'MYSTÈRE' };
+      return { text: 'Connaissance inconnue', cls: 'mystery', tag: 'SAVOIR INCONNU' };
     }
     const st = recipeStateOf(r);
     if (st) {
@@ -817,7 +817,7 @@ function skilltreeCtaHtml(r) {
 
   function cardStatus(r) {
     if (isMysteryRecipe(r)) {
-      return { text: 'MYSTÈRE', cls: 'mystery', tip: 'Connaissance inconnue — Voir dans les savoirs →' };
+      return { text: 'SAVOIR INCONNU', cls: 'mystery', tip: 'Cette fabrication n\'a pas encore été apprise. — Voir dans les savoirs →' };
     }
     if (r && r.skillState && r.skillState.loading) {
       return { text: 'CHARGEMENT', cls: 'warn', tip: 'Chargement des savoirs...' };
@@ -902,7 +902,7 @@ function skilltreeCtaHtml(r) {
     } else if (r.locked) {
       reasons.push(lockText(r).text);
     }
-    if (r.missingItems && !(st && (st.code === 'skill_locked' || st.code === 'level_required' || st.code === 'blueprint_required' || st.code === 'mystery'))) {
+    if (r.missingItems && !(st && (st.code === 'skill_locked' || st.code === 'level_required' || st.code === 'blueprint_required' || (st.code === 'mystery' || st.code === 'skill_unknown')))) {
       const miss = prodMissingCause(r, batch);
       reasons.push(miss ? ('Manque : ' + miss.label + ' x' + miss.need) : 'Matériaux manquants');
     }
@@ -1185,7 +1185,7 @@ function skilltreeCtaHtml(r) {
 
       const favOn = isFavorite(r.id);
       const status = isMysteryRecipe(r)
-        ? { text: '???', cls: 'mystery', tip: 'Connaissance inconnue — Voir dans les savoirs →' }
+        ? { text: '???', cls: 'mystery', tip: 'Cette fabrication n\'a pas encore été apprise. — Voir dans les savoirs →' }
         : cardStatus(r);
       card.classList.add(`state-${status.cls || 'bad'}`);
       if (r.rarity) {
