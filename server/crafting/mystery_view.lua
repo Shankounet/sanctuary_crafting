@@ -26,35 +26,73 @@ local function cfgMystery()
     return (Config and Config.Mystery) or {}
 end
 
+local function recipeHasSkillGate(recipe)
+    if type(recipe) ~= 'table' then return false end
+    if recipe.requireSkill ~= nil or recipe.requiredSkill ~= nil or recipe.requiredSkills ~= nil then
+        return true
+    end
+    if recipe.skillTree ~= nil then return true end
+    return false
+end
+
 function MysteryView.NormalizeVisibility(raw, recipe)
     if type(raw) == 'string' and raw ~= '' then
         local v = raw:lower()
-        if v == 'mystery' then return VIS.MYSTERY end
+        if v == 'mystery' or v == 'skill_unknown' then return VIS.MYSTERY end
         if v == 'hidden' then return VIS.HIDDEN end
         if v == 'discovered' then return VIS.DISCOVERED end
         return v
     end
+    local mcfg = cfgMystery()
     if recipe and recipe.hideIfSkillLocked then
-        return VIS.HIDDEN
+        local map = mcfg.MapHideIfSkillLockedTo or VIS.MYSTERY
+        if map == 'hidden' or map == VIS.HIDDEN then return VIS.HIDDEN end
+        if map == VIS.VISIBLE_LOCKED or map == 'visible_locked' then return VIS.VISIBLE_LOCKED end
+        if map == VIS.DISCOVERED or map == 'discovered_locked' then return VIS.DISCOVERED end
+        return VIS.MYSTERY
+    end
+    -- Sanctuary default: any skill-gated recipe without explicit visibility → mystery ???
+    if recipeHasSkillGate(recipe) then
+        local def = mcfg.DefaultSkillVisibility or VIS.MYSTERY
+        if def == 'hidden' or def == VIS.HIDDEN then return VIS.HIDDEN end
+        if def == VIS.VISIBLE_LOCKED or def == 'visible_locked' then return VIS.VISIBLE_LOCKED end
+        if def == VIS.DISCOVERED or def == 'discovered_locked' then return VIS.DISCOVERED end
+        return VIS.MYSTERY
     end
     return VIS.VISIBLE_LOCKED
 end
 
---- Default: full for mystery secrets; recipe_only for normal progression modes.
+--- Resolve mystery data mode: full | recipe_only | visual
+--- Aliases: strict→full (or recipe_only if mysteryRevealSkillName/category), visual→visual
 function MysteryView.ResolveMysteryMode(recipe, visibility)
-    local mode = recipe and recipe.mysteryMode
+    local mcfg = cfgMystery()
+    local mode = recipe and (recipe.mysteryDataMode or recipe.mysteryMode)
+    if type(mode) ~= 'string' or mode == '' then
+        mode = mcfg.mysteryDataMode
+    end
     if type(mode) == 'string' and mode ~= '' then
         local m = mode:lower()
+        if m == 'visual' or m == 'image' then return 'visual' end
         if m == 'recipe_only' or m == 'recipe-only' or m == 'recipeonly' then
             return 'recipe_only'
         end
-        return 'full'
+        if m == 'strict' or m == 'full' then
+            -- Progression default: show category (+ optional skill name) unless recipe forces full secret
+            if m == 'strict' and mcfg.mysteryRevealSkillName ~= false then
+                local vis = visibility or MysteryView.NormalizeVisibility(recipe and recipe.skillVisibility, recipe)
+                if vis == VIS.MYSTERY and (recipe and recipe.mysteryMode == 'full') then
+                    return 'full'
+                end
+                return (mcfg.defaultModeForProgression) or 'recipe_only'
+            end
+            return 'full'
+        end
     end
     local vis = visibility or MysteryView.NormalizeVisibility(recipe and recipe.skillVisibility, recipe)
     if vis == VIS.MYSTERY then
-        return (cfgMystery().defaultModeForSecrets) or 'full'
+        return (mcfg.defaultModeForSecrets) or 'full'
     end
-    return (cfgMystery().defaultModeForProgression) or 'recipe_only'
+    return (mcfg.defaultModeForProgression) or 'recipe_only'
 end
 
 local function skillLockedFromEntry(entry, facing)
@@ -165,12 +203,25 @@ function MysteryView.ApplyUnknownView(entry, recipe, facing)
     local catUid = categoryUidOf(recipe, entry, facing)
     local catLabel = categoryLabelOf(recipe, entry, facing)
 
+    local mcfg = cfgMystery()
     entry.state = 'unknown'
     entry.playerVisualState = 'unknown'
+    entry.skill_unknown = true
     entry.mysteryMode = mode
+    entry.mysteryDataMode = mode
     entry.displayLabel = '???'
     entry.label = '???'
-    entry.displayImage = 'mystery'
+    entry.displayDescription = '???'
+    entry.description = '???'
+    -- strict: no real image; visual: keep image for client veil
+    if mode == 'visual' and entry.image then
+        entry.displayImage = entry.image
+        entry.imageVeiled = true
+    else
+        entry.displayImage = 'mystery'
+        entry.image = nil
+        entry.prop = nil
+    end
     entry.canCraft = false
     entry.locked = true
     entry.missingItems = false
@@ -181,11 +232,27 @@ function MysteryView.ApplyUnknownView(entry, recipe, facing)
     entry.openSkillsCategory = catUid
     entry.skilltreeCategoryUid = catUid
     entry.skillCategoryLabel = catLabel
-    entry.description = 'Cette fabrication reste inconnue.'
-    entry.lockHint = 'Connaissance inconnue'
-    entry.blockReason = 'Connaissance inconnue'
+    entry.lockHint = 'Cette fabrication n\'a pas encore été apprise.'
+    entry.blockReason = 'Savoir non appris'
     entry.lockReason = entry.lockReason or 'craft_skill_required'
     entry.lockKind = 'ml_skill'
+    entry.cardStatus = 'SAVOIR INCONNU'
+    entry.globalStatus = 'SAVOIR INCONNU'
+    entry.ctaLabel = 'Apprenez d\'abord ce savoir'
+    -- Station: optional reveal (not a major spoiler)
+    if mcfg.mysteryRevealStation == false then
+        entry.station = nil
+        entry.stationLabel = nil
+        entry.stationLevel = nil
+        entry.requirements = entry.requirements or {}
+        if type(entry.requirements) == 'table' then
+            entry.requirements.station = nil
+        end
+    end
+    -- Never leak recommended path / materials summary
+    entry.pathHints = nil
+    entry.pathHintsMore = false
+    entry.artisanHints = nil
 
     -- Strip secrets — do NOT send true name / ings / duration / XP / output metadata
     entry.ingredients = {}
@@ -237,19 +304,28 @@ function MysteryView.ApplyUnknownView(entry, recipe, facing)
         } or nil
         entry.requireSkill = nil
     else
-        -- recipe_only: show category as SAVOIR REQUIS, still no skill name/uid focus
-        entry.requiredSkillLabel = catLabel and ('Savoir · %s'):format(catLabel) or 'Savoir requis'
-        entry.skilltreeSkillLabel = nil
-        entry.skilltreeSkillUid = nil
+        -- recipe_only / visual: category for SAVOIR REQUIS; optional skill name (progression)
+        local revealName = (cfgMystery().mysteryRevealSkillName ~= false)
+            and mode ~= 'full'
+        local skillLab = nil
+        if revealName then
+            skillLab = (facing and facing.requiredSkillLabel)
+                or (entry.skillState and entry.skillState.skillLabel)
+                or entry.requiredSkillLabel
+                or entry.skilltreeSkillLabel
+        end
+        entry.requiredSkillLabel = skillLab
+            or (catLabel and ('Savoir · %s'):format(catLabel) or 'Savoir requis')
+        entry.skilltreeSkillLabel = skillLab
+        entry.skilltreeSkillUid = nil -- never focus-node spoiler via uid
         if entry.skillState then
             entry.skillState.label = entry.requiredSkillLabel
-            entry.skillState.skillLabel = nil
+            entry.skillState.skillLabel = skillLab
             entry.skillState.skillUid = nil
             entry.skillState.visualStatus = 'MYSTERY'
             entry.skillState.categoryUid = catUid
             entry.skillState.categoryLabel = catLabel
             entry.skillState.unlocked = false
-            -- keep skills list stripped of labels/uids for security
             if type(entry.skillState.skills) == 'table' then
                 local stripped = {}
                 for i = 1, #entry.skillState.skills do
@@ -257,11 +333,12 @@ function MysteryView.ApplyUnknownView(entry, recipe, facing)
                     stripped[i] = {
                         provider = sk.provider,
                         category = sk.category,
-                        categoryLabel = sk.categoryLabel,
-                        categoryUid = sk.categoryUid,
+                        categoryLabel = sk.categoryLabel or catLabel,
+                        categoryUid = sk.categoryUid or catUid,
                         unlocked = false,
                         skillUid = nil,
-                        skillLabel = nil,
+                        skillLabel = revealName and (sk.skillLabel or sk.label) or nil,
+                        label = revealName and (sk.skillLabel or sk.label) or nil,
                     }
                 end
                 entry.skillState.skills = stripped
@@ -305,6 +382,16 @@ function MysteryView.ApplyUnknownView(entry, recipe, facing)
     -- Favorites discouraged while fully unknown
     entry.favoriteAllowed = false
     entry.followLabel = 'Savoir inconnu'
+    entry.requirements = entry.requirements or {}
+    if type(entry.requirements) == 'table' then
+        entry.requirements.materials = { ok = false, status = 'hidden', summary = '???', missing = {} }
+        entry.requirements.tools = nil
+        -- keep skill stub for CTA
+        entry.requirements.skill = entry.requirements.skill or {
+            ok = false, status = 'bad', unlocked = false,
+            categoryLabel = catLabel, reason = 'Savoir non appris',
+        }
+    end
     entry.knowledge = 'unknown'
     entry.adminMysteryBadge = nil -- never on player UI
 
