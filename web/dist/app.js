@@ -1447,12 +1447,15 @@ function skilltreeCtaHtml(r) {
 
   function recipeSpecialtyKey(r) {
     if (!r) return 'survival';
+    // Pictogram = métier / station / craft taxonomy — NOT ml_skills category
+    // (agri was wrongly showing Survie flame via skillCategory=survival).
     const st = r.skillTree || {};
-    const key = st.category
-      || r.skillCategory
+    const key = r.craftCategoryUid
       || r.requireSpec
       || r.station
       || (r.xp && r.xp.category)
+      || st.category
+      || r.skillCategory
       || 'survival';
     return key;
   }
@@ -1747,9 +1750,11 @@ function skilltreeCtaHtml(r) {
     }
 
     groups.forEach((g) => {
-      const ico = specialtyIconHtml(g.categoryKey)
+      const ico = specialtyIconHtml(recipeSpecialtyKey(r))
+        || specialtyIconHtml(g.categoryKey)
         || specialtyIconHtml(r.requireSpec)
-        || specialtyIconHtml('survival');
+        || specialtyIconHtml(r.craftCategoryUid)
+        || specialtyIconHtml(r.station);
       const catName = g.categoryLabel || 'Savoir';
       html += `<div class="savoir-cat">`;
       html += `<div class="savoir-cat-name">${ico}<span>${escapeHtml(catName)}</span></div>`;
