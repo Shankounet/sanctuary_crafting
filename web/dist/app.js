@@ -1011,7 +1011,7 @@ function skilltreeCtaHtml(r) {
       manche_forgeron: 'fa-hammer',
       fonderie_forgeron: 'fa-fire',
       reparation_forgeron: 'fa-screwdriver-wrench',
-      agriculture: 'fa-seedling',
+      agriculture: 'fa-wheat-awn',
       schema: 'fa-drafting-compass',
       accessoires: 'fa-puzzle-piece',
       decoration: 'fa-couch',
