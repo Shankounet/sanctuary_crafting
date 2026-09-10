@@ -147,8 +147,16 @@ Config.SkillIntegration = {
 --------------------------------------------------------------------------------
 Config.Mystery = {
     Enabled = true,
-    defaultModeForSecrets = 'full',          -- mystery_until_unlocked default
-    defaultModeForProgression = 'recipe_only',
+    -- Sanctuary: skill-gated + hideIfSkillLocked → mystery_until_unlocked (??? cards), not omit.
+    DefaultSkillVisibility = 'mystery_until_unlocked',
+    MapHideIfSkillLockedTo = 'mystery_until_unlocked', -- was hidden_until_unlocked
+    -- Data mode for UNKNOWN: strict (no secrets) | visual (may send image for veil)
+    -- Aliases: full≈strict (hide skill name), recipe_only≈strict+category, visual=veiled image
+    mysteryDataMode = 'strict',
+    defaultModeForSecrets = 'full',          -- hide skill name for true secrets
+    defaultModeForProgression = 'recipe_only', -- show category for SAVOIR REQUIS
+    mysteryRevealStation = true,             -- atelier OK to show
+    mysteryRevealSkillName = true,           -- progression: show skill label; secrets override via mysteryMode=full
     BlockFavoritesWhenUnknown = true,
     RevealMs = 280, -- CSS reveal duration when skill unlocks (200–350)
 }
