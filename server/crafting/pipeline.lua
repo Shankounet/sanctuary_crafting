@@ -1987,7 +1987,7 @@ local function buildRecipeStateAndRequirements(opts)
 
     local state
     if mystery then
-        state = { code = 'mystery', label = 'MYSTÈRE', cardTag = 'MYSTÈRE', blocking = true, cls = 'mystery' }
+        state = { code = 'skill_unknown', label = 'SAVOIR INCONNU', cardTag = 'SAVOIR INCONNU', blocking = true, cls = 'mystery', helper = 'Cette fabrication n\'a pas encore été apprise.' }
     elseif not skillOk then
         state = { code = 'skill_locked', label = 'SAVOIR NON APPRIS', cardTag = 'SAVOIR REQUIS', blocking = true, cls = 'warn', helper = 'Apprenez d\'abord le savoir requis.' }
     elseif not levelOk then
@@ -2701,13 +2701,20 @@ local function buildRecipeEntry(src, r, ctx)
             entry = MysteryView.FinalizePlayerEntry(entry, r, facing)
         end
         if entry.playerVisualState == 'unknown' then
-            entry.recipeState = { code = 'mystery', label = 'MYSTÈRE', cardTag = 'MYSTÈRE', blocking = true, cls = 'mystery' }
-            entry.cardStatus = 'MYSTÈRE'
-            entry.globalStatus = 'MYSTÈRE'
+            entry.recipeState = {
+                code = 'skill_unknown',
+                label = 'SAVOIR INCONNU',
+                cardTag = 'SAVOIR INCONNU',
+                blocking = true,
+                cls = 'mystery',
+                helper = 'Cette fabrication n\'a pas encore été apprise.',
+            }
+            entry.cardStatus = 'SAVOIR INCONNU'
+            entry.globalStatus = 'SAVOIR INCONNU'
             entry.locked = true
             entry.canCraft = false
-            entry.blockReason = 'Connaissance inconnue'
-            entry.lockHint = 'Connaissance inconnue'
+            entry.blockReason = entry.blockReason or 'Savoir non appris'
+            entry.lockHint = entry.lockHint or 'Cette fabrication n\'a pas encore été apprise.'
         end
         -- Admin-only MYSTERY badge never on player UI
         if not (ctx and ctx.adminPreview) then
