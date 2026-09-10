@@ -59,11 +59,8 @@ function SpecialtyIcon.Resolve(key)
         end
     end
 
-    local station = (Config.StationSkillCategory or {})[nk]
-    if station and station ~= nk then
-        return SpecialtyIcon.Resolve(station)
-    end
-
+    -- Do not remap via StationSkillCategory for pictograms (agri→survival = wrong flame).
+    -- Unknown keys simply have no specialty icon.
     return nil
 end
 
