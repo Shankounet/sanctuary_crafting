@@ -115,9 +115,17 @@ local function skillUnlockedFromEntry(entry, facing)
     if facing and facing.hasRequiredSkill == true then return true end
     if entry and entry.hasRequiredSkill == true then return true end
     if entry and entry.skillState and entry.skillState.unlocked == true then return true end
+    -- Explicit lock from facing/entry beats "no needs"
+    if facing and facing.recipeLocked == true then return false end
+    if entry and (entry.lockReason == 'craft_skill_required' or entry.lockKind == 'ml_skill') then
+        return false
+    end
     -- No skill gate → treated as unlocked for visibility
     local needs = entry and (entry.requiredSkill or entry.requireSkill or entry.skilltreeSkillUid
-        or (entry.skillState and entry.skillState.skillUid))
+        or (entry.skillState and entry.skillState.skillUid)
+        or (entry.skillState and entry.skillState.skills and #entry.skillState.skills > 0))
+    if facing and facing.requireSkill then needs = true end
+    if facing and facing.skills and #facing.skills > 0 then needs = true end
     if not needs and facing and not facing.requireSkill then
         return true
     end
