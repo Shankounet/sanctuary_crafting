@@ -20,6 +20,7 @@ local labelIndex = nil
 -- publishedSkillByUid: skillUid -> list of { categoryUid, skillUid, label } from published nodes.
 local recipeSkillIndex = nil
 local publishedSkillByUid = nil
+local publishedByNormLabel = nil -- norm(label) -> { categoryUid, skillUid, label } (unique only)
 local recipeIndexLoaded = false
 local publishedCategoryUids = {} -- exact ml_skills category UIDs; beat legacy aliases
 local warnedDown = false
@@ -164,10 +165,105 @@ local function decodeMeta(raw)
     return ok and type(decoded) == 'table' and decoded or {}
 end
 
+
+--- Normalize labels for fuzzy recipe↔node matching (FR/EN, accents, spaces).
+---@param s string|nil
+---@return string
+local function normLabel(s)
+    if type(s) ~= 'string' or s == '' then return '' end
+    local out = s:lower()
+    local accents = {
+        ['à']='a',['á']='a',['â']='a',['ä']='a',['ã']='a',
+        ['è']='e',['é']='e',['ê']='e',['ë']='e',
+        ['ì']='i',['í']='i',['î']='i',['ï']='i',
+        ['ò']='o',['ó']='o',['ô']='o',['ö']='o',
+        ['ù']='u',['ú']='u',['û']='u',['ü']='u',
+        ['ç']='c',['ñ']='n',['ÿ']='y',
+    }
+    out = out:gsub('[àáâäãèéêëìíîïòóôöùúûüçñÿ]', function(c) return accents[c] or c end)
+    out = out:gsub('[^%w]+', '')
+    return out
+end
+Skills._NormLabel = normLabel
+
+local function itemLabelOf(item)
+    if type(item) ~= 'string' or item == '' then return nil end
+    if GetResourceState and GetResourceState('ox_inventory') == 'started' then
+        local ok, def = pcall(function()
+            return exports.ox_inventory:Items(item)
+        end)
+        if ok and type(def) == 'table' and type(def.label) == 'string' and def.label ~= '' then
+            return def.label
+        end
+    end
+    return nil
+end
+
+--- After trees (+ optionally recipes) are known, link recipes by label / result item.
+---@return number linked
+local function linkRecipesByPublishedLabels()
+    if not recipeIndexLoaded or type(publishedByNormLabel) ~= 'table' then return 0 end
+    local recipes = Config.RecipeById or Config.Recipes
+    if type(recipes) ~= 'table' then return 0 end
+    local list
+    if recipes[1] ~= nil then
+        list = recipes
+    else
+        list = {}
+        for _, r in pairs(recipes) do list[#list + 1] = r end
+    end
+    local linked = 0
+    for i = 1, #list do
+        local r = list[i]
+        if type(r) == 'table' and type(r.id) == 'string' and r.id ~= '' and not (recipeSkillIndex and recipeSkillIndex[r.id]) then
+            local candidates = {}
+            local function pushCand(s)
+                if type(s) == 'string' and s ~= '' then candidates[#candidates + 1] = s end
+            end
+            pushCand(r.label)
+            pushCand(r.name)
+            local item = r.result and (r.result.item or r.result.name) or r.item
+            if type(item) == 'string' then
+                pushCand(item)
+                pushCand(item:gsub('_', ' '))
+                pushCand(itemLabelOf(item))
+                -- craft_<item> already handled via id if equal
+            end
+            local matched = nil
+            for ci = 1, #candidates do
+                local nk = normLabel(candidates[ci])
+                local pub = nk ~= '' and publishedByNormLabel[nk] or nil
+                if type(pub) == 'table' then
+                    matched = pub
+                    break
+                end
+            end
+            -- Also: result item craft id / item id equals a published skill uid
+            if not matched and type(item) == 'string' and publishedSkillByUid then
+                local bucket = publishedSkillByUid[item] or publishedSkillByUid['craft_' .. item]
+                if type(bucket) == 'table' and #bucket == 1 then
+                    matched = bucket[1]
+                end
+            end
+            if matched then
+                recipeSkillIndex[r.id] = {
+                    recipeId = r.id,
+                    categoryUid = matched.categoryUid,
+                    skillUid = matched.skillUid,
+                    label = matched.label,
+                }
+                linked = linked + 1
+            end
+        end
+    end
+    return linked
+end
+
 local function loadLabelIndex()
     labelIndex = {}
     recipeSkillIndex = {}
     publishedSkillByUid = {}
+    publishedByNormLabel = {}
     recipeIndexLoaded = false
     publishedCategoryUids = {}
     local res = resourceName()
@@ -223,6 +319,15 @@ local function loadLabelIndex()
             end
         end
         link(meta.recipeId or meta.recipe_id or sk.recipeId or sk.recipe_id)
+        local data = type(sk.data) == 'table' and sk.data or meta
+        if type(data) == 'table' then
+            link(data.recipeId or data.recipe_id or data.craftId or data.craft_id)
+            link(data.unlockRecipe or data.unlock_recipe)
+        end
+        local effect = sk.effect or meta.effect
+        if type(effect) == 'table' then
+            link(effect.recipeId or effect.recipe_id or effect.craftId)
+        end
         local ids = meta.recipeIds or meta.recipe_ids or sk.recipeIds or sk.recipe_ids
         if type(ids) == 'table' then
             for i = 1, #ids do link(ids[i]) end
@@ -231,12 +336,29 @@ local function loadLabelIndex()
         if suid:find('^craft_', 1, false) or suid:find('^recipe_', 1, false) then
             link(suid)
         end
-        local resultItem = meta.resultItem or meta.result_item or meta.item or sk.resultItem
+        local resultItem = meta.resultItem or meta.result_item or meta.item or sk.resultItem or sk.item
         if type(resultItem) == 'string' and resultItem ~= '' then
-            -- Only link recipe.id == resultItem when Config.RecipeById is already warm.
             local byId = Config.RecipeById
-            if type(byId) == 'table' and byId[resultItem] then
-                link(resultItem)
+            if type(byId) == 'table' then
+                if byId[resultItem] then link(resultItem) end
+                local craftId = 'craft_' .. resultItem
+                if byId[craftId] then link(craftId) end
+            end
+        end
+        -- Unique normalized label → skill (for later recipe matching).
+        if type(slabel) == 'string' and slabel ~= '' then
+            local nk = Skills._NormLabel and Skills._NormLabel(slabel) or nil
+            if nk and nk ~= '' then
+                local prev = publishedByNormLabel[nk]
+                if prev == nil then
+                    publishedByNormLabel[nk] = {
+                        categoryUid = catUid,
+                        skillUid = suid,
+                        label = slabel,
+                    }
+                elseif prev ~= false and (prev.skillUid ~= suid or prev.categoryUid ~= catUid) then
+                    publishedByNormLabel[nk] = false -- ambiguous
+                end
             end
         end
     end
@@ -249,20 +371,40 @@ local function loadLabelIndex()
             publishedCategoryUids[cuid] = true
             if type(clabel) == 'string' then labelIndex['cat:' .. cuid] = clabel end
         end
-        local skills = cat.skills or cat.Skills or cat.nodes or cat.talents
-        if type(skills) == 'table' then
-            if skills[1] ~= nil then
-                for i = 1, #skills do ingestSkill(cuid, skills[i]) end
-            else
-                for _, sk in pairs(skills) do ingestSkill(cuid, sk) end
+        local skillBags = { cat.skills, cat.Skills, cat.nodes, cat.talents, cat.children, cat.Children }
+        for bi = 1, #skillBags do
+            local skills = skillBags[bi]
+            if type(skills) == 'table' then
+                if skills[1] ~= nil then
+                    for i = 1, #skills do
+                        local sk = skills[i]
+                        if type(sk) == 'table' then
+                            if sk.skills or sk.Skills or sk.nodes or sk.children then
+                                ingestCategory(sk)
+                            end
+                            ingestSkill(cuid, sk)
+                        end
+                    end
+                else
+                    for _, sk in pairs(skills) do
+                        if type(sk) == 'table' then
+                            if sk.skills or sk.Skills or sk.nodes or sk.children then
+                                ingestCategory(sk)
+                            end
+                            ingestSkill(cuid, sk)
+                        end
+                    end
+                end
             end
         end
-        -- nested trees
+        -- nested trees / loose node tables
         for k, v in pairs(cat) do
-            if type(v) == 'table' and k ~= 'skills' and k ~= 'Skills' and k ~= 'parent' then
-                if v.uid or v.skillUid or v.skill_uid then
+            if type(v) == 'table' and k ~= 'skills' and k ~= 'Skills' and k ~= 'nodes' and k ~= 'talents'
+                and k ~= 'children' and k ~= 'Children' and k ~= 'parent' and k ~= 'meta' then
+                if v.uid or v.skillUid or v.skill_uid or v.id then
                     ingestSkill(cuid, v)
-                elseif v.categoryUid or v.skills or v.Skills then
+                end
+                if v.categoryUid or v.skills or v.Skills or v.nodes or v.children then
                     ingestCategory(v)
                 end
             end
@@ -292,8 +434,25 @@ local function loadLabelIndex()
         end
     end
     recipeIndexLoaded = true
+    local nLabelLinks = linkRecipesByPublishedLabels()
+    if nLabelLinks > 0 then
+        print(('[CRAFT] ML SKILLS: linked %d recipe(s) via published node label/item'):format(nLabelLinks))
+    end
     if skillsCfg().BypassRequirements == true then
         print('[CRAFT] WARNING: Config.Skills.BypassRequirements=true — ALL skill gates skipped for every player (labs only)')
+    end
+end
+
+--- Public: re-run label/item linking once RecipeById is warm (boot / overlay).
+function Skills.RebuildRecipeGateLinks()
+    if recipeSkillIndex == nil or publishedSkillByUid == nil then
+        loadLabelIndex()
+        return
+    end
+    if not recipeIndexLoaded then return end
+    local n = linkRecipesByPublishedLabels()
+    if n > 0 then
+        print(('[CRAFT] ML SKILLS: rebuilt %d recipe gate(s) via label/item'):format(n))
     end
 end
 
@@ -344,6 +503,7 @@ function Skills.RefreshLabels()
     labelIndex = nil
     recipeSkillIndex = nil
     publishedSkillByUid = nil
+    publishedByNormLabel = nil
     recipeIndexLoaded = false
     loadLabelIndex()
     return labelIndex ~= nil and recipeIndexLoaded == true
@@ -858,6 +1018,37 @@ function Skills.normalizeSkillRequirements(recipe, src)
                 provider = 'ml_skills',
                 treeIndexed = true,
             }
+        end
+        -- Last chance: label / result item ↔ published node (lazy, once recipes+ox labels exist).
+        if recipe.id and linkRecipesByPublishedLabels then
+            linkRecipesByPublishedLabels()
+            local linked2 = recipeSkillIndex and recipeSkillIndex[recipe.id]
+            if linked2 then
+                local row = {
+                    provider = 'ml_skills',
+                    category = linked2.categoryUid,
+                    categoryKey = linked2.categoryUid,
+                    categoryUid = linked2.categoryUid,
+                    uid = linked2.skillUid,
+                    skillUid = linked2.skillUid,
+                    label = linked2.label or Skills.SkillLabel(linked2.skillUid, linked2.categoryUid),
+                    source = 'ml_skills_label',
+                }
+                if src then
+                    row.unlocked = Skills.HasUnlockedSkill(src, linked2.categoryUid, linked2.skillUid) == true
+                end
+                return {
+                    mode = 'all',
+                    skills = { row },
+                    visibility = visibility,
+                    xp = recipe.skillXp or recipe.xp,
+                    rawCount = 1,
+                    normalizedCount = 1,
+                    duplicatesRemoved = 0,
+                    provider = 'ml_skills',
+                    treeIndexed = true,
+                }
+            end
         end
         return nil
     end
@@ -1543,6 +1734,7 @@ local function onMlResource(res)
     labelIndex = nil
     recipeSkillIndex = nil
     publishedSkillByUid = nil
+    publishedByNormLabel = nil
     recipeIndexLoaded = false
     UnlockedCache = {}
     warnedDown = false
