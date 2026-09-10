@@ -661,7 +661,8 @@
     let tag = 'SAVOIR REQUIS';
     if (r.lockReason === 'craft_blueprint_required' || r.lockReason === 'craft_knowledge_required') tag = 'PLAN REQUIS';
     else if (r.lockReason === 'craft_level_required') tag = 'NIVEAU REQUIS';
-    else if (r.lockReason === 'craft_station_level' || r.lockReason === 'craft_no_power' || r.lockReason === 'craft_spec_required') tag = 'ATELIER';
+    else if (r.lockReason === 'craft_spec_required' || (r.recipeState && r.recipeState.code === 'spec_required')) tag = 'SPÉCIALITÉ';
+    else if (r.lockReason === 'craft_station_level' || r.lockReason === 'craft_no_power') tag = 'ATELIER';
     else if (r.lockReason === 'craft_tool_required') tag = 'OUTIL MANQUANT';
     else if (r.lockReason === 'craft_skill_required' || r.lockReason === 'skill_locked' || r.lockReason === 'craft_recipe_locked') tag = 'SAVOIR REQUIS';
     return { text, cls: 'warn', tag };
