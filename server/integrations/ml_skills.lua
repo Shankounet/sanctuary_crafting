@@ -245,6 +245,19 @@ local function linkRecipesByPublishedLabels()
                     matched = bucket[1]
                 end
             end
+            -- Fuzzy: unique published label containing item stem (carrot_sprout → carrot / carotte)
+            if not matched and type(item) == 'string' and type(publishedByNormLabel) == 'table' then
+                local stem = normLabel(item:gsub('_sprout$', ''):gsub('_seed$', ''):gsub('^craft_', ''):gsub('_', ''))
+                if stem ~= '' and #stem >= 4 then
+                    local hits = {}
+                    for nk, pub in pairs(publishedByNormLabel) do
+                        if type(pub) == 'table' and type(nk) == 'string' and nk:find(stem, 1, true) then
+                            hits[#hits + 1] = pub
+                        end
+                    end
+                    if #hits == 1 then matched = hits[1] end
+                end
+            end
             if matched then
                 recipeSkillIndex[r.id] = {
                     recipeId = r.id,
@@ -931,9 +944,13 @@ function Skills.normalizeSkillRequirements(recipe, src)
 
     local provider = 'ml_skills'
     local visibility = recipe.skillVisibility
-        or (recipe.hideIfSkillLocked and 'hidden_until_unlocked')
-        or 'visible_locked'
-    if visibility == 'mystery' then visibility = 'mystery_until_unlocked' end
+    if (not visibility or visibility == '') and MysteryView and MysteryView.NormalizeVisibility then
+        visibility = MysteryView.NormalizeVisibility(nil, recipe)
+    end
+    if not visibility or visibility == '' then
+        visibility = (recipe.hideIfSkillLocked and 'mystery_until_unlocked') or 'visible_locked'
+    end
+    if visibility == 'mystery' or visibility == 'skill_unknown' then visibility = 'mystery_until_unlocked' end
     if visibility == 'discovered' then visibility = 'discovered_locked' end
 
     if recipeSkillIndex == nil then loadLabelIndex() end
@@ -1047,6 +1064,87 @@ function Skills.normalizeSkillRequirements(recipe, src)
                     duplicatesRemoved = 0,
                     provider = 'ml_skills',
                     treeIndexed = true,
+                }
+            end
+        end
+
+        -- Sanctuary: NEVER free-pass recipes that declare a skill / hideIfSkillLocked / mystery.
+        -- Provisional gate from legacy requireSkill (or category-only) so mystery/??? can show.
+        -- Prefer published category UID when the declared cat exists in the live tree.
+        local refs2 = collectLegacySkillRefs(recipe)
+        local wantsGate = (#refs2 > 0)
+            or recipe.hideIfSkillLocked == true
+            or visibility == 'mystery_until_unlocked'
+            or visibility == 'hidden_until_unlocked'
+            or visibility == 'discovered_locked'
+        if wantsGate then
+            local skills2, seen2 = {}, {}
+            local function pushProv(uid, cat, label, sourceTag)
+                if type(uid) ~= 'string' or uid == '' then return end
+                local catUid = cat
+                if type(cat) == 'string' and cat ~= '' then
+                    if publishedCategoryUids and publishedCategoryUids[cat] then
+                        catUid = cat
+                    else
+                        catUid = resolveCategoryUid(cat) or cat
+                    end
+                else
+                    catUid = 'agriculture'
+                    if publishedCategoryUids then
+                        if publishedCategoryUids['agriculture'] then catUid = 'agriculture'
+                        elseif publishedCategoryUids['survie'] then catUid = 'survie'
+                        end
+                    end
+                end
+                local key = tostring(catUid) .. ':' .. uid
+                if seen2[key] then return end
+                seen2[key] = true
+                local row = {
+                    provider = 'ml_skills',
+                    category = catUid,
+                    categoryKey = catUid,
+                    categoryUid = catUid,
+                    uid = uid,
+                    skillUid = uid,
+                    label = label or Skills.SkillLabel(uid, catUid),
+                    source = sourceTag or 'legacy_provisional',
+                }
+                if src then
+                    row.unlocked = Skills.HasUnlockedSkill(src, catUid, uid) == true
+                end
+                skills2[#skills2 + 1] = row
+            end
+            for i = 1, #refs2 do
+                pushProv(refs2[i].uid, refs2[i].cat, nil, 'legacy_provisional')
+            end
+            -- hideIfSkillLocked without uid: still gate on a synthetic marker so mystery applies
+            if #skills2 == 0 and (recipe.hideIfSkillLocked or visibility == 'mystery_until_unlocked') then
+                local item = recipe.result and (recipe.result.item or recipe.result.name)
+                local synth = (type(recipe.id) == 'string' and recipe.id) or (type(item) == 'string' and item) or 'unknown_skill'
+                local cat = recipe.requireSkillCategory or recipe.skillCategory
+                    or (recipe.xp and recipe.xp.category) or 'agriculture'
+                pushProv(synth, cat, recipe.label, 'mystery_provisional')
+            end
+            if #skills2 > 0 then
+                if recipe.id and recipeSkillIndex and not recipeSkillIndex[recipe.id] then
+                    recipeSkillIndex[recipe.id] = {
+                        recipeId = recipe.id,
+                        categoryUid = skills2[1].categoryUid,
+                        skillUid = skills2[1].skillUid,
+                        label = skills2[1].label,
+                    }
+                end
+                return {
+                    mode = 'all',
+                    skills = skills2,
+                    visibility = (visibility == 'visible_locked' and 'mystery_until_unlocked') or visibility,
+                    xp = recipe.skillXp or recipe.xp,
+                    rawCount = #refs2,
+                    normalizedCount = #skills2,
+                    duplicatesRemoved = 0,
+                    provider = 'ml_skills',
+                    treeIndexed = true,
+                    provisional = true,
                 }
             end
         end
